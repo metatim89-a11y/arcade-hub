@@ -13,7 +13,7 @@ import '@solana/wallet-adapter-react-ui/styles.css';
 
 // --- Configuration ---
 const NETWORK = WalletAdapterNetwork.Devnet;
-const TREASURY_WALLET = new PublicKey('8WJc3sB1D6D2Yp6V9hGZ6h1b7e5r4W7mG7i8m8o8p8q8'); // Placeholder: USER SHOULD CHANGE THIS
+const TREASURY_WALLET = new PublicKey('AL6hAPJ6SNmgy9UYf4H3CDhAhtvSr3Sg75WvJaf95jMJ'); 
 const RC_TO_USD = 2; // 2 Real Coins = $1 USD
 const WITHDRAW_FEE_PERCENT = 0.20; // 20% House Fee
 
