@@ -7,6 +7,7 @@ import { SolflareWalletAdapter } from '@solana/wallet-adapter-solflare';
 import { WalletModalProvider } from '@solana/wallet-adapter-react-ui';
 import { clusterApiUrl, Connection, PublicKey, Transaction, SystemProgram, LAMPORTS_PER_SOL } from '@solana/web3.js';
 import { useCoinSystem } from './CoinContext';
+import { useAuth } from './AuthContext';
 
 // Import styles
 import '@solana/wallet-adapter-react-ui/styles.css';
@@ -54,6 +55,7 @@ const SolanaLogicProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     const { connection } = useConnection();
     const { publicKey, sendTransaction } = useWallet();
     const { addCoins, subtractCoins, realCoins, setCurrencyMode } = useCoinSystem();
+    const { user } = useAuth();
 
     const [solPrice, setSolPrice] = useState<number | null>(null);
     const [jupPrice, setJupPrice] = useState<number | null>(null);
