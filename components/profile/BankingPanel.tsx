@@ -145,8 +145,11 @@ const BankingPanel: React.FC = () => {
                             disabled={isBanking || !solPrice || parseFloat(rcAmount) > realCoins}
                             className="w-full bg-yellow-600 hover:bg-yellow-500 disabled:bg-gray-700 text-black font-bold py-4 rounded-xl shadow-lg transition-all transform active:scale-95"
                         >
-                            {isBanking ? 'Processing...' : 'Request Withdrawal'}
+                            {isBanking ? 'Processing...' : 'Submit Withdrawal Request'}
                         </button>
+                        <p className="text-[10px] text-gray-500 text-center italic mt-2">
+                            *This will deduct coins from your balance. The Admin will then manually send the SOL to your wallet.
+                        </p>
                     </div>
                 )}
             </div>

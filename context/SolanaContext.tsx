@@ -168,8 +168,8 @@ const SolanaLogicProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             // Convert house fee to JUP
             const feeJup = jupPrice ? feeUsd / jupPrice : 0;
 
-            // Subtract coins immediately (locking it in)
-            const success = subtractCoins(rcAmount, `Withdraw Request: ${netSol.toFixed(4)} SOL (Fee: ${feeJup.toFixed(2)} JUP) | Wallet: ${publicKey.toBase58()}`);
+            // Subtract coins immediately (locking it in) - target 'real' currency explicitly
+            const success = subtractCoins(rcAmount, `Withdraw Request: ${netSol.toFixed(4)} SOL (Fee: ${feeJup.toFixed(2)} JUP) | Wallet: ${publicKey.toBase58()}`, 'real');
             
             if (success) {
                 if (feeJup > 0) {

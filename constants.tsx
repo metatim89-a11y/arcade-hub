@@ -12,7 +12,7 @@ import MancalaGame from './components/games/MancalaGame';
 import BlackjackGame from './components/games/BlackjackGame';
 import TexasHoldemGame from './components/games/TexasHoldemGame';
 
-export const APP_VERSION = '0.0.2';
+export const APP_VERSION = '0.0.3';
 
 export const ADULT_GAMES: Game[] = [
     { id: 'crash', label: 'Crash', component: CrashGame },

@@ -51,7 +51,7 @@ interface CoinContextType {
   setCurrencyMode: (mode: CurrencyMode) => void;
   coins: number; 
   addCoins: (amount: number, reason?: string, targetCurrency?: CurrencyMode) => void;
-  subtractCoins: (amount: number, reason?: string) => boolean;
+  subtractCoins: (amount: number, reason?: string, targetCurrency?: CurrencyMode) => boolean;
   resetCoins: () => void;
   canBet: (amount: number) => boolean;
   transactions: Transaction[];
@@ -148,21 +148,30 @@ export const CoinProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     setTimeout(() => setIsProcessing(false), 50);
   }, [currencyMode, logTransaction]);
 
-  const subtractCoins = useCallback((amount: number, reason: string = 'Game Bet'): boolean => {
+  const subtractCoins = useCallback((amount: number, reason: string = 'Game Bet', targetCurrency?: CurrencyMode): boolean => {
     if (amount <= 0 || isProcessing) return false;
 
+    const target = targetCurrency || currencyMode;
+    const balance = target === 'fun' ? funCoins : realCoins;
+
     // Check balance before locking
-    if (activeBalance >= amount) {
+    if (balance >= amount) {
       setIsProcessing(true);
-      updateActiveBalance(prev => prev - amount);
-      logTransaction('debit', amount, reason);
+      
+      if (target === 'fun') {
+          setFunCoins(prev => prev - amount);
+      } else {
+          setRealCoins(prev => prev - amount);
+      }
+      
+      logTransaction('debit', amount, reason, target);
       
       setTimeout(() => setIsProcessing(false), 50);
       return true;
     }
     
     return false;
-  }, [activeBalance, isProcessing, updateActiveBalance, logTransaction]);
+  }, [funCoins, realCoins, currencyMode, isProcessing, logTransaction]);
 
   const resetCoins = useCallback(() => {
       setFunCoins(1000);
