@@ -18,10 +18,10 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// Default Admin User Configuration
+// Default Users Configuration
 const ADMIN_USER = {
   id: 'admin_root_001',
-  username: 'Admin',
+  username: '5ides5ales',
   email: '5ide4ustle5ales@gmail.com',
   password: 'admin',
   isVerified: true,
@@ -31,17 +31,37 @@ const ADMIN_USER = {
   bio: 'System Administrator'
 };
 
+const TEST_USER = {
+  id: 'test_user_001',
+  username: '5idespi',
+  email: 'test@5ides.com',
+  password: 'password',
+  isVerified: true,
+  verificationCode: null,
+  joinedAt: new Date().toISOString(),
+  avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=5idespi',
+  bio: 'Test Account'
+};
+
 // Mock database helper
 const getStoredUsers = (): any[] => {
     const stored = localStorage.getItem('arcade_users');
-    const users = stored ? JSON.parse(stored) : [];
+    let users = stored ? JSON.parse(stored) : [];
     
-    // Ensure Admin user exists
-    if (!users.find((u: any) => u.email === ADMIN_USER.email)) {
+    // Ensure Admin user exists and has updated username
+    const adminIdx = users.findIndex((u: any) => u.email === ADMIN_USER.email);
+    if (adminIdx === -1) {
         users.push(ADMIN_USER);
-        localStorage.setItem('arcade_users', JSON.stringify(users));
+    } else {
+        users[adminIdx].username = ADMIN_USER.username; // Update username if email matches
+    }
+
+    // Ensure Test user exists
+    if (!users.find((u: any) => u.username === TEST_USER.username)) {
+        users.push(TEST_USER);
     }
     
+    localStorage.setItem('arcade_users', JSON.stringify(users));
     return users;
 };
 
