@@ -13,7 +13,9 @@ const ProfilePage: React.FC<{ onBack: () => void }> = ({ onBack }) => {
   // Profile State
   const [isEditing, setIsEditing] = useState(false);
   const [bio, setBio] = useState(user?.bio || '');
+  const [avatar, setAvatar] = useState(user?.avatar || '');
   const [activeTab, setActiveTab] = useState<'overview' | 'history' | 'dev' | 'banking'>('overview');
+  const [historyFilter, setHistoryFilter] = useState<'all' | 'gaming' | 'banking'>('all');
 
   // Dev/Git State
   const [currentBranch, setCurrentBranch] = useState('main');
@@ -25,9 +27,17 @@ const ProfilePage: React.FC<{ onBack: () => void }> = ({ onBack }) => {
   if (!user) return null;
 
   const handleSave = () => {
-    updateProfile({ bio });
+    updateProfile({ bio, avatar });
     setIsEditing(false);
   };
+
+  // Filter transactions
+  const filteredTransactions = transactions.filter(tx => {
+      const isBanking = tx.reason.toLowerCase().includes('solana') || tx.reason.toLowerCase().includes('withdraw');
+      if (historyFilter === 'banking') return isBanking;
+      if (historyFilter === 'gaming') return !isBanking;
+      return true;
+  });
 
   // Simulated Git Actions
   const handleCreateBranch = () => {
@@ -129,13 +139,26 @@ const ProfilePage: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                     <div className="w-full bg-black/30 rounded-xl p-3 mb-4">
                         {isEditing ? (
                             <div className="flex flex-col gap-2">
-                                <textarea 
-                                    value={bio} 
-                                    onChange={(e) => setBio(e.target.value)}
-                                    className="bg-gray-800 border border-gray-600 rounded p-2 text-sm text-white w-full focus:border-yellow-400 outline-none"
-                                    rows={3}
-                                    placeholder="Tell us about yourself..."
-                                />
+                                <div className="text-left">
+                                    <label className="text-[10px] text-gray-500 uppercase font-bold ml-1">Profile Picture URL</label>
+                                    <input 
+                                        type="text" 
+                                        value={avatar} 
+                                        onChange={(e) => setAvatar(e.target.value)}
+                                        className="bg-gray-800 border border-gray-600 rounded p-2 text-xs text-white w-full focus:border-yellow-400 outline-none mb-2"
+                                        placeholder="https://..."
+                                    />
+                                </div>
+                                <div className="text-left">
+                                    <label className="text-[10px] text-gray-500 uppercase font-bold ml-1">Bio</label>
+                                    <textarea 
+                                        value={bio} 
+                                        onChange={(e) => setBio(e.target.value)}
+                                        className="bg-gray-800 border border-gray-600 rounded p-2 text-sm text-white w-full focus:border-yellow-400 outline-none"
+                                        rows={3}
+                                        placeholder="Tell us about yourself..."
+                                    />
+                                </div>
                                 <div className="flex gap-2">
                                     <button onClick={handleSave} className="flex-1 bg-green-600 hover:bg-green-500 text-white text-xs py-2 rounded font-bold">Save</button>
                                     <button onClick={() => setIsEditing(false)} className="flex-1 bg-gray-700 hover:bg-gray-600 text-white text-xs py-2 rounded font-bold">Cancel</button>
@@ -225,7 +248,30 @@ const ProfilePage: React.FC<{ onBack: () => void }> = ({ onBack }) => {
         {/* HISTORY TAB */}
         {activeTab === 'history' && (
             <div className="bg-gray-900/80 border border-gray-700 rounded-2xl p-6 backdrop-blur-sm">
-                <h2 className="text-2xl font-bold text-white mb-6">Transaction History</h2>
+                <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
+                    <h2 className="text-2xl font-bold text-white">Transaction History</h2>
+                    <div className="flex bg-black/40 p-1 rounded-lg border border-white/5">
+                        <button 
+                            onClick={() => setHistoryFilter('all')}
+                            className={`px-4 py-1.5 rounded-md text-xs font-bold transition-all ${historyFilter === 'all' ? 'bg-yellow-400 text-black shadow-md' : 'text-gray-400 hover:text-white'}`}
+                        >
+                            All
+                        </button>
+                        <button 
+                            onClick={() => setHistoryFilter('gaming')}
+                            className={`px-4 py-1.5 rounded-md text-xs font-bold transition-all ${historyFilter === 'gaming' ? 'bg-yellow-400 text-black shadow-md' : 'text-gray-400 hover:text-white'}`}
+                        >
+                            Gaming
+                        </button>
+                        <button 
+                            onClick={() => setHistoryFilter('banking')}
+                            className={`px-4 py-1.5 rounded-md text-xs font-bold transition-all ${historyFilter === 'banking' ? 'bg-yellow-400 text-black shadow-md' : 'text-gray-400 hover:text-white'}`}
+                        >
+                            Banking
+                        </button>
+                    </div>
+                </div>
+                
                 <div className="overflow-x-auto">
                     <table className="w-full text-left border-collapse">
                         <thead>
@@ -238,7 +284,7 @@ const ProfilePage: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                             </tr>
                         </thead>
                         <tbody className="text-sm">
-                            {transactions.length > 0 ? transactions.map(tx => (
+                            {filteredTransactions.length > 0 ? filteredTransactions.map(tx => (
                                 <tr key={tx.id} className="border-b border-gray-800 hover:bg-white/5">
                                     <td className="p-3 text-gray-400">{new Date(tx.timestamp).toLocaleString()}</td>
                                     <td className="p-3">

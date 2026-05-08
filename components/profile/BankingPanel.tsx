@@ -41,6 +41,11 @@ const BankingPanel: React.FC = () => {
         }
     };
 
+    const { transactions } = useCoinSystem();
+    const bankingTransactions = transactions.filter(tx => 
+        tx.reason.toLowerCase().includes('solana') || tx.reason.toLowerCase().includes('withdraw')
+    ).slice(0, 5);
+
     if (!connected) {
         return (
             <div className="bg-gray-800/50 p-6 rounded-xl border border-yellow-500/20 flex flex-col items-center gap-4 text-center">
@@ -165,6 +170,28 @@ const BankingPanel: React.FC = () => {
                     All deposits are instant. Withdrawals are processed manually within 24 hours. 
                     Testnet SOL only. 2 Real Coins = $1.00 USD.
                 </p>
+            </div>
+
+            {/* Banking History Preview */}
+            <div className="mt-4 pt-4 border-t border-white/10">
+                <h4 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3">Recent Banking Activity</h4>
+                <div className="space-y-2">
+                    {bankingTransactions.length > 0 ? (
+                        bankingTransactions.map(tx => (
+                            <div key={tx.id} className="flex justify-between items-center bg-black/30 p-2 rounded-lg border border-white/5 text-[10px]">
+                                <div className="flex flex-col">
+                                    <span className="text-gray-200 font-medium truncate max-w-[150px]">{tx.reason}</span>
+                                    <span className="text-gray-500">{new Date(tx.timestamp).toLocaleDateString()}</span>
+                                </div>
+                                <span className={`font-mono font-bold ${tx.type === 'credit' ? 'text-green-400' : 'text-red-400'}`}>
+                                    {tx.type === 'credit' ? '+' : '-'}{tx.amount} RC
+                                </span>
+                            </div>
+                        ))
+                    ) : (
+                        <p className="text-[10px] text-gray-600 italic text-center py-2">No recent deposits or withdrawals.</p>
+                    )}
+                </div>
             </div>
         </div>
     );
