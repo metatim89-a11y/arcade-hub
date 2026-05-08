@@ -1,12 +1,13 @@
 
 import React from 'react';
+import { APP_VERSION } from '../constants';
 
 const Footer: React.FC = () => {
   return (
     <footer className="mt-8 py-6 text-center text-sm bg-gray-900 text-yellow-400/40 tracking-widest border-t-2 border-yellow-400/20 w-full">
       <div className="flex flex-col items-center gap-2">
         <p>
-          Arcade Hub <span className="text-yellow-400/20 text-xs">v1.1.0 (Stable)</span> · Made by 5idescoder & Copilot
+          Arcade Hub <span className="text-yellow-400/20 text-xs">v{APP_VERSION}</span> · Made by 5idescoder
         </p>
         <a 
           href="https://github.com/5idescoder" 
