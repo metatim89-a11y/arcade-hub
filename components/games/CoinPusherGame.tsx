@@ -1,237 +1,292 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import Matter from 'matter-js';
 import { useCoinSystem } from '../../context/CoinContext';
 import GlassButton from '../ui/GlassButton';
 
-// --- Component Types ---
-interface Coin {
-  id: number;
-  x: number; // % relative to width
-  z: number; // px relative to depth
-  isNew: boolean;
-  angle: number; // visual rotation
-}
-
 // --- Constants ---
-const SHELF_WIDTH = 320; // px
-const SHELF_DEPTH = 400; // px
-const COIN_DIAMETER = 26; // px
-const PUSH_AMPLITUDE = 70; // Increased pusher range
-const PUSHER_SPEED = 0.0015; 
-const WIN_ZONE_Z = 380; 
-const SIDE_MARGIN = 5; 
-const BET_AMOUNT = 10; 
+const SHELF_WIDTH = 320; 
+const SHELF_HEIGHT = 400; // This is the "depth" in a top-down view
+const COIN_RADIUS = 13;
+const PUSH_AMPLITUDE = 60;
+const PUSHER_SPEED = 0.002;
+const WIN_ZONE_Y = 380;
+const SIDE_MARGIN = 10;
+const BET_AMOUNT = 10;
 
-// --- Helper Functions ---
-const createInitialCoins = (): Coin[] => {
-    const coins: Coin[] = [];
-    // Preload a full machine ~120 coins
-    for (let i = 0; i < 120; i++) {
-        coins.push({
-            id: i,
-            x: 10 + Math.random() * 80,
-            z: 50 + Math.random() * 300,
-            isNew: false,
-            angle: Math.random() * 360
-        });
-    }
-    return coins;
-};
+interface CoinData {
+    id: number;
+    isNew: boolean;
+    angle: number;
+}
 
 const CoinPusherGame: React.FC = () => {
     const { canBet, subtractCoins, addCoins, currencyMode } = useCoinSystem();
-    const [coins, setCoins] = useState<Coin[]>(createInitialCoins);
     const [feedback, setFeedback] = useState('Insert Coin to Start!');
-    const pusherPosRef = useRef(0); 
-    const lastTimeRef = useRef(0);
-    const animationRef = useRef<number | null>(null);
+    const [coinPositions, setCoinPositions] = useState<{id: number, x: number, y: number, angle: number, isNew: boolean}[]>([]);
+    const [pusherY, setPusherY] = useState(40);
     
-    const nextCoinId = useRef(coins.length + 500);
+    // Matter.js Refs
+    const engineRef = useRef(Matter.Engine.create({ gravity: { x: 0, y: 0.5 } })); // Slight "gravity" towards the edge
+    const pusherBodyRef = useRef<Matter.Body | null>(null);
+    const coinsMapRef = useRef<Map<number, Matter.Body>>(new Map());
+    const nextCoinId = useRef(Date.now());
     const currencySymbol = currencyMode === 'fun' ? 'FC' : 'RC';
 
-    // --- Physics Loop ---
-    const updatePhysics = useCallback((timestamp: number) => {
-        if (!lastTimeRef.current) lastTimeRef.current = timestamp;
-        // const dt = timestamp - lastTimeRef.current; // Unused currently but good for variable step
-        lastTimeRef.current = timestamp;
+    // --- Initialization ---
+    useEffect(() => {
+        const engine = engineRef.current;
+        const world = engine.world;
 
-        // Move Pusher
-        pusherPosRef.current = (timestamp * PUSHER_SPEED) % (2 * Math.PI);
-        const pusherExtension = (Math.sin(pusherPosRef.current) + 1) / 2; 
-        const pusherZ = 40 + pusherExtension * PUSH_AMPLITUDE; 
+        // 1. Create Boundaries
+        const ground = Matter.Bodies.rectangle(SHELF_WIDTH / 2, SHELF_HEIGHT + 50, SHELF_WIDTH, 100, { isStatic: true });
+        const leftWall = Matter.Bodies.rectangle(-10, SHELF_HEIGHT / 2, 20, SHELF_HEIGHT, { isStatic: true });
+        const rightWall = Matter.Bodies.rectangle(SHELF_WIDTH + 10, SHELF_HEIGHT / 2, 20, SHELF_HEIGHT, { isStatic: true });
+        
+        // 2. Create Pusher (Kinematic-like)
+        const pusher = Matter.Bodies.rectangle(SHELF_WIDTH / 2, 40, SHELF_WIDTH - 20, 80, { 
+            isStatic: true,
+            friction: 0.5,
+            render: { fillStyle: '#4a5568' }
+        });
+        pusherBodyRef.current = pusher;
 
-        setCoins(currentCoins => {
-            // Deep clone for mutation in physics step
-            const nextCoins = currentCoins.map(c => ({ ...c }));
+        Matter.World.add(world, [ground, leftWall, rightWall, pusher]);
+
+        // 3. Add Initial Coins
+        const initialCoins: Matter.Body[] = [];
+        for (let i = 0; i < 80; i++) {
+            const x = SIDE_MARGIN + Math.random() * (SHELF_WIDTH - 2 * SIDE_MARGIN);
+            const y = 100 + Math.random() * 250;
+            const coin = Matter.Bodies.circle(x, y, COIN_RADIUS, {
+                restitution: 0.1,
+                friction: 0.05,
+                density: 0.01,
+                label: 'coin',
+                plugin: { id: nextCoinId.current++ }
+            });
+            initialCoins.push(coin);
+            coinsMapRef.current.set(coin.plugin.id, coin);
+        }
+        Matter.World.add(world, initialCoins);
+
+        // 4. Physics Loop
+        let animationFrame: number;
+        const update = () => {
+            const time = Date.now();
             
-            // Spatial Partitioning for Performance (Simple Grid)
-            const gridSize = 40;
-            const grid: { [key: string]: Coin[] } = {};
-            
-            nextCoins.forEach(c => {
-                const key = `${Math.floor(c.x / 20)}-${Math.floor(c.z / gridSize)}`;
-                if (!grid[key]) grid[key] = [];
-                grid[key].push(c);
-            });
+            // Move Pusher
+            const extension = (Math.sin(time * PUSHER_SPEED) + 1) / 2;
+            const newY = 40 + extension * PUSH_AMPLITUDE;
+            Matter.Body.setPosition(pusher, { x: SHELF_WIDTH / 2, y: newY });
+            setPusherY(newY);
 
-            // 1. Pusher Interaction
-            nextCoins.forEach(coin => {
-                // Check if coin is in pusher zone
-                if (coin.z < pusherZ + COIN_DIAMETER/2 && coin.z > 0) {
-                    coin.z = pusherZ + COIN_DIAMETER/2;
-                    // Jitter
-                    coin.x += (Math.random() - 0.5) * 0.8;
-                }
-            });
+            Matter.Engine.update(engine, 1000 / 60);
 
-            // 2. Collision Resolution
-            // Only check neighbors in grid
-            const checkCollision = (c1: Coin, c2: Coin) => {
-                const x1Px = (c1.x / 100) * SHELF_WIDTH;
-                const x2Px = (c2.x / 100) * SHELF_WIDTH;
-                const dx = x1Px - x2Px;
-                const dz = c1.z - c2.z;
-                const distSq = dx*dx + dz*dz;
-                const minDist = COIN_DIAMETER * 0.95; // Tighter packing
-
-                if (distSq < minDist * minDist) {
-                    const dist = Math.sqrt(distSq);
-                    const overlap = minDist - dist;
-                    const angle = Math.atan2(dz, dx);
-                    const force = overlap * 0.5;
-                    
-                    const moveX = Math.cos(angle) * force;
-                    const moveZ = Math.sin(angle) * force;
-                    
-                    // Apply separation
-                    c1.x += (moveX / SHELF_WIDTH) * 100;
-                    c1.z += moveZ;
-                    c2.x -= (moveX / SHELF_WIDTH) * 100;
-                    c2.z -= moveZ;
-                }
-            };
-
-            nextCoins.forEach(c => {
-               const gx = Math.floor(c.x / 20);
-               const gz = Math.floor(c.z / gridSize);
-               
-               // Check surrounding grid cells
-               for (let i = -1; i <= 1; i++) {
-                   for (let j = -1; j <= 1; j++) {
-                       const key = `${gx+i}-${gz+j}`;
-                       if (grid[key]) {
-                           grid[key].forEach(neighbor => {
-                               if (c.id !== neighbor.id) checkCollision(c, neighbor);
-                           });
-                       }
-                   }
-               }
-
-               // Wall Constraints
-               if (c.x < SIDE_MARGIN) c.x = SIDE_MARGIN;
-               if (c.x > 100 - SIDE_MARGIN) c.x = 100 - SIDE_MARGIN;
-            });
-
-            // 3. Win Check
-            const survivingCoins: Coin[] = [];
+            // Sync State & Check for Wins
+            const currentCoins: any[] = [];
+            const coinsToRemoval: Matter.Body[] = [];
             let winnings = 0;
-            
-            nextCoins.forEach(c => {
-                if (c.z > WIN_ZONE_Z) {
-                    winnings++;
-                } else {
-                    survivingCoins.push(c);
+
+            world.bodies.forEach(body => {
+                if (body.label === 'coin') {
+                    if (body.position.y > WIN_ZONE_Y) {
+                        winnings++;
+                        coinsToRemoval.push(body);
+                    } else {
+                        currentCoins.push({
+                            id: body.plugin.id,
+                            x: (body.position.x / SHELF_WIDTH) * 100,
+                            y: body.position.y,
+                            angle: body.angle * (180 / Math.PI),
+                            isNew: false
+                        });
+                    }
                 }
             });
 
-            if (winnings > 0) {
-                const prize = winnings * BET_AMOUNT * 1.8; 
+            // Cleanup win coins
+            if (coinsToRemoval.length > 0) {
+                Matter.World.remove(world, coinsToRemoval);
+                coinsToRemoval.forEach(b => coinsMapRef.current.delete(b.plugin.id));
+                
+                const prize = coinsToRemoval.length * BET_AMOUNT * 2;
                 addCoins(prize, 'Pusher Win');
                 setFeedback(`WON ${Math.floor(prize)} ${currencySymbol}!`);
-                // Clear feedback after delay if no more wins
-                setTimeout(() => setFeedback(prev => prev.includes('WON') ? '' : prev), 2000);
             }
 
-            return survivingCoins;
-        });
-
-        animationRef.current = requestAnimationFrame(updatePhysics);
-    }, [addCoins, currencySymbol]);
-
-    useEffect(() => {
-        animationRef.current = requestAnimationFrame(updatePhysics);
-        return () => {
-            if (animationRef.current) cancelAnimationFrame(animationRef.current);
+            setCoinPositions(currentCoins);
+            animationFrame = requestAnimationFrame(update);
         };
-    }, [updatePhysics]);
+
+        animationFrame = requestAnimationFrame(update);
+
+        return () => {
+            cancelAnimationFrame(animationFrame);
+            Matter.World.clear(world, false);
+            Matter.Engine.clear(engine);
+        };
+    }, [addCoins, currencySymbol]);
 
     const handleDropCoin = () => {
         if (!canBet(BET_AMOUNT)) {
             setFeedback('Insufficient Funds!');
             return;
         }
+        
         subtractCoins(BET_AMOUNT, 'Pusher Drop');
         
-        const newId = nextCoinId.current++;
-        const dropX = 20 + Math.random() * 60; 
+        const dropX = SIDE_MARGIN + 20 + Math.random() * (SHELF_WIDTH - 2 * SIDE_MARGIN - 40);
+        const dropY = pusherY - 20; // Drop just behind or on the pusher
         
-        setCoins(prev => [...prev, {
-            id: newId,
-            x: dropX,
-            z: 30, 
-            isNew: true,
-            angle: Math.random() * 360
-        }]);
-        // Visual flash or sound could go here
+        const newCoin = Matter.Bodies.circle(dropX, dropY, COIN_RADIUS, {
+            restitution: 0.1,
+            friction: 0.05,
+            density: 0.01,
+            label: 'coin',
+            plugin: { id: nextCoinId.current++, isNew: true }
+        });
+
+        Matter.World.add(engineRef.current.world, newCoin);
+        coinsMapRef.current.set(newCoin.plugin.id, newCoin);
+        setFeedback('');
     };
 
     return (
         <div className="cp-game-wrapper">
             <div className="cp-main-content">
                 <div className="cp-header">
-                    <div className="font-bold text-yellow-400 text-xl">MEGA PUSHER</div>
-                    <div className="bg-black/30 px-4 py-1 rounded-full border border-yellow-500/30">
-                        {feedback || 'Ready'}
+                    <div className="font-bold text-yellow-400 text-xl tracking-widest">ARCADE PUSHER</div>
+                    <div className="bg-black/40 px-6 py-1 rounded-full border border-yellow-500/50 shadow-[0_0_15px_rgba(234,179,8,0.2)]">
+                        {feedback || 'ACTIVE'}
                     </div>
                 </div>
 
-                <div className="coin-pusher-scene">
-                    <div className="coin-pusher-world">
+                <div className="coin-pusher-scene scale-90 sm:scale-100">
+                    <div className="coin-pusher-world shadow-2xl overflow-hidden rounded-t-lg">
                         <div className="pusher-bed"></div>
                         
-                        {/* Moving Wall */}
-                        <div 
-                            className="pusher-wall"
-                            style={{ 
-                                // Sync visual with physics logic
-                                transform: `translateZ(${40 + ((Math.sin(Date.now() * PUSHER_SPEED) + 1) / 2) * PUSH_AMPLITUDE}px)`
-                            }}
-                        ></div>
+                        {/* Static Side Rails */}
+                        <div className="absolute left-0 top-0 w-2 h-full bg-gradient-to-r from-gray-800 to-gray-600 z-50"></div>
+                        <div className="absolute right-0 top-0 w-2 h-full bg-gradient-to-l from-gray-800 to-gray-600 z-50"></div>
 
-                        {/* Coins */}
-                        {coins.map(coin => (
+                        {/* Moving Pusher Visual */}
+                        <div 
+                            className="pusher-wall flex items-center justify-center"
+                            style={{ 
+                                transform: `translateY(${pusherY - 40}px)`,
+                                height: '80px',
+                                background: 'linear-gradient(to bottom, #4a5568, #2d3748)',
+                                borderBottom: '4px solid #1a202c'
+                            }}
+                        >
+                            <div className="w-full h-1 bg-yellow-500/20 animate-pulse"></div>
+                        </div>
+
+                        {/* Physical Coins */}
+                        {coinPositions.map(coin => (
                             <div
                                 key={coin.id}
-                                className={`cp-coin ${coin.isNew ? 'animate-pop-in' : ''} animate-coin`}
+                                className={`cp-coin ${coin.isNew ? 'animate-pop-in' : ''}`}
                                 style={{
                                     left: `${coin.x}%`,
-                                    top: `${coin.z}px`, 
-                                    zIndex: Math.floor(coin.z),
-                                    transform: `rotate(${coin.angle}deg)`
+                                    top: `${coin.y}px`, 
+                                    zIndex: Math.floor(coin.y),
+                                    transform: `translate(-50%, -50%) rotate(${coin.angle}deg)`,
+                                    width: `${COIN_RADIUS * 2}px`,
+                                    height: `${COIN_RADIUS * 2}px`
                                 }}
-                            ></div>
+                            >
+                                <div className="inner-coin"></div>
+                            </div>
                         ))}
                         
-                        <div className="absolute bottom-0 w-full h-1 bg-red-500/50 animate-pulse" style={{ top: `${WIN_ZONE_Z}px`}}></div>
+                        {/* Win Threshold Line */}
+                        <div className="absolute w-full h-4 bg-gradient-to-b from-transparent to-green-500/20" style={{ top: `${WIN_ZONE_Y}px`}}></div>
+                        <div className="absolute w-full h-1 bg-green-500/40 shadow-[0_0_10px_rgba(34,197,94,0.5)]" style={{ top: `${WIN_ZONE_Y}px`}}></div>
                     </div>
                 </div>
 
-                <div className="cp-controls-wrapper flex flex-col items-center gap-4">
-                    <GlassButton onClick={handleDropCoin} className="w-full max-w-md py-4 text-2xl bg-gradient-to-r from-yellow-500 to-orange-600 border-none shadow-lg hover:shadow-orange-500/40">
-                        DROP COIN ({BET_AMOUNT})
+                <div className="cp-controls-wrapper w-full max-w-md mt-6">
+                    <GlassButton 
+                        onClick={handleDropCoin} 
+                        className="w-full py-6 text-3xl font-black bg-gradient-to-b from-yellow-400 to-orange-600 border-none shadow-[0_8px_0_rgb(154,52,18)] active:translate-y-1 active:shadow-none transition-all"
+                    >
+                        DROP COIN
+                        <span className="block text-sm font-normal opacity-80 mt-1">COST: {BET_AMOUNT} {currencySymbol}</span>
                     </GlassButton>
                 </div>
             </div>
+            
+            <style>{`
+                .cp-game-wrapper {
+                    display: flex;
+                    justify-content: center;
+                    align-items: center;
+                    min-height: 100%;
+                    padding: 20px;
+                    background: #111;
+                    user-select: none;
+                }
+                .cp-main-content {
+                    display: flex;
+                    flex-direction: column;
+                    align-items: center;
+                    width: 100%;
+                }
+                .coin-pusher-scene {
+                    perspective: 1000px;
+                    margin-top: 20px;
+                }
+                .coin-pusher-world {
+                    width: ${SHELF_WIDTH}px;
+                    height: ${SHELF_HEIGHT}px;
+                    background: #222;
+                    position: relative;
+                    transform: rotateX(20deg);
+                    border: 10px solid #333;
+                    border-bottom: none;
+                    box-shadow: 0 50px 100px rgba(0,0,0,0.5);
+                }
+                .pusher-bed {
+                    position: absolute;
+                    width: 100%;
+                    height: 100%;
+                    background-image: 
+                        linear-gradient(rgba(255,255,255,0.05) 1px, transparent 1px),
+                        linear-gradient(90deg, rgba(255,255,255,0.05) 1px, transparent 1px);
+                    background-size: 40px 40px;
+                }
+                .pusher-wall {
+                    position: absolute;
+                    width: 100%;
+                    z-index: 10;
+                    box-shadow: 0 10px 20px rgba(0,0,0,0.4);
+                }
+                .cp-coin {
+                    position: absolute;
+                    border-radius: 50%;
+                    background: radial-gradient(circle at 30% 30%, #fbbf24, #b45309);
+                    border: 2px solid #78350f;
+                    box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                }
+                .inner-coin {
+                    width: 70%;
+                    height: 70%;
+                    border-radius: 50%;
+                    border: 1px solid rgba(255,255,255,0.2);
+                }
+                @keyframes pop-in {
+                    0% { transform: translate(-50%, -50%) scale(2); opacity: 0; }
+                    100% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+                }
+                .animate-pop-in {
+                    animation: pop-in 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+                }
+            `}</style>
         </div>
     );
 };

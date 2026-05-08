@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useCoinSystem } from '../../context/CoinContext';
 import GlassButton from '../ui/GlassButton';
+import BankingPanel from './BankingPanel';
 
 const ProfilePage: React.FC<{ onBack: () => void }> = ({ onBack }) => {
   const { user, updateProfile } = useAuth();
@@ -11,7 +12,7 @@ const ProfilePage: React.FC<{ onBack: () => void }> = ({ onBack }) => {
   // Profile State
   const [isEditing, setIsEditing] = useState(false);
   const [bio, setBio] = useState(user?.bio || '');
-  const [activeTab, setActiveTab] = useState<'overview' | 'history' | 'dev'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'history' | 'dev' | 'banking'>('overview');
 
   // Dev/Git State
   const [currentBranch, setCurrentBranch] = useState('main');
@@ -87,6 +88,12 @@ const ProfilePage: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                     className={`px-6 py-2 rounded-lg text-sm font-bold transition-all whitespace-nowrap ${activeTab === 'history' ? 'bg-yellow-400 text-black shadow-lg' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}
                 >
                     History
+                </button>
+                <button 
+                    onClick={() => setActiveTab('banking')}
+                    className={`px-6 py-2 rounded-lg text-sm font-bold transition-all whitespace-nowrap ${activeTab === 'banking' ? 'bg-green-500 text-white shadow-lg shadow-green-500/30' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}
+                >
+                    💰 Banking
                 </button>
                 <button 
                     onClick={() => setActiveTab('dev')}
@@ -197,6 +204,13 @@ const ProfilePage: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                          )}
                      </div>
                 </div>
+            </div>
+        )}
+
+        {/* BANKING TAB */}
+        {activeTab === 'banking' && (
+            <div className="max-w-2xl mx-auto">
+                <BankingPanel />
             </div>
         )}
 

@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useCoinSystem } from '../../context/CoinContext';
 import GlassButton from '../ui/GlassButton';
 
@@ -15,6 +15,8 @@ interface Card {
 
 const SUITS: Suit[] = ['♠', '♥', '♦', '♣'];
 const RANKS: Rank[] = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A'];
+const DECKS_IN_SHOE = 6;
+const SHUFFLE_THRESHOLD = 60; // Shuffle when fewer than 60 cards remain
 
 const getCardValue = (rank: Rank): number => {
   if (['J', 'Q', 'K'].includes(rank)) return 10;
@@ -24,30 +26,44 @@ const getCardValue = (rank: Rank): number => {
 
 const BlackjackGame: React.FC = () => {
   const { canBet, subtractCoins, addCoins, currencyMode } = useCoinSystem();
-  const [bet, setBet] = useState(10);
-  const [deck, setDeck] = useState<Card[]>([]);
+  
+  // Game States
+  const [baseBet, setBaseBet] = useState(10);
+  const [currentBet, setCurrentBet] = useState(0);
+  const [shoe, setShoe] = useState<Card[]>([]);
   const [playerHand, setPlayerHand] = useState<Card[]>([]);
   const [dealerHand, setDealerHand] = useState<Card[]>([]);
   const [gameState, setGameState] = useState<'BETTING' | 'PLAYING' | 'DEALER_TURN' | 'GAME_OVER'>('BETTING');
   const [message, setMessage] = useState('Place your bet to start');
+  
   const currencySymbol = currencyMode === 'fun' ? 'FC' : 'RC';
 
-  // --- Deck Management ---
-  const createDeck = () => {
-    const newDeck: Card[] = [];
-    for (const suit of SUITS) {
-      for (const rank of RANKS) {
-        newDeck.push({ suit, rank, value: getCardValue(rank) });
-      }
+  // --- Shoe Management ---
+  const createShoe = useCallback(() => {
+    const newShoe: Card[] = [];
+    for (let d = 0; d < DECKS_IN_SHOE; d++) {
+        for (const suit of SUITS) {
+            for (const rank of RANKS) {
+                newShoe.push({ suit, rank, value: getCardValue(rank) });
+            }
+        }
     }
-    return newDeck.sort(() => Math.random() - 0.5);
-  };
+    // Fisher-Yates Shuffle
+    for (let i = newShoe.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [newShoe[i], newShoe[j]] = [newShoe[j], newShoe[i]];
+    }
+    return newShoe;
+  }, []);
 
-  const drawCard = (currentDeck: Card[], hidden = false): { card: Card; newDeck: Card[] } => {
-    const card = currentDeck[0];
-    const newDeck = currentDeck.slice(1);
-    return { card: { ...card, isHidden: hidden }, newDeck };
-  };
+  const drawCard = useCallback((currentShoe: Card[], hidden = false) => {
+    let activeShoe = [...currentShoe];
+    if (activeShoe.length === 0) {
+        activeShoe = createShoe();
+    }
+    const card = activeShoe.shift()!;
+    return { card: { ...card, isHidden: hidden }, newShoe: activeShoe };
+  }, [createShoe]);
 
   const calculateScore = (hand: Card[]) => {
     let score = 0;
@@ -66,47 +82,50 @@ const BlackjackGame: React.FC = () => {
 
   // --- Game Actions ---
   const dealGame = () => {
-    if (!canBet(bet)) {
+    if (!canBet(baseBet)) {
       setMessage('Insufficient funds!');
       return;
     }
-    subtractCoins(bet, 'Blackjack Bet');
+
+    // Integrity: Ensure shoe is ready
+    let currentShoe = shoe.length < SHUFFLE_THRESHOLD ? createShoe() : [...shoe];
     
-    let d = createDeck();
+    subtractCoins(baseBet, 'Blackjack Bet');
+    setCurrentBet(baseBet);
+    
     const pHand: Card[] = [];
     const dHand: Card[] = [];
 
-    // Deal: P, D, P, D(Hidden)
-    let draw = drawCard(d); pHand.push(draw.card); d = draw.newDeck;
-    draw = drawCard(d); dHand.push(draw.card); d = draw.newDeck;
-    draw = drawCard(d); pHand.push(draw.card); d = draw.newDeck;
-    draw = drawCard(d, true); dHand.push(draw.card); d = draw.newDeck;
+    // Deal Sequence
+    let res = drawCard(currentShoe); pHand.push(res.card); currentShoe = res.newShoe;
+    res = drawCard(currentShoe); dHand.push(res.card); currentShoe = res.newShoe;
+    res = drawCard(currentShoe); pHand.push(res.card); currentShoe = res.newShoe;
+    res = drawCard(currentShoe, true); dHand.push(res.card); currentShoe = res.newShoe;
 
-    setDeck(d);
+    setShoe(currentShoe);
     setPlayerHand(pHand);
     setDealerHand(dHand);
     setGameState('PLAYING');
-    setMessage('Hit or Stand?');
+    setMessage('Hit, Stand or Double?');
 
-    // Check for Instant Blackjack
+    // Instant Blackjack Check
     const pScore = calculateScore(pHand);
+    const dScore = calculateScore(dHand.map(c => ({...c, isHidden: false})));
+    
     if (pScore === 21) {
-       handleGameOver(pHand, dHand, true);
+       handleGameOver(pHand, dHand.map(c => ({...c, isHidden: false})), true);
     }
   };
 
   const hit = () => {
-    const { card, newDeck } = drawCard(deck);
+    const { card, newShoe } = drawCard(shoe);
     const newHand = [...playerHand, card];
-    setDeck(newDeck);
+    setShoe(newShoe);
     setPlayerHand(newHand);
 
     const score = calculateScore(newHand);
     if (score > 21) {
-      setGameState('GAME_OVER');
-      setMessage('Bust! Dealer wins.');
-      // Reveal dealer card for UI
-      setDealerHand(prev => prev.map(c => ({...c, isHidden: false})));
+      handleGameOver(newHand, dealerHand.map(c => ({...c, isHidden: false})), false);
     }
   };
 
@@ -115,23 +134,22 @@ const BlackjackGame: React.FC = () => {
   };
 
   const doubleDown = () => {
-    if (!canBet(bet)) {
-        setMessage("Can't afford to double!");
+    if (!canBet(baseBet)) {
+        setMessage("Not enough coins to double!");
         return;
     }
-    subtractCoins(bet, 'Blackjack Double');
-    const { card, newDeck } = drawCard(deck);
+    subtractCoins(baseBet, 'Blackjack Double');
+    setCurrentBet(prev => prev + baseBet);
+    
+    const { card, newShoe } = drawCard(shoe);
     const newHand = [...playerHand, card];
-    setDeck(newDeck);
+    setShoe(newShoe);
     setPlayerHand(newHand);
     
     const score = calculateScore(newHand);
     if (score > 21) {
-        setGameState('GAME_OVER');
-        setMessage(`Bust! Dealer wins. (-${bet * 2})`);
-        setDealerHand(prev => prev.map(c => ({...c, isHidden: false})));
+        handleGameOver(newHand, dealerHand.map(c => ({...c, isHidden: false})), false, baseBet * 2);
     } else {
-        // Auto stand after double
         setGameState('DEALER_TURN');
     }
   };
@@ -139,153 +157,204 @@ const BlackjackGame: React.FC = () => {
   // --- Dealer Logic ---
   useEffect(() => {
     if (gameState === 'DEALER_TURN') {
-      let currentDealerHand = dealerHand.map(c => ({ ...c, isHidden: false }));
-      let dDeck = [...deck];
-      let dScore = calculateScore(currentDealerHand);
-
       const playDealer = async () => {
-        setDealerHand(currentDealerHand); // Reveal first
-        await new Promise(r => setTimeout(r, 600));
+        let currentDealerHand = dealerHand.map(c => ({ ...c, isHidden: false }));
+        let currentShoe = [...shoe];
+        let dScore = calculateScore(currentDealerHand);
+
+        setDealerHand(currentDealerHand); // Reveal
+        await new Promise(r => setTimeout(r, 800));
 
         while (dScore < 17) {
-          const { card, newDeck } = drawCard(dDeck);
-          dDeck = newDeck;
-          currentDealerHand = [...currentDealerHand, card];
+          const res = drawCard(currentShoe);
+          currentShoe = res.newShoe;
+          currentDealerHand = [...currentDealerHand, res.card];
           dScore = calculateScore(currentDealerHand);
+          
           setDealerHand(currentDealerHand);
-          setDeck(dDeck);
+          setShoe(currentShoe);
           await new Promise(r => setTimeout(r, 800));
         }
-        handleGameOver(playerHand, currentDealerHand, false, gameState === 'DEALER_TURN' && bet * (playerHand.length === 3 && bet > 10 ? 2 : 1)); // Check current bet logic manually or just pass nothing
+        
+        handleGameOver(playerHand, currentDealerHand);
       };
       playDealer();
     }
-  }, [gameState]);
+  }, [gameState, playerHand, drawCard]);
 
-  const handleGameOver = (pHand: Card[], dHand: Card[], playerBlackjack = false, currentTotalBet?: number) => {
-    const finalBet = currentTotalBet || (playerHand.length === 3 ? bet * 2 : bet); // Rudimentary double check
+  const handleGameOver = (pHand: Card[], dHand: Card[], isPBlackjack = false, finalBet?: number) => {
+    const betAmount = finalBet || currentBet;
     const pScore = calculateScore(pHand);
     const dScore = calculateScore(dHand);
+    const isDBlackjack = dScore === 21 && dHand.length === 2;
+    
     setGameState('GAME_OVER');
+    setDealerHand(dHand.map(c => ({...c, isHidden: false})));
 
-    if (playerBlackjack) {
-        // Check if dealer also has blackjack
-        const dBlackjack = calculateScore(dHand) === 21 && dHand.length === 2;
-        if (dBlackjack) {
-            addCoins(bet, 'Blackjack Push');
+    if (isPBlackjack) {
+        if (isDBlackjack) {
+            addCoins(betAmount, 'Blackjack Push');
             setMessage('Push! Both have Blackjack.');
         } else {
-            const win = bet * 2.5;
-            addCoins(win, 'Blackjack!');
-            setMessage(`Blackjack! You won ${win} ${currencySymbol}!`);
+            const payout = betAmount * 2.5;
+            addCoins(payout, 'Blackjack Payout');
+            setMessage(`BLACKJACK! Won ${payout} ${currencySymbol}`);
         }
-        setDealerHand(dHand.map(c => ({...c, isHidden: false})));
         return;
     }
 
     if (pScore > 21) {
         setMessage('Bust! Dealer wins.');
     } else if (dScore > 21) {
-        const win = finalBet * 2;
-        addCoins(win, 'Blackjack Win (Dealer Bust)');
-        setMessage(`Dealer Bust! You won ${win} ${currencySymbol}!`);
+        const payout = betAmount * 2;
+        addCoins(payout, 'Dealer Bust');
+        setMessage(`Dealer Bust! Won ${payout} ${currencySymbol}`);
     } else if (pScore > dScore) {
-        const win = finalBet * 2;
-        addCoins(win, 'Blackjack Win');
+        const payout = betAmount * 2;
+        addCoins(payout, 'Win');
         setMessage(`You Win! ${pScore} vs ${dScore}`);
     } else if (pScore < dScore) {
         setMessage(`Dealer Wins. ${dScore} vs ${pScore}`);
     } else {
-        addCoins(finalBet, 'Blackjack Push');
-        setMessage('Push! Bets returned.');
+        addCoins(betAmount, 'Push');
+        setMessage(`Push! Both have ${pScore}`);
     }
   };
 
-  // --- UI Components ---
-  const CardView: React.FC<{ card: Card }> = ({ card }) => {
-    if (card.isHidden) {
-      return (
-        <div className="w-16 h-24 md:w-24 md:h-36 bg-blue-800 rounded-lg border-2 border-white shadow-lg flex items-center justify-center bg-[url('https://www.transparenttextures.com/patterns/diagmonds-light.png')]">
-           <div className="w-12 h-16 border border-blue-400/30 rounded-sm"></div>
-        </div>
-      );
-    }
-    const color = ['♥', '♦'].includes(card.suit) ? 'text-red-500' : 'text-black';
-    return (
-      <div className={`w-16 h-24 md:w-24 md:h-36 bg-white rounded-lg shadow-lg flex flex-col items-center justify-between p-1 md:p-2 ${color} transition-transform hover:-translate-y-2`}>
-        <div className="self-start text-sm md:text-xl font-bold leading-none">{card.rank}<br/>{card.suit}</div>
-        <div className="text-2xl md:text-4xl">{card.suit}</div>
-        <div className="self-end text-sm md:text-xl font-bold leading-none rotate-180">{card.rank}<br/>{card.suit}</div>
-      </div>
-    );
-  };
+  // --- UI ---
+  const CardView: React.FC<{ card: Card, index: number }> = ({ card, index }) => (
+    <div 
+        className={`relative w-16 h-24 md:w-24 md:h-36 transition-all duration-500 animate-slide-in`}
+        style={{ animationDelay: `${index * 150}ms` }}
+    >
+        {card.isHidden ? (
+            <div className="absolute inset-0 bg-gradient-to-br from-blue-700 to-blue-900 rounded-xl border-4 border-white shadow-xl flex items-center justify-center">
+                <div className="w-12 h-20 border-2 border-blue-400/20 rounded-lg flex items-center justify-center">
+                    <span className="text-3xl opacity-20">🂠</span>
+                </div>
+            </div>
+        ) : (
+            <div className="absolute inset-0 bg-white rounded-xl shadow-xl flex flex-col justify-between p-2 border border-gray-200">
+                <div className={`text-sm md:text-xl font-black leading-none ${['♥', '♦'].includes(card.suit) ? 'text-red-600' : 'text-black'}`}>
+                    {card.rank}<br/>{card.suit}
+                </div>
+                <div className={`text-3xl md:text-5xl self-center ${['♥', '♦'].includes(card.suit) ? 'text-red-600' : 'text-black'}`}>
+                    {card.suit}
+                </div>
+                <div className={`text-sm md:text-xl font-black leading-none rotate-180 ${['♥', '♦'].includes(card.suit) ? 'text-red-600' : 'text-black'}`}>
+                    {card.rank}<br/>{card.suit}
+                </div>
+            </div>
+        )}
+    </div>
+  );
 
   return (
-    <div className="flex flex-col items-center w-full max-w-4xl gap-6 p-4 bg-[#0f3318] rounded-3xl border-8 border-[#2d1b0e] shadow-2xl">
-      {/* Dealer Area */}
-      <div className="flex flex-col items-center gap-2 min-h-[160px]">
-        <div className="text-gray-300 text-sm font-bold uppercase tracking-widest">Dealer {gameState !== 'BETTING' && `(${calculateScore(dealerHand)})`}</div>
-        <div className="flex gap-2 md:gap-4">
-          {dealerHand.map((c, i) => <CardView key={i} card={c} />)}
-          {dealerHand.length === 0 && <div className="w-24 h-36 border-2 border-dashed border-green-700 rounded-lg opacity-30"></div>}
+    <div className="flex flex-col items-center w-full max-w-4xl p-6 bg-gradient-to-b from-green-800 to-green-950 rounded-[40px] border-[12px] border-[#3e2723] shadow-[0_40px_100px_rgba(0,0,0,0.8)] relative overflow-hidden">
+      
+      {/* Table Felt Decoration */}
+      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[150%] h-[150%] border-[40px] border-green-700/20 rounded-full pointer-events-none"></div>
+
+      {/* Shoe Indicator */}
+      <div className="absolute top-4 right-8 text-green-300/50 text-[10px] font-black uppercase tracking-[0.2em]">
+          Shoe: {shoe.length} / {DECKS_IN_SHOE * 52}
+          <div className="w-24 h-1 bg-green-900 mt-1 rounded-full overflow-hidden">
+              <div className="h-full bg-green-400" style={{ width: `${(shoe.length / (DECKS_IN_SHOE * 52)) * 100}%` }}></div>
+          </div>
+      </div>
+
+      {/* Dealer Hand */}
+      <div className="flex flex-col items-center gap-4 z-10">
+        <div className="bg-black/40 px-4 py-1 rounded-full text-xs font-bold text-gray-300 uppercase tracking-widest border border-white/5">
+            Dealer {gameState !== 'BETTING' && `• ${calculateScore(dealerHand)}`}
+        </div>
+        <div className="flex gap-2 md:gap-4 h-36">
+          {dealerHand.map((c, i) => <CardView key={i} card={c} index={i} />)}
+          {dealerHand.length === 0 && <div className="w-24 h-36 border-4 border-dashed border-green-900/50 rounded-xl"></div>}
         </div>
       </div>
 
-      {/* Game Info */}
-      <div className="flex flex-col items-center justify-center h-20">
-          <div className="text-yellow-400 font-bold text-xl md:text-2xl drop-shadow-md text-center">{message}</div>
+      {/* Message Board */}
+      <div className="my-8 flex flex-col items-center justify-center min-h-[60px] text-center px-4">
+          <div className="text-2xl md:text-3xl font-black text-yellow-400 italic tracking-tight drop-shadow-2xl animate-pulse">
+              {message}
+          </div>
+          {currentBet > 0 && <div className="text-white/60 text-xs font-bold mt-2">ACTIVE BET: {currentBet} {currencySymbol}</div>}
       </div>
 
-      {/* Player Area */}
-      <div className="flex flex-col items-center gap-2 min-h-[160px]">
-        <div className="flex gap-2 md:gap-4">
-          {playerHand.map((c, i) => <CardView key={i} card={c} />)}
-          {playerHand.length === 0 && <div className="w-24 h-36 border-2 border-dashed border-green-700 rounded-lg opacity-30"></div>}
+      {/* Player Hand */}
+      <div className="flex flex-col items-center gap-4 z-10">
+        <div className="flex gap-2 md:gap-4 h-36">
+          {playerHand.map((c, i) => <CardView key={i} card={c} index={i} />)}
+          {playerHand.length === 0 && <div className="w-24 h-36 border-4 border-dashed border-green-900/50 rounded-xl"></div>}
         </div>
-        <div className="text-gray-300 text-sm font-bold uppercase tracking-widest">Player {gameState !== 'BETTING' && `(${calculateScore(playerHand)})`}</div>
+        <div className="bg-black/40 px-4 py-1 rounded-full text-xs font-bold text-gray-300 uppercase tracking-widest border border-white/5">
+            Player {gameState !== 'BETTING' && `• ${calculateScore(playerHand)}`}
+        </div>
       </div>
 
-      {/* Controls */}
-      <div className="w-full bg-black/30 p-4 rounded-xl backdrop-blur-md flex flex-col md:flex-row gap-4 justify-center items-center">
+      {/* Control Station */}
+      <div className="w-full mt-10 bg-[#1b1b1b] p-6 rounded-3xl border border-white/10 shadow-2xl flex flex-col md:flex-row gap-6 justify-between items-center">
+        
         {gameState === 'BETTING' || gameState === 'GAME_OVER' ? (
-           <div className="flex gap-4 items-center">
-               <div className="flex items-center gap-2 bg-black/40 p-2 rounded-lg">
-                   <button onClick={() => setBet(Math.max(10, bet - 10))} className="w-8 h-8 bg-red-500 rounded text-white font-bold">-</button>
-                   <span className="text-white font-bold w-16 text-center">{bet}</span>
-                   <button onClick={() => setBet(bet + 10)} className="w-8 h-8 bg-green-500 rounded text-white font-bold">+</button>
+           <div className="flex flex-wrap justify-center gap-6 items-center">
+               <div className="flex items-center gap-3 bg-black/60 p-3 rounded-2xl border border-white/10">
+                   <button onClick={() => setBaseBet(Math.max(10, baseBet - 10))} className="w-10 h-10 bg-gray-800 hover:bg-red-900 rounded-xl text-white font-black shadow-lg transition-all">-</button>
+                   <div className="text-center w-20">
+                       <div className="text-[10px] text-gray-500 font-bold uppercase">BET</div>
+                       <div className="text-yellow-500 font-black text-xl">{baseBet}</div>
+                   </div>
+                   <button onClick={() => setBaseBet(baseBet + 10)} className="w-10 h-10 bg-gray-800 hover:bg-green-900 rounded-xl text-white font-black shadow-lg transition-all">+</button>
                </div>
-               <GlassButton onClick={dealGame} className="!bg-yellow-500 hover:!bg-yellow-400 text-black min-w-[120px]">
-                   {gameState === 'GAME_OVER' ? 'PLAY AGAIN' : 'DEAL'}
+               <GlassButton onClick={dealGame} className="!py-4 !px-12 text-xl font-black !bg-yellow-500 hover:!bg-yellow-400 !text-black shadow-[0_5px_0_rgb(154,52,18)] active:translate-y-1 active:shadow-none">
+                   {gameState === 'GAME_OVER' ? 'RE-DEAL' : 'DEAL HAND'}
                </GlassButton>
            </div>
         ) : (
-           <div className="flex gap-4">
+           <div className="flex flex-wrap justify-center gap-4">
                <button 
                  onClick={hit} 
                  disabled={gameState !== 'PLAYING'}
-                 className="bg-green-600 hover:bg-green-500 text-white font-bold py-3 px-8 rounded-full shadow-lg disabled:opacity-50 disabled:cursor-not-allowed transform active:scale-95 transition-all"
+                 className="bg-green-600 hover:bg-green-500 text-white font-black py-4 px-10 rounded-2xl shadow-[0_5px_0_rgb(21,128,61)] active:translate-y-1 active:shadow-none transition-all disabled:opacity-30"
                >
                  HIT
                </button>
                <button 
                  onClick={stand} 
                  disabled={gameState !== 'PLAYING'}
-                 className="bg-red-600 hover:bg-red-500 text-white font-bold py-3 px-8 rounded-full shadow-lg disabled:opacity-50 disabled:cursor-not-allowed transform active:scale-95 transition-all"
+                 className="bg-red-600 hover:bg-red-500 text-white font-black py-4 px-10 rounded-2xl shadow-[0_5px_0_rgb(153,27,27)] active:translate-y-1 active:shadow-none transition-all disabled:opacity-30"
                >
                  STAND
                </button>
-               {playerHand.length === 2 && canBet(bet) && (
+               {playerHand.length === 2 && canBet(baseBet) && (
                    <button 
                     onClick={doubleDown} 
                     disabled={gameState !== 'PLAYING'}
-                    className="bg-yellow-500 hover:bg-yellow-400 text-black font-bold py-3 px-8 rounded-full shadow-lg disabled:opacity-50 disabled:cursor-not-allowed transform active:scale-95 transition-all"
+                    className="bg-yellow-500 hover:bg-yellow-400 text-black font-black py-4 px-10 rounded-2xl shadow-[0_5px_0_rgb(154,52,18)] active:translate-y-1 active:shadow-none transition-all"
                    >
                     DOUBLE
                    </button>
                )}
            </div>
         )}
+
+        <div className="flex flex-col items-end">
+            <div className="text-[10px] text-gray-500 font-bold uppercase tracking-widest">Bankroll</div>
+            <div className="text-2xl font-black text-green-400 italic">
+                {currencyMode === 'fun' ? Math.floor(useCoinSystem().funCoins) : Math.floor(useCoinSystem().realCoins)} <span className="text-xs">{currencySymbol}</span>
+            </div>
+        </div>
       </div>
+
+      <style>{`
+        @keyframes slide-in {
+            from { transform: translateY(-50px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+        .animate-slide-in {
+            animation: slide-in 0.4s ease-out forwards;
+        }
+      `}</style>
     </div>
   );
 };

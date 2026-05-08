@@ -2,6 +2,12 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
+import { Buffer } from 'buffer';
+
+// Polyfill Buffer for Solana web3.js
+if (typeof window !== 'undefined') {
+  window.Buffer = Buffer;
+}
 
 const rootElement = document.getElementById('root');
 if (!rootElement) {

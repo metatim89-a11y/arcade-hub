@@ -1,6 +1,7 @@
 
 import React, { useState } from 'react';
 import { CoinProvider } from './context/CoinContext';
+import { SolanaProvider } from './context/SolanaContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { GameMode, Game } from './types';
 import { ADULT_GAMES, UNDER18_GAMES } from './constants';
@@ -104,7 +105,9 @@ function App() {
   return (
     <AuthProvider>
         <CoinProvider>
-            <AppContent />
+            <SolanaProvider>
+                <AppContent />
+            </SolanaProvider>
         </CoinProvider>
     </AuthProvider>
   );

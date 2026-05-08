@@ -3,6 +3,7 @@ import React from 'react';
 import { GameMode } from '../types';
 import { useCoinSystem } from '../context/CoinContext';
 import { useAuth } from '../context/AuthContext';
+import { WalletMultiButton } from '@solana/wallet-adapter-react-ui';
 
 interface HeaderProps {
   mode: GameMode;
@@ -69,12 +70,17 @@ const Header: React.FC<HeaderProps> = ({ mode, setMode, simple = false, onProfil
         <div className="flex flex-wrap justify-between items-center gap-4 w-full border-t border-white/10 pt-2">
             <div className="flex items-center gap-4">
                 {isCasinoMode && (
-                <div className="flex gap-2 text-sm md:text-base font-bold">
-                    <div className={`py-1 px-3 rounded-xl shadow-inner shadow-black/50 transition-colors ${currencyMode === 'fun' ? 'bg-yellow-400 text-gray-900' : 'bg-gray-900/70 text-yellow-400/60'}`}>
-                    Fun: <span>{Math.floor(funCoins)}</span>
+                <div className="flex items-center gap-2">
+                    <div className="flex gap-2 text-sm md:text-base font-bold">
+                        <div className={`py-1 px-3 rounded-xl shadow-inner shadow-black/50 transition-colors ${currencyMode === 'fun' ? 'bg-yellow-400 text-gray-900' : 'bg-gray-900/70 text-yellow-400/60'}`}>
+                        Fun: <span>{Math.floor(funCoins)}</span>
+                        </div>
+                        <div className={`py-1 px-3 rounded-xl shadow-inner shadow-black/50 transition-colors ${currencyMode === 'real' ? 'bg-green-500 text-gray-900' : 'bg-gray-900/70 text-green-400/60'}`}>
+                        Real: <span>{Math.floor(realCoins)}</span>
+                        </div>
                     </div>
-                    <div className={`py-1 px-3 rounded-xl shadow-inner shadow-black/50 transition-colors ${currencyMode === 'real' ? 'bg-green-500 text-gray-900' : 'bg-gray-900/70 text-green-400/60'}`}>
-                    Real: <span>{Math.floor(realCoins)}</span>
+                    <div className="hidden sm:block">
+                        <WalletMultiButton className="!bg-black/30 !h-8 !text-xs !py-0 !px-4 !rounded-full !border !border-white/20 hover:!bg-black/50" />
                     </div>
                 </div>
                 )}
