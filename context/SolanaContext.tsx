@@ -19,11 +19,13 @@ const WITHDRAW_FEE_PERCENT = 0.20; // 20% House Fee
 
 interface SolanaContextType {
     solPrice: number | null;
+    jupPrice: number | null;
     isLoadingPrice: boolean;
     deposit: (usdAmount: number) => Promise<boolean>;
     requestWithdraw: (rcAmount: number) => Promise<boolean>;
     isBanking: boolean;
     error: string | null;
+    houseEarningsJup: number;
 }
 
 const SolanaContext = createContext<SolanaContextType | undefined>(undefined);
@@ -54,30 +56,46 @@ const SolanaLogicProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     const { addCoins, subtractCoins, realCoins, setCurrencyMode } = useCoinSystem();
 
     const [solPrice, setSolPrice] = useState<number | null>(null);
+    const [jupPrice, setJupPrice] = useState<number | null>(null);
     const [isLoadingPrice, setIsLoadingPrice] = useState(false);
     const [isBanking, setIsBanking] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [houseEarningsJup, setHouseEarningsJup] = useState<number>(0);
 
-    // Fetch SOL price from CoinGecko
-    const fetchPrice = async () => {
+    // Load earnings on mount
+    useEffect(() => {
+        const savedEarnings = localStorage.getItem('house_earnings_jup');
+        if (savedEarnings) setHouseEarningsJup(parseFloat(savedEarnings));
+    }, []);
+
+    // Save earnings whenever they change
+    useEffect(() => {
+        localStorage.setItem('house_earnings_jup', houseEarningsJup.toString());
+    }, [houseEarningsJup]);
+
+    // Fetch prices from CoinGecko
+    const fetchPrices = async () => {
         setIsLoadingPrice(true);
         try {
-            const response = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=solana&vs_currencies=usd');
+            const response = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=solana,jupiter-exchange-solana&vs_currencies=usd');
             const data = await response.json();
             if (data.solana && data.solana.usd) {
                 setSolPrice(data.solana.usd);
             }
+            if (data['jupiter-exchange-solana'] && data['jupiter-exchange-solana'].usd) {
+                setJupPrice(data['jupiter-exchange-solana'].usd);
+            }
         } catch (err) {
-            console.error('Failed to fetch SOL price:', err);
-            setError('Could not fetch live SOL price.');
+            console.error('Failed to fetch prices:', err);
+            setError('Could not fetch live crypto prices.');
         } finally {
             setIsLoadingPrice(false);
         }
     };
 
     useEffect(() => {
-        fetchPrice();
-        const interval = setInterval(fetchPrice, 60000); // Update every minute
+        fetchPrices();
+        const interval = setInterval(fetchPrices, 60000); // Update every minute
         return () => clearInterval(interval);
     }, []);
 
@@ -143,16 +161,20 @@ const SolanaLogicProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
         try {
             const usdValue = rcAmount / RC_TO_USD;
-            const fee = usdValue * WITHDRAW_FEE_PERCENT;
-            const netUsd = usdValue - fee;
+            const feeUsd = usdValue * WITHDRAW_FEE_PERCENT;
+            const netUsd = usdValue - feeUsd;
             const netSol = netUsd / solPrice;
+            
+            // Convert house fee to JUP
+            const feeJup = jupPrice ? feeUsd / jupPrice : 0;
 
             // Subtract coins immediately (locking it in)
-            const success = subtractCoins(rcAmount, `Withdraw Request: ${netSol.toFixed(4)} SOL (Wallet: ${publicKey.toBase58()})`);
+            const success = subtractCoins(rcAmount, `Withdraw Request: ${netSol.toFixed(4)} SOL (Fee: ${feeJup.toFixed(2)} JUP) | Wallet: ${publicKey.toBase58()}`);
             
             if (success) {
-                // In a real app, you'd send this to a backend. 
-                // Here, it's logged in the transactions list for manual processing.
+                if (feeJup > 0) {
+                    setHouseEarningsJup(prev => prev + feeJup);
+                }
                 console.log(`Withdraw Request Submitted: ${rcAmount} RC -> ${netSol.toFixed(4)} SOL to ${publicKey.toBase58()}`);
                 return true;
             } else {
@@ -171,11 +193,13 @@ const SolanaLogicProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     return (
         <SolanaContext.Provider value={{
             solPrice,
+            jupPrice,
             isLoadingPrice,
             deposit,
             requestWithdraw,
             isBanking,
-            error
+            error,
+            houseEarningsJup
         }}>
             {children}
         </SolanaContext.Provider>

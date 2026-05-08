@@ -1,9 +1,11 @@
 
 import React from 'react';
 import { useCoinSystem } from '../../context/CoinContext';
+import { useSolanaPayments } from '../../context/SolanaContext';
 
 const AdminWithdrawalPanel: React.FC = () => {
     const { transactions } = useCoinSystem();
+    const { houseEarningsJup, jupPrice } = useSolanaPayments();
     
     // Filter transactions for withdraw requests
     const withdrawalRequests = transactions.filter(tx => 
@@ -12,15 +14,23 @@ const AdminWithdrawalPanel: React.FC = () => {
 
     return (
         <div className="bg-gray-900/90 border border-red-500/30 rounded-2xl p-6 backdrop-blur-md shadow-2xl">
-            <div className="flex items-center gap-3 mb-6 border-b border-red-500/20 pb-4">
-                <div className="w-10 h-10 bg-red-500/20 rounded-lg flex items-center justify-center text-red-400">
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
-                    </svg>
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6 border-b border-red-500/20 pb-4">
+                <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-red-500/20 rounded-lg flex items-center justify-center text-red-400">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
+                        </svg>
+                    </div>
+                    <div>
+                        <h3 className="text-xl font-bold text-white">Withdrawal Requests</h3>
+                        <p className="text-xs text-red-400 uppercase tracking-widest font-bold">Admin Review Panel</p>
+                    </div>
                 </div>
-                <div>
-                    <h3 className="text-xl font-bold text-white">Withdrawal Requests</h3>
-                    <p className="text-xs text-red-400 uppercase tracking-widest font-bold">Admin Review Panel</p>
+
+                <div className="bg-black/40 p-3 rounded-xl border border-yellow-500/20 flex flex-col items-end">
+                    <span className="text-[10px] text-gray-500 uppercase font-bold">Total House Earnings</span>
+                    <span className="text-xl font-black text-yellow-400">{houseEarningsJup.toFixed(2)} JUP</span>
+                    {jupPrice && <span className="text-[10px] text-green-500/80">≈ ${(houseEarningsJup * jupPrice).toFixed(2)} USD</span>}
                 </div>
             </div>
 
