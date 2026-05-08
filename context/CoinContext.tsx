@@ -50,7 +50,7 @@ interface CoinContextType {
   currencyMode: CurrencyMode;
   setCurrencyMode: (mode: CurrencyMode) => void;
   coins: number; 
-  addCoins: (amount: number, reason?: string) => void;
+  addCoins: (amount: number, reason?: string, targetCurrency?: CurrencyMode) => void;
   subtractCoins: (amount: number, reason?: string) => boolean;
   resetCoins: () => void;
   canBet: (amount: number) => boolean;
@@ -63,7 +63,7 @@ const CoinContext = createContext<CoinContextType | undefined>(undefined);
 export const CoinProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const { user } = useAuth();
   const [funCoins, setFunCoins] = useState<number>(1000);
-  const [realCoins, setRealCoins] = useState<number>(100);
+  const [realCoins, setRealCoins] = useState<number>(10);
   const [currencyMode, setCurrencyMode] = useState<CurrencyMode>('fun');
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
@@ -84,7 +84,7 @@ export const CoinProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         if (loadedTx !== null) setTransactions(loadedTx);
       } else {
         setFunCoins(1000);
-        setRealCoins(100);
+        setRealCoins(10);
         setTransactions([]);
       }
       setIsLoaded(true);
@@ -118,28 +118,35 @@ export const CoinProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const activeBalance = currencyMode === 'fun' ? funCoins : realCoins;
   const updateActiveBalance = currencyMode === 'fun' ? setFunCoins : setRealCoins;
 
-  const logTransaction = useCallback((type: 'credit' | 'debit', amount: number, reason: string) => {
+  const logTransaction = useCallback((type: 'credit' | 'debit', amount: number, reason: string, currency: CurrencyMode = currencyMode) => {
     const newTx: Transaction = {
         id: Date.now().toString() + Math.random().toString(36).substring(2, 11),
         type,
         amount,
-        currency: currencyMode,
+        currency,
         reason,
         timestamp: Date.now()
     };
     setTransactions(prev => [newTx, ...prev].slice(0, 100));
   }, [currencyMode]);
 
-  const addCoins = useCallback((amount: number, reason: string = 'Game Win') => {
+  const addCoins = useCallback((amount: number, reason: string = 'Game Win', targetCurrency?: CurrencyMode) => {
     if (amount <= 0) return;
     
     setIsProcessing(true);
-    updateActiveBalance(prev => prev + amount);
-    logTransaction('credit', amount, reason);
+    const target = targetCurrency || currencyMode;
+    
+    if (target === 'fun') {
+        setFunCoins(prev => prev + amount);
+    } else {
+        setRealCoins(prev => prev + amount);
+    }
+    
+    logTransaction('credit', amount, reason, target);
     
     // Tiny delay to ensure React state batching completes before releasing lock
     setTimeout(() => setIsProcessing(false), 50);
-  }, [updateActiveBalance, logTransaction]);
+  }, [currencyMode, logTransaction]);
 
   const subtractCoins = useCallback((amount: number, reason: string = 'Game Bet'): boolean => {
     if (amount <= 0 || isProcessing) return false;
@@ -159,7 +166,7 @@ export const CoinProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const resetCoins = useCallback(() => {
       setFunCoins(1000);
-      setRealCoins(100);
+      setRealCoins(10);
       setTransactions([]);
   }, []);
 

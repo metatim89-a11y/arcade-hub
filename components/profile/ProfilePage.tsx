@@ -4,6 +4,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useCoinSystem } from '../../context/CoinContext';
 import GlassButton from '../ui/GlassButton';
 import BankingPanel from './BankingPanel';
+import AdminWithdrawalPanel from './AdminWithdrawalPanel';
 
 const ProfilePage: React.FC<{ onBack: () => void }> = ({ onBack }) => {
   const { user, updateProfile } = useAuth();
@@ -153,6 +154,13 @@ const ProfilePage: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                         )}
                     </div>
                 </div>
+
+                {/* Admin Withdrawal Panel (Only for 5ides5ales) */}
+                {user.username === '5ides5ales' && (
+                    <div className="md:col-span-3">
+                        <AdminWithdrawalPanel />
+                    </div>
+                )}
 
                 {/* Stats & Balances */}
                 <div className="md:col-span-2 flex flex-col gap-6">

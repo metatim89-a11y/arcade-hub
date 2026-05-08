@@ -112,7 +112,7 @@ const SolanaLogicProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
             // On Success, add Real Coins (2 RC per 1 USD)
             const rcAmount = usdAmount * RC_TO_USD;
-            addCoins(rcAmount, `Solana Deposit: ${usdAmount}$ (${solAmount.toFixed(4)} SOL)`);
+            addCoins(rcAmount, `Solana Deposit: ${usdAmount}$ (${solAmount.toFixed(4)} SOL)`, 'real');
             
             // Switch to real coins mode automatically
             setCurrencyMode('real');
