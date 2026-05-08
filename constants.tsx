@@ -11,11 +11,14 @@ import SlotsGame from './components/games/SlotsGame';
 import MancalaGame from './components/games/MancalaGame';
 import BlackjackGame from './components/games/BlackjackGame';
 import TexasHoldemGame from './components/games/TexasHoldemGame';
+import SpinWheelGame from './components/games/SpinWheelGame';
 
-export const APP_VERSION = '0.0.5';
+export const APP_VERSION = '0.0.6';
 
 export const ADULT_GAMES: Game[] = [
+    { id: 'wheel', label: 'Spin Wheel', component: SpinWheelGame },
     { id: 'crash', label: 'Crash', component: CrashGame },
+
     { id: 'blackjack', label: 'Blackjack', component: BlackjackGame },
     { id: 'poker', label: 'Hold\'em', component: TexasHoldemGame },
     { id: 'keno', label: 'Keno', component: KenoGame },
