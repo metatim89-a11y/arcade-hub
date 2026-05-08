@@ -1,16 +1,88 @@
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useCoinSystem } from '../../context/CoinContext';
 import { useSolanaPayments } from '../../context/SolanaContext';
+import { useConnection, useWallet } from '@solana/wallet-adapter-react';
+import { PublicKey, Transaction, SystemProgram, LAMPORTS_PER_SOL } from '@solana/web3.js';
+
+interface GlobalWithdrawRequest {
+    id: string;
+    userAddress: string;
+    username: string;
+    rcAmount: number;
+    usdValue: number;
+    netSol: number;
+    feeJup: number;
+    timestamp: number;
+    status: 'pending' | 'paid';
+}
 
 const AdminWithdrawalPanel: React.FC = () => {
-    const { transactions } = useCoinSystem();
     const { houseEarningsJup, jupPrice } = useSolanaPayments();
+    const { connection } = useConnection();
+    const { publicKey, sendTransaction } = useWallet();
     
-    // Filter transactions for withdraw requests
-    const withdrawalRequests = transactions.filter(tx => 
-        tx.type === 'debit' && tx.reason.toLowerCase().includes('withdraw request')
-    );
+    const [requests, setRequests] = useState<GlobalWithdrawRequest[]>([]);
+    const [isPaying, setIsPaying] = useState<string | null>(null);
+
+    const loadRequests = () => {
+        const globalRequests = JSON.parse(localStorage.getItem('arcade_global_withdrawals') || '[]');
+        setRequests(globalRequests.filter((r: any) => r.status === 'pending').reverse());
+    };
+
+    useEffect(() => {
+        loadRequests();
+        const interval = setInterval(loadRequests, 5000); // Refresh every 5s
+        return () => clearInterval(interval);
+    }, []);
+
+    const handlePayout = async (request: GlobalWithdrawRequest) => {
+        if (!publicKey) {
+            alert("Please connect your Admin wallet to perform payouts.");
+            return;
+        }
+
+        if (!window.confirm(`Are you sure you want to send ${request.netSol.toFixed(4)} SOL to ${request.userAddress}?`)) {
+            return;
+        }
+
+        setIsPaying(request.id);
+        try {
+            const recipient = new PublicKey(request.userAddress);
+            const lamports = Math.floor(request.netSol * LAMPORTS_PER_SOL);
+
+            const transaction = new Transaction().add(
+                SystemProgram.transfer({
+                    fromPubkey: publicKey,
+                    toPubkey: recipient,
+                    lamports,
+                })
+            );
+
+            const {
+                context: { slot: minContextSlot },
+                value: { blockhash, lastValidBlockHeight }
+            } = await connection.getLatestBlockhashAndContext();
+
+            const signature = await sendTransaction(transaction, connection, { minContextSlot });
+            await connection.confirmTransaction({ blockhash, lastValidBlockHeight, signature });
+
+            // Mark as Paid in Global Registry
+            const allRequests = JSON.parse(localStorage.getItem('arcade_global_withdrawals') || '[]');
+            const updated = allRequests.map((r: any) => 
+                r.id === request.id ? { ...r, status: 'paid' } : r
+            );
+            localStorage.setItem('arcade_global_withdrawals', JSON.stringify(updated));
+            
+            alert(`Payout Successful! Sig: ${signature.slice(0, 8)}...`);
+            loadRequests();
+        } catch (err: any) {
+            console.error('Payout failed:', err);
+            alert(`Payout Failed: ${err.message}`);
+        } finally {
+            setIsPaying(null);
+        }
+    };
 
     return (
         <div className="bg-gray-900/90 border border-red-500/30 rounded-2xl p-6 backdrop-blur-md shadow-2xl">
@@ -35,24 +107,27 @@ const AdminWithdrawalPanel: React.FC = () => {
             </div>
 
             <div className="space-y-4">
-                {withdrawalRequests.length > 0 ? (
-                    withdrawalRequests.map(req => (
+                {requests.length > 0 ? (
+                    requests.map(req => (
                         <div key={req.id} className="bg-black/40 border border-white/5 p-4 rounded-xl flex flex-col md:flex-row justify-between gap-4">
                             <div className="space-y-1">
                                 <div className="flex items-center gap-2">
                                     <span className="text-xs bg-red-500/20 text-red-400 px-2 py-0.5 rounded font-bold uppercase">Pending</span>
                                     <span className="text-gray-400 text-[10px]">{new Date(req.timestamp).toLocaleString()}</span>
+                                    <span className="text-blue-400 text-[10px] font-bold">Player: {req.username}</span>
                                 </div>
-                                <p className="text-sm text-gray-200 font-mono break-all">{req.reason}</p>
-                                <p className="text-xs text-gray-500 italic">User requested payout for {req.amount} RC</p>
+                                <p className="text-sm text-gray-200 font-mono break-all">{req.userAddress}</p>
+                                <p className="text-xs text-gray-500 italic">User requested payout for {req.rcAmount} RC (${req.usdValue.toFixed(2)})</p>
+                                <p className="text-xs text-yellow-500/80">Fee Collected: {req.feeJup.toFixed(2)} JUP</p>
                             </div>
                             <div className="flex flex-col items-end justify-center">
-                                <span className="text-2xl font-black text-red-400">-{req.amount} RC</span>
+                                <span className="text-2xl font-black text-green-400">{req.netSol.toFixed(4)} SOL</span>
                                 <button 
-                                    onClick={() => alert("Mark as Paid: This would notify the user and clear the log in a production backend.")}
-                                    className="mt-2 px-4 py-1.5 bg-green-600 hover:bg-green-500 text-white text-xs font-bold rounded-lg transition-colors shadow-lg"
+                                    onClick={() => handlePayout(req)}
+                                    disabled={isPaying === req.id}
+                                    className="mt-2 px-6 py-2 bg-green-600 hover:bg-green-500 disabled:bg-gray-700 text-white text-xs font-bold rounded-lg transition-colors shadow-lg active:scale-95"
                                 >
-                                    Mark as Paid
+                                    {isPaying === req.id ? 'Processing...' : 'Send SOL Payout'}
                                 </button>
                             </div>
                         </div>

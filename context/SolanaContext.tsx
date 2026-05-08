@@ -175,6 +175,23 @@ const SolanaLogicProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                 if (feeJup > 0) {
                     setHouseEarningsJup(prev => prev + feeJup);
                 }
+
+                // Add to Global Withdrawal Registry for Admin visibility
+                const globalRequests = JSON.parse(localStorage.getItem('arcade_global_withdrawals') || '[]');
+                const newRequest = {
+                    id: Date.now().toString(),
+                    userAddress: publicKey.toBase58(),
+                    username: user?.username || 'Unknown',
+                    rcAmount,
+                    usdValue,
+                    netSol,
+                    feeJup,
+                    timestamp: Date.now(),
+                    status: 'pending'
+                };
+                globalRequests.push(newRequest);
+                localStorage.setItem('arcade_global_withdrawals', JSON.stringify(globalRequests));
+
                 console.log(`Withdraw Request Submitted: ${rcAmount} RC -> ${netSol.toFixed(4)} SOL to ${publicKey.toBase58()}`);
                 return true;
             } else {
