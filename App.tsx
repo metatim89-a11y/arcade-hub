@@ -1,5 +1,5 @@
 
-// App.tsx v0.0.6 - Core Application Shell
+// App.tsx v0.0.7 - Core Application Shell
 import React, { useState } from 'react';
 import { CoinProvider } from './context/CoinContext';
 import { SolanaProvider } from './context/SolanaContext';
