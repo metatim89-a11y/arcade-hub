@@ -1,0 +1,22 @@
+#!/bin/bash
+# dump v1.0.0 - Arcade Hub Source Aggregator
+
+PROJECT_NAME="arcade-hub"
+OUTPUT="${PROJECT_NAME}_dump.txt"
+
+echo "Aggregating source code into ${OUTPUT}..."
+
+echo "--------------------------------------------------------------------------------" > ${OUTPUT}
+echo "PROJECT: ${PROJECT_NAME}" >> ${OUTPUT}
+echo "DATE: $(date)" >> ${OUTPUT}
+echo "--------------------------------------------------------------------------------" >> ${OUTPUT}
+
+find . -maxdepth 3 -name "*.tsx" -o -name "*.ts" -o -name "*.html" -o -name "*.css" | grep -v "node_modules" | grep -v "dist" | while read file; do
+    echo "================================================================================" >> ${OUTPUT}
+    echo "FILE: ${file}" >> ${OUTPUT}
+    echo "================================================================================" >> ${OUTPUT}
+    cat "${file}" >> ${OUTPUT}
+    echo -e "\n" >> ${OUTPUT}
+done
+
+echo "Dump complete."

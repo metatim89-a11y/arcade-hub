@@ -234,9 +234,12 @@ const RubiksCubeGame: React.FC = () => {
             {faces.map(f => (
               <div 
                 key={f.dir} 
-                className={`sticker ${f.dir}`} 
+                className={`sticker ${f.dir} relative overflow-hidden`} 
                 style={{ backgroundColor: f.color }} 
-              />
+              >
+                  {/* Specular Shine */}
+                  <div className="absolute inset-0 bg-gradient-to-br from-white/20 to-transparent pointer-events-none"></div>
+              </div>
             ))}
             {/* Inner black cube to prevent seeing through */}
             <div className="sticker" style={{ transform: 'translateZ(0)', background: '#111', width: '56px', height: '56px', margin: '2px' }}></div>
@@ -255,7 +258,7 @@ const RubiksCubeGame: React.FC = () => {
 
       {/* 3D Scene */}
       <div 
-        className="cube-scene my-8" 
+        className={`cube-scene my-8 ${!isDragging ? 'animate-ambient-float' : ''}`} 
         onMouseDown={handleMouseDown}
         onTouchStart={handleMouseDown}
         onMouseMove={handleMouseMove}
@@ -299,6 +302,21 @@ const RubiksCubeGame: React.FC = () => {
          <GlassButton onClick={handleScramble}>Scramble</GlassButton>
          <GlassButton onClick={handleReset}>Reset</GlassButton>
       </div>
+
+      <style>{`
+        .animate-ambient-float {
+            animation: ambient-pulse 6s infinite ease-in-out;
+        }
+        @keyframes ambient-pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+        }
+        .sticker {
+            border: 2px solid #000;
+            border-radius: 6px;
+            box-shadow: inset 0 0 10px rgba(0,0,0,0.3);
+        }
+      `}</style>
     </div>
   );
 };

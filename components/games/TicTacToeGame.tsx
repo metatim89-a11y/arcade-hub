@@ -72,8 +72,8 @@ const TicTacToeGame: React.FC<TicTacToeGameProps> = ({ playMode, playerNames }) 
     };
     
     const symbolClass = `
-      ${value ? 'animate-pop-in' : ''}
-      ${isWinningSquare ? 'animate-glow-grow' : ''}
+      ${value ? 'animate-symbol-pop' : ''}
+      ${isWinningSquare ? 'animate-winning-glow' : ''}
     `;
 
     // Borders for grid look without canvas
@@ -137,6 +137,24 @@ const TicTacToeGame: React.FC<TicTacToeGameProps> = ({ playMode, playerNames }) 
           <GlassButton onClick={() => handleReset()}>Reset Game</GlassButton>
         )}
       </div>
+
+      <style>{`
+        @keyframes symbol-pop {
+            0% { transform: scale(0) rotate(-45deg); opacity: 0; }
+            70% { transform: scale(1.2) rotate(10deg); opacity: 1; }
+            100% { transform: scale(1) rotate(0); opacity: 1; }
+        }
+        .animate-symbol-pop {
+            animation: symbol-pop 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+        }
+        @keyframes winning-glow {
+            0%, 100% { text-shadow: 0 0 10px #fff, 0 0 20px currentColor; transform: scale(1); }
+            50% { text-shadow: 0 0 20px #fff, 0 0 40px currentColor; transform: scale(1.1); }
+        }
+        .animate-winning-glow {
+            animation: winning-glow 1s infinite ease-in-out;
+        }
+      `}</style>
     </div>
   );
 };

@@ -155,18 +155,24 @@ const WormGame: React.FC<WormGameProps> = ({ playMode, playerNames }) => {
   };
 
   const createExplosion = (x: number, y: number, color: string, size: number) => {
+    // Shockwave
+    gameState.current.particles.push({
+        id: Math.random(),
+        x, y, vx: 0, vy: 0, life: 1.0, color: '#fff', size: 100 // Size will be used for radius
+    });
+
     for (let i = 0; i < size; i++) {
       const angle = Math.random() * Math.PI * 2;
-      const speed = Math.random() * 6 + 2;
+      const speed = Math.random() * 8 + 4;
       gameState.current.particles.push({
         id: Math.random(),
         x,
         y,
         vx: Math.cos(angle) * speed,
         vy: Math.sin(angle) * speed,
-        life: 1.0,
+        life: 1.5,
         color,
-        size: Math.random() * 4 + 2
+        size: Math.random() * 6 + 3
       });
     }
   };
@@ -378,14 +384,14 @@ const WormGame: React.FC<WormGameProps> = ({ playMode, playerNames }) => {
         // --- 3. Move ---
         if (worm.isBoosting && worm.body.length > 10) {
             worm.speed = BOOST_SPEED;
-            if (state.frameCount % 3 === 0) {
+            if (state.frameCount % 2 === 0) {
                 const tail = worm.body[worm.body.length - 1];
                 state.particles.push({
                     id: Math.random(),
                     x: tail.x, y: tail.y,
-                    vx: (Math.random() - 0.5) * 2,
-                    vy: (Math.random() - 0.5) * 2,
-                    life: 0.5, color: worm.color, size: Math.random() * 5 + 2
+                    vx: -Math.cos(worm.angle) * 3,
+                    vy: -Math.sin(worm.angle) * 3,
+                    life: 0.8, color: worm.color, size: Math.random() * 8 + 4
                 });
             }
             // Cost mass to boost
@@ -611,12 +617,26 @@ const WormGame: React.FC<WormGameProps> = ({ playMode, playerNames }) => {
 
       // Particles
       state.particles.forEach(p => {
-         p.x += p.vx; p.y += p.vy; p.life -= 0.03;
-         if (p.life > 0) {
-             ctx.globalAlpha = p.life;
-             ctx.fillStyle = p.color;
-             ctx.beginPath(); ctx.arc(p.x, p.y, p.size, 0, Math.PI*2); ctx.fill();
-             ctx.globalAlpha = 1.0;
+         if (p.vx === 0 && p.vy === 0) {
+             // Shockwave rendering
+             p.life -= 0.02;
+             ctx.save();
+             ctx.strokeStyle = `rgba(255, 255, 255, ${p.life})`;
+             ctx.lineWidth = 4;
+             ctx.beginPath();
+             ctx.arc(p.x, p.y, (1 - p.life) * p.size * 2, 0, Math.PI * 2);
+             ctx.stroke();
+             ctx.restore();
+         } else {
+             p.x += p.vx; p.y += p.vy; p.life -= 0.03;
+             if (p.life > 0) {
+                 ctx.globalAlpha = p.life;
+                 ctx.fillStyle = p.color;
+                 ctx.shadowColor = p.color; ctx.shadowBlur = 10;
+                 ctx.beginPath(); ctx.arc(p.x, p.y, p.size * p.life, 0, Math.PI*2); ctx.fill();
+                 ctx.shadowBlur = 0;
+                 ctx.globalAlpha = 1.0;
+             }
          }
       });
 

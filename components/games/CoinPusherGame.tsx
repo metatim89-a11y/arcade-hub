@@ -31,6 +31,7 @@ const CoinPusherGame: React.FC = () => {
     const pusherBodyRef = useRef<Matter.Body | null>(null);
     const coinsMapRef = useRef<Map<number, Matter.Body>>(new Map());
     const nextCoinId = useRef(Date.now());
+    const [isShaking, setIsShaking] = useState(false);
     const currencySymbol = currencyMode === 'fun' ? 'FC' : 'RC';
 
     // --- Initialization ---
@@ -72,6 +73,8 @@ const CoinPusherGame: React.FC = () => {
 
         // 4. Physics Loop
         let animationFrame: number;
+        let lastExtension = 0;
+
         const update = () => {
             const time = Date.now();
             
@@ -80,6 +83,13 @@ const CoinPusherGame: React.FC = () => {
             const newY = 40 + extension * PUSH_AMPLITUDE;
             Matter.Body.setPosition(pusher, { x: SHELF_WIDTH / 2, y: newY });
             setPusherY(newY);
+
+            // Shake trigger on max extension
+            if (extension > 0.98 && lastExtension <= 0.98) {
+                setIsShaking(true);
+                setTimeout(() => setIsShaking(false), 100);
+            }
+            lastExtension = extension;
 
             Matter.Engine.update(engine, 1000 / 60);
 
@@ -154,7 +164,7 @@ const CoinPusherGame: React.FC = () => {
 
     return (
         <div className="cp-game-wrapper">
-            <div className="cp-main-content">
+            <div className={`cp-main-content ${isShaking ? 'animate-shake' : ''}`}>
                 <div className="cp-header">
                     <div className="font-bold text-yellow-400 text-xl tracking-widest">ARCADE PUSHER</div>
                     <div className="bg-black/40 px-6 py-1 rounded-full border border-yellow-500/50 shadow-[0_0_15px_rgba(234,179,8,0.2)]">
@@ -197,7 +207,9 @@ const CoinPusherGame: React.FC = () => {
                                     height: `${COIN_RADIUS * 2}px`
                                 }}
                             >
-                                <div className="inner-coin"></div>
+                                <div className="inner-coin overflow-hidden relative">
+                                    <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/40 to-transparent -translate-x-full animate-shine"></div>
+                                </div>
                             </div>
                         ))}
                         
@@ -233,6 +245,7 @@ const CoinPusherGame: React.FC = () => {
                     flex-direction: column;
                     align-items: center;
                     width: 100%;
+                    transition: transform 0.1s ease-out;
                 }
                 .coin-pusher-scene {
                     perspective: 1000px;
@@ -285,6 +298,23 @@ const CoinPusherGame: React.FC = () => {
                 }
                 .animate-pop-in {
                     animation: pop-in 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+                }
+                @keyframes shine {
+                    0% { transform: translateX(-100%) skewX(-20deg); }
+                    20%, 100% { transform: translateX(200%) skewX(-20deg); }
+                }
+                .animate-shine {
+                    animation: shine 3s infinite linear;
+                }
+                @keyframes shake {
+                    0% { transform: translate(0, 0); }
+                    25% { transform: translate(2px, 2px); }
+                    50% { transform: translate(-2px, -2px); }
+                    75% { transform: translate(2px, -2px); }
+                    100% { transform: translate(0, 0); }
+                }
+                .animate-shake {
+                    animation: shake 0.1s ease-in-out;
                 }
             `}</style>
         </div>

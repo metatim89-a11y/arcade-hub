@@ -27,26 +27,22 @@ const createDeck = (): Card[] => {
 };
 
 // Simplified Hand Evaluator for Casino Hold'em
-// Returns score: High Card < Pair < Two Pair < Trips < Straight < Flush < Full House < Quads < Straight Flush
 const evaluateHand = (hole: Card[], community: Card[]): { score: number, name: string } => {
     const allCards = [...hole, ...community].sort((a, b) => b.value - a.value);
     const values = allCards.map(c => c.value);
     const suits = allCards.map(c => c.suit);
     
-    // Helper to count frequencies
     const counts: {[key: number]: number} = {};
     values.forEach(v => counts[v] = (counts[v] || 0) + 1);
     const countValues = Object.values(counts);
     
-    // Flush
     const suitCounts: {[key: string]: number} = {};
     suits.forEach(s => suitCounts[s] = (suitCounts[s] || 0) + 1);
     const flushSuit = Object.keys(suitCounts).find(s => suitCounts[s] >= 5);
     const isFlush = !!flushSuit;
 
-    // Straight
     let uniqueVals = Array.from(new Set(values));
-    if (uniqueVals.includes(14)) uniqueVals.push(1); // Ace low
+    if (uniqueVals.includes(14)) uniqueVals.push(1);
     uniqueVals.sort((a, b) => b - a);
     let streak = 0;
     let isStraight = false;
@@ -120,17 +116,13 @@ const TexasHoldemGame: React.FC = () => {
         setCommunityCards(finalCommunity);
         setDealerHand(prev => prev.map(c => ({...c, isHidden: false})));
 
-        // Dealer Qualification (Pair of 4s or better)
-        // For simplicity in this arcade version:
-        // Compare hands directly.
-        
         const pResult = evaluateHand(playerHand, finalCommunity);
         const dResult = evaluateHand(dealerHand.map(c => ({...c, isHidden: false})), finalCommunity);
 
         setGameState('SHOWDOWN');
         
         if (pResult.score > dResult.score) {
-            const win = (ante * 3) + (callBet * 2); // Simple payout simplification
+            const win = (ante * 3) + (callBet * 2);
             addCoins(win, 'Holdem Win');
             setMessage(`You Win! ${pResult.name} beats ${dResult.name}`);
         } else if (pResult.score < dResult.score) {
@@ -141,15 +133,27 @@ const TexasHoldemGame: React.FC = () => {
         }
     };
 
-    const CardView: React.FC<{ card: Card }> = ({ card }) => {
-        if (card.isHidden) {
-            return <div className="w-14 h-20 md:w-20 md:h-28 bg-red-900 rounded border-2 border-white shadow-md bg-[url('https://www.transparenttextures.com/patterns/diagmonds-light.png')]"></div>;
-        }
-        const color = ['♥', '♦'].includes(card.suit) ? 'text-red-500' : 'text-black';
+    const CardView: React.FC<{ card: Card, index: number }> = ({ card, index }) => {
+        const [isFlipped, setIsFlipped] = useState(card.isHidden);
+        
+        useEffect(() => {
+            setIsFlipped(card.isHidden);
+        }, [card.isHidden]);
+
         return (
-            <div className={`w-14 h-20 md:w-20 md:h-28 bg-white rounded shadow-md flex flex-col items-center justify-center ${color} font-bold text-xl`}>
-                <span>{card.rank}</span>
-                <span className="text-2xl">{card.suit}</span>
+            <div 
+                className="relative w-14 h-20 md:w-20 md:h-28 perspective-1000 animate-card-slide"
+                style={{ animationDelay: `${index * 150}ms` }}
+            >
+                <div className={`relative w-full h-full transition-transform duration-700 preserve-3d ${!isFlipped ? 'rotate-y-180' : ''}`}>
+                    {/* Back */}
+                    <div className="absolute inset-0 backface-hidden bg-red-900 rounded border-2 border-white shadow-md bg-[url('https://www.transparenttextures.com/patterns/diagmonds-light.png')]"></div>
+                    {/* Front */}
+                    <div className={`absolute inset-0 backface-hidden rotate-y-180 bg-white rounded shadow-md flex flex-col items-center justify-center ${['♥', '♦'].includes(card.suit) ? 'text-red-500' : 'text-black'} font-bold text-xl`}>
+                        <span>{card.rank}</span>
+                        <span className="text-2xl">{card.suit}</span>
+                    </div>
+                </div>
             </div>
         );
     };
@@ -159,15 +163,15 @@ const TexasHoldemGame: React.FC = () => {
             {/* Dealer */}
             <div className="flex flex-col items-center gap-2">
                 <div className="text-gray-400 text-xs font-bold uppercase">Dealer</div>
-                <div className="flex gap-2">
-                    {dealerHand.length > 0 ? dealerHand.map((c, i) => <CardView key={i} card={c} />) : <div className="h-20 md:h-28"></div>}
+                <div className="flex gap-2 h-20 md:h-28">
+                    {dealerHand.map((c, i) => <CardView key={i} card={c} index={i} />)}
                 </div>
             </div>
 
             {/* Community */}
-            <div className="flex gap-2 md:gap-4 bg-[#0f4224] p-4 rounded-full border-4 border-[#daa520]/30">
-                {communityCards.map((c, i) => <CardView key={i} card={c} />)}
-                {communityCards.length === 0 && <div className="text-[#daa520] font-bold">COMMUNITY CARDS</div>}
+            <div className="flex gap-2 md:gap-4 bg-[#0f4224] p-4 rounded-full border-4 border-[#daa520]/30 min-h-[100px] md:min-h-[140px] items-center">
+                {communityCards.map((c, i) => <CardView key={i} card={c} index={i} />)}
+                {communityCards.length === 0 && <div className="text-[#daa520] font-bold px-8">COMMUNITY CARDS</div>}
             </div>
 
             {/* Message */}
@@ -175,8 +179,8 @@ const TexasHoldemGame: React.FC = () => {
 
             {/* Player */}
             <div className="flex flex-col items-center gap-2">
-                <div className="flex gap-2">
-                    {playerHand.map((c, i) => <CardView key={i} card={c} />)}
+                <div className="flex gap-2 h-20 md:h-28">
+                    {playerHand.map((c, i) => <CardView key={i} card={c} index={i} />)}
                 </div>
                 <div className="text-gray-400 text-xs font-bold uppercase">You</div>
             </div>
@@ -199,6 +203,21 @@ const TexasHoldemGame: React.FC = () => {
                     </>
                 )}
             </div>
+
+            <style>{`
+                .perspective-1000 { perspective: 1000px; }
+                .preserve-3d { transform-style: preserve-3d; }
+                .backface-hidden { backface-visibility: hidden; }
+                .rotate-y-180 { transform: rotateY(180deg); }
+                
+                @keyframes card-slide {
+                    from { transform: translate(300px, -300px) rotate(20deg); opacity: 0; }
+                    to { transform: translate(0, 0) rotate(0deg); opacity: 1; }
+                }
+                .animate-card-slide {
+                    animation: card-slide 0.5s cubic-bezier(0.23, 1, 0.32, 1) forwards;
+                }
+            `}</style>
         </div>
     );
 };

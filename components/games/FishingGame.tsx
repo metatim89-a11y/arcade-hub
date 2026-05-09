@@ -46,6 +46,22 @@ const FishingGame: React.FC = () => {
     const [isLockEnabled, setIsLockEnabled] = useState(false);
     const [lockedTargetId, setLockedTargetId] = useState<number | null>(null);
     const [coinsWon, setCoinsWon] = useState<{ x: number, y: number, text: string, id: number }[]>([]);
+    const bubblesRef = useRef<{x: number, y: number, r: number, s: number}[]>([]);
+    const [recoil, setRecoil] = useState(0);
+
+    // Initialize bubbles
+    useEffect(() => {
+        const bubbles = [];
+        for(let i=0; i<30; i++) {
+            bubbles.push({
+                x: Math.random() * CANVAS_WIDTH,
+                y: Math.random() * CANVAS_HEIGHT,
+                r: Math.random() * 5 + 2,
+                s: Math.random() * 1 + 0.5
+            });
+        }
+        bubblesRef.current = bubbles;
+    }, []);
 
     // Matter.js Refs
     const engineRef = useRef(Matter.Engine.create({ gravity: { x: 0, y: 0 } }));
@@ -62,6 +78,8 @@ const FishingGame: React.FC = () => {
         lastFireTime.current = time;
 
         if (subtractCoins(betAmount, 'Fishing Shot')) {
+            setRecoil(15);
+            setTimeout(() => setRecoil(0), 100);
             const angle = cannonAngleRef.current;
             const spawnX = CANVAS_WIDTH / 2 + Math.cos(angle) * 80;
             const spawnY = CANVAS_HEIGHT - 60 + Math.sin(angle) * 80;
@@ -222,8 +240,23 @@ const FishingGame: React.FC = () => {
             ctx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
             
             // Background
-            ctx.fillStyle = '#004466';
+            const bgGradient = ctx.createLinearGradient(0, 0, 0, CANVAS_HEIGHT);
+            bgGradient.addColorStop(0, '#005588');
+            bgGradient.addColorStop(1, '#001122');
+            ctx.fillStyle = bgGradient;
             ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+
+            // Draw Bubbles
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
+            ctx.lineWidth = 1;
+            bubblesRef.current.forEach(b => {
+                b.y -= b.s;
+                if (b.y < -20) b.y = CANVAS_HEIGHT + 20;
+                b.x += Math.sin(b.y / 50) * 0.5;
+                ctx.beginPath();
+                ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2);
+                ctx.stroke();
+            });
 
             // Draw Fish
             world.bodies.forEach(body => {
@@ -273,7 +306,7 @@ const FishingGame: React.FC = () => {
             ctx.translate(CANVAS_WIDTH/2, CANVAS_HEIGHT-40);
             ctx.rotate(cannonAngleRef.current);
             ctx.fillStyle = '#ffd700';
-            ctx.fillRect(0, -20, 90, 40);
+            ctx.fillRect(-recoil, -20, 90, 40);
             ctx.fillStyle = '#444';
             ctx.beginPath(); ctx.arc(0, 0, 40, 0, Math.PI*2); ctx.fill();
             ctx.restore();

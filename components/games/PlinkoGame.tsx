@@ -104,7 +104,7 @@ const PlinkoGame: React.FC = () => {
     const particlesRef = useRef<Particle[]>([]);
     const lastAutoDropRef = useRef(0);
     const animationRef = useRef<number>();
-    const glowingPegRef = useRef<{r: number, c: number, life: number}[]>([]);
+    const glowingPegRef = useRef<{r: number, c: number, life: number, scale: number}[]>([]);
 
     // Computed Multipliers
     const multipliers = useMemo(() => {
@@ -170,23 +170,27 @@ const PlinkoGame: React.FC = () => {
                 // Check glow
                 const glowIndex = glowingPegRef.current.findIndex(p => p.r === row && p.c === col);
                 let pegColor = '#4b5563'; // gray-600
+                let currentPegRadius = pegRadius;
 
                 if (glowIndex !== -1) {
                     const glow = glowingPegRef.current[glowIndex];
+                    currentPegRadius = pegRadius * glow.scale;
+                    
                     ctx.beginPath();
-                    ctx.arc(x, y, pegRadius + 3, 0, Math.PI * 2);
-                    ctx.fillStyle = `rgba(255, 255, 255, ${glow.life * 0.5})`;
+                    ctx.arc(x, y, currentPegRadius + 5, 0, Math.PI * 2);
+                    ctx.fillStyle = `rgba(255, 255, 255, ${glow.life * 0.3})`;
                     ctx.fill();
                     
                     pegColor = '#fff';
-                    glowingPegRef.current[glowIndex].life -= 0.1;
+                    glowingPegRef.current[glowIndex].life -= 0.05;
+                    glowingPegRef.current[glowIndex].scale = 1 + glow.life * 0.5;
                     if (glowingPegRef.current[glowIndex].life <= 0) {
                         glowingPegRef.current.splice(glowIndex, 1);
                     }
                 }
 
                 ctx.beginPath();
-                ctx.arc(x, y, pegRadius, 0, Math.PI * 2);
+                ctx.arc(x, y, currentPegRadius, 0, Math.PI * 2);
                 ctx.fillStyle = pegColor;
                 ctx.fill();
             }
@@ -304,7 +308,7 @@ const PlinkoGame: React.FC = () => {
                         ball.y += ny * overlap;
 
                         // Visual Feedback
-                        glowingPegRef.current.push({r: r, c: c, life: 1.0});
+                        glowingPegRef.current.push({r: r, c: c, life: 1.0, scale: 1.5});
                      }
                  }
             }

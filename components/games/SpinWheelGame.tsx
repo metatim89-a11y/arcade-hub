@@ -23,6 +23,7 @@ const SpinWheelGame: React.FC = () => {
     const [feedback, setFeedback] = useState('Place your bet and spin the wheel!');
     const [isSpinning, setIsSpinning] = useState(false);
     const [rotation, setRotation] = useState(0);
+    const [winningIndex, setWinningIndex] = useState<number | null>(null);
     const currencySymbol = currencyMode === 'fun' ? 'FC' : 'RC';
     const animationFrameId = useRef<number | null>(null);
     const rotationRef = useRef(rotation);
@@ -50,9 +51,21 @@ const SpinWheelGame: React.FC = () => {
             ctx.moveTo(0, 0);
             ctx.arc(0, 0, radius, i * segmentAngle, (i + 1) * segmentAngle);
             ctx.closePath();
-            ctx.fillStyle = segment.color;
+            
+            // Winning Glow
+            if (winningIndex === i) {
+                ctx.fillStyle = '#fff';
+                ctx.shadowBlur = 20;
+                ctx.shadowColor = '#fff';
+            } else {
+                ctx.fillStyle = segment.color;
+                ctx.shadowBlur = 0;
+            }
+            
             ctx.fill();
+            ctx.strokeStyle = 'rgba(0,0,0,0.2)';
             ctx.stroke();
+            ctx.shadowBlur = 0;
 
             ctx.save();
             ctx.rotate(i * segmentAngle + segmentAngle / 2);
@@ -64,10 +77,12 @@ const SpinWheelGame: React.FC = () => {
         });
         ctx.restore();
         
-        // Draw pointer
+        // Draw pointer with click react
+        const tickerOffset = Math.sin(angle * SEGMENTS.length) * 5;
+
         ctx.fillStyle = 'red';
         ctx.beginPath();
-        ctx.moveTo(centerX + radius - 5, centerY);
+        ctx.moveTo(centerX + radius - 5, centerY + tickerOffset);
         ctx.lineTo(centerX + radius + 15, centerY - 10);
         ctx.lineTo(centerX + radius + 15, centerY + 10);
         ctx.closePath();
@@ -127,6 +142,7 @@ const SpinWheelGame: React.FC = () => {
         }
         subtractCoins(bet, 'Wheel Spin');
         setIsSpinning(true);
+        setWinningIndex(null);
         setFeedback('Spinning...');
 
         const spinDuration = 5000 + Math.random() * 3000; // 5-8 seconds
@@ -154,8 +170,9 @@ const SpinWheelGame: React.FC = () => {
                 const finalAngle = currentRotation % (2 * Math.PI);
                 setRotation(finalAngle);
                 
-                const winningIndex = Math.floor((SEGMENTS.length - (finalAngle / segmentAngle) + (SEGMENTS.length / 2)) % SEGMENTS.length);
-                const winningSegment = SEGMENTS[winningIndex];
+                const winIdx = Math.floor((SEGMENTS.length - (finalAngle / segmentAngle) + (SEGMENTS.length / 2)) % SEGMENTS.length);
+                setWinningIndex(winIdx);
+                const winningSegment = SEGMENTS[winIdx];
                 
                 const winnings = bet * winningSegment.multiplier;
                 if (winnings > 0) addCoins(winnings, 'Wheel Win');

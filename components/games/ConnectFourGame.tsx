@@ -69,6 +69,7 @@ const ConnectFourGame: React.FC<ConnectFourProps> = ({ playMode, playerNames }) 
   const [isAnimating, setIsAnimating] = useState(false);
   const [hoverCol, setHoverCol] = useState<number | null>(null);
   const [landingPieceId, setLandingPieceId] = useState<number | null>(null);
+  const [isShaking, setIsShaking] = useState(false);
 
 
   const checkWinner = (b: Cell[][]): [Player, [number, number][]] | null => {
@@ -118,6 +119,9 @@ const ConnectFourGame: React.FC<ConnectFourProps> = ({ playMode, playerNames }) 
       // State update is now split: animation starts, then logic finalizes.
       setTimeout(() => {
         setLandingPieceId(newPiece.id);
+        setIsShaking(true);
+        setTimeout(() => setIsShaking(false), 200);
+
         const newBoard = board.map(r => [...r]);
         newBoard[targetRow][col] = player;
         setBoard(newBoard);
@@ -228,7 +232,7 @@ const ConnectFourGame: React.FC<ConnectFourProps> = ({ playMode, playerNames }) 
         {status}
         {gameState === 'playing' && (<div className="w-6 h-6 rounded-full" style={{ backgroundColor: currentPlayer === '1' ? 'var(--connect4-p1-color)' : 'var(--connect4-p2-color)'}}></div>)}
       </div>
-      <div className="relative w-full max-w-lg aspect-[7/6]" style={{ '--board-gap': 'var(--board-gap)' } as React.CSSProperties}>
+      <div className={`relative w-full max-w-lg aspect-[7/6] ${isShaking ? 'animate-shake' : ''}`} style={{ '--board-gap': 'var(--board-gap)' } as React.CSSProperties}>
         {/* Pieces Container - uses a grid that perfectly overlays the board visuals */}
         <div className="absolute inset-0 grid grid-rows-6 grid-cols-7 z-20 pointer-events-none">
             {pieces.map(p => {
@@ -260,7 +264,7 @@ const ConnectFourGame: React.FC<ConnectFourProps> = ({ playMode, playerNames }) 
               {/* Hover Guide */}
               {hoverCol === col && !isAnimating && gameState === 'playing' && (
                   <div className="w-full h-full" style={{padding: 'calc(var(--board-gap)/2)'}}>
-                      <div className="w-full aspect-square rounded-full opacity-50" style={{ backgroundColor: currentPlayer === '1' ? 'var(--connect4-p1-color)' : 'var(--connect4-p2-color)'}}></div>
+                      <div className="w-full aspect-square rounded-full opacity-50 animate-pulse" style={{ backgroundColor: currentPlayer === '1' ? 'var(--connect4-p1-color)' : 'var(--connect4-p2-color)'}}></div>
                   </div>
               )}
             </div>
@@ -269,6 +273,34 @@ const ConnectFourGame: React.FC<ConnectFourProps> = ({ playMode, playerNames }) 
 
       </div>
       <button onClick={() => handleReset()} className="mt-4 bg-yellow-500 text-gray-900 font-bold py-2 px-6 rounded-lg hover:bg-yellow-400 transition-colors">Reset Game</button>
+
+      <style>{`
+        @keyframes glow {
+            0%, 100% { box-shadow: 0 0 5px #fff, 0 0 10px #fff, 0 0 20px #fff, 0 0 40px var(--primary-glow-color); transform: scale(1); }
+            50% { box-shadow: 0 0 10px #fff, 0 0 20px #fff, 0 0 40px #fff, 0 0 80px var(--primary-glow-color); transform: scale(1.1); }
+        }
+        .animate-glow {
+            animation: glow 1s infinite ease-in-out;
+            z-index: 50;
+        }
+        @keyframes thud {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+            100% { transform: scale(1); }
+        }
+        .animate-thud {
+            animation: thud 0.2s ease-out;
+        }
+        @keyframes shake {
+            0%, 100% { transform: translate(0, 0); }
+            25% { transform: translate(0, 4px); }
+            50% { transform: translate(0, -2px); }
+            75% { transform: translate(0, 2px); }
+        }
+        .animate-shake {
+            animation: shake 0.2s ease-in-out;
+        }
+      `}</style>
     </div>
   );
 };

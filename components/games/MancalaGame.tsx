@@ -17,6 +17,7 @@ const sleep = (ms: number) => new Promise(res => setTimeout(res, ms));
 
 const MancalaGame: React.FC<MancalaProps> = ({ playMode, playerNames }) => {
     const [pits, setPits] = useState<number[]>(INITIAL_PITS);
+    const [lastHopedPit, setLastHopedPit] = useState<number | null>(null);
     const pitsRef = useRef(pits);
     useEffect(() => { pitsRef.current = pits }, [pits]);
 
@@ -60,12 +61,14 @@ const MancalaGame: React.FC<MancalaProps> = ({ playMode, playerNames }) => {
                 currentIndex = (currentIndex + 1) % 14;
             }
             setHighlightedPit(currentIndex);
+            setLastHopedPit(currentIndex);
             await sleep(300); // Slowed down animation
             
             tempPits = [...pitsRef.current];
             tempPits[currentIndex]++;
             setPits([...tempPits]);
             setHighlightedPit(null);
+            setTimeout(() => setLastHopedPit(null), 300);
         }
 
         // End of move logic
@@ -148,17 +151,18 @@ const MancalaGame: React.FC<MancalaProps> = ({ playMode, playerNames }) => {
         setPits(INITIAL_PITS); setCurrentPlayer(startingPlayer); setStatus(`Player ${startingPlayer}'s Turn`); setGameOver(false); setWinner(null);
     }
     
-    const renderStones = (count: number) => {
+    const renderStones = (count: number, index: number) => {
+        const isHoping = lastHopedPit === index;
         if (count > STONE_STACK_THRESHOLD) {
             return (
-                <div className="stone-stack">
+                <div className={`stone-stack ${isHoping ? 'animate-stone-hop' : ''}`}>
                     <div className="stone-stack-icon">🪨</div>
                     <div className="stone-stack-count">{count}</div>
                 </div>
             )
         }
         return (
-            <div className="stones-container">
+            <div className={`stones-container ${isHoping ? 'animate-stone-hop' : ''}`}>
                 {Array.from({ length: count }).map((_, stoneIdx) => (
                     <div 
                         key={stoneIdx} 
@@ -227,7 +231,7 @@ const MancalaGame: React.FC<MancalaProps> = ({ playMode, playerNames }) => {
                             <div className="grid grid-cols-[1.5fr_1fr_1fr_1fr_1fr_1fr_1fr_1.5fr] h-full" style={{ gap: 'var(--mancala-pit-gap)'}}>
                                 {/* Player 2 Store */}
                                 <div className={`row-span-2 mancala-store ${highlightedPit === PLAYER_2_STORE ? 'highlight' : ''}`}>
-                                    {renderStones(pits[PLAYER_2_STORE])}
+                                    {renderStones(pits[PLAYER_2_STORE], PLAYER_2_STORE)}
                                 </div>
                                 
                                 {/* Player 2 Pits */}
@@ -235,20 +239,20 @@ const MancalaGame: React.FC<MancalaProps> = ({ playMode, playerNames }) => {
                                   const pitIndex = 12 - i;
                                   return (
                                     <div key={pitIndex} onClick={() => handlePitClick(pitIndex)} className={`mancala-pit ${highlightedPit === pitIndex ? 'highlight' : ''} ${currentPlayer === 2 && !gameOver && pits[pitIndex] > 0 ? 'cursor-pointer hover:bg-[#D2691E]' : 'cursor-not-allowed'}`}>
-                                      {renderStones(count)}
+                                      {renderStones(count, pitIndex)}
                                     </div>
                                   );
                                 })}
                                 
                                 {/* Player 1 Store */}
                                 <div className={`row-span-2 mancala-store ${highlightedPit === PLAYER_1_STORE ? 'highlight' : ''}`}>
-                                    {renderStones(pits[PLAYER_1_STORE])}
+                                    {renderStones(pits[PLAYER_1_STORE], PLAYER_1_STORE)}
                                 </div>
                                 
                                 {/* Player 1 Pits */}
                                 {pits.slice(0, 6).map((count, i) => (
                                   <div key={i} onClick={() => handlePitClick(i)} className={`mancala-pit ${highlightedPit === i ? 'highlight' : ''} ${currentPlayer === 1 && !gameOver && pits[i] > 0 ? 'cursor-pointer hover:bg-[#D2691E]' : 'cursor-not-allowed'}`}>
-                                      {renderStones(count)}
+                                      {renderStones(count, i)}
                                   </div>
                                 ))}
                             </div>
@@ -274,6 +278,22 @@ const MancalaGame: React.FC<MancalaProps> = ({ playMode, playerNames }) => {
 
             {/* Bottom: Reset Button */}
             <button onClick={() => handleReset()} className="justify-self-center bg-yellow-500 text-gray-900 font-bold py-2 px-6 rounded-lg hover:bg-yellow-400 transition-colors"> Reset Game </button>
+
+            <style>{`
+                @keyframes stone-hop {
+                    0% { transform: scale(1) translateY(0); }
+                    50% { transform: scale(1.1) translateY(-15px); }
+                    100% { transform: scale(1) translateY(0); }
+                }
+                .animate-stone-hop {
+                    animation: stone-hop 0.3s ease-out forwards;
+                }
+                .mancala-pit.highlight, .mancala-store.highlight {
+                    border-color: #fbbf24 !important;
+                    background-color: rgba(210, 105, 30, 0.4);
+                    box-shadow: inset 0 0 15px #fbbf24;
+                }
+            `}</style>
         </div>
     );
 };

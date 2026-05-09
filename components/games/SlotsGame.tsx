@@ -178,10 +178,10 @@ const SlotsGame: React.FC = () => {
                         {reels.map((reel, i) => (
                             <div key={i} className="relative flex-1 overflow-hidden h-[260px] bg-[#f8f8f8] rounded-lg shadow-[inset_0_0_30px_rgba(0,0,0,0.6)] border-x border-gray-300/20">
                                 <div 
-                                    className="flex flex-col items-center transition-transform will-change-transform"
+                                    className={`flex flex-col items-center transition-transform will-change-transform ${reel.isSpinning ? 'animate-reel-blur' : 'animate-reel-land'}`}
                                     style={{ 
                                         transform: `translateY(-${reel.symbols.length * SYMBOL_HEIGHT - 260 - reel.offset}px)`,
-                                        transition: reel.isSpinning ? 'none' : 'transform 0.6s cubic-bezier(0.1, 0.9, 0.2, 1)' 
+                                        transition: reel.isSpinning ? 'none' : 'transform 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275)' 
                                     }}
                                 >
                                     {reel.symbols.map((symbol, idx) => {
@@ -285,6 +285,25 @@ const SlotsGame: React.FC = () => {
                      </div>
                  ))}
             </div>
+
+            <style>{`
+                @keyframes reel-blur {
+                    0% { filter: blur(0px); }
+                    50% { filter: blur(4px); }
+                    100% { filter: blur(0px); }
+                }
+                .animate-reel-blur {
+                    animation: reel-blur 0.1s infinite;
+                }
+                @keyframes reel-land {
+                    0% { transform: translateY(-5px); }
+                    50% { transform: translateY(2px); }
+                    100% { transform: translateY(0); }
+                }
+                .animate-reel-land {
+                    animation: reel-land 0.2s ease-out;
+                }
+            `}</style>
         </div>
     );
 };

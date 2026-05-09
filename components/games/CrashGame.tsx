@@ -22,6 +22,22 @@ const CrashGame: React.FC = () => {
   const requestRef = useRef<number | undefined>(undefined);
   const startTimeRef = useRef<number>(0);
   const crashPointRef = useRef<number>(0);
+  const starsRef = useRef<{x: number, y: number, s: number}[]>([]);
+  const particlesRef = useRef<{x: number, y: number, life: number}[]>([]);
+  const [isShaking, setIsShaking] = useState(false);
+
+  // Initialize stars
+  useEffect(() => {
+    const stars = [];
+    for(let i=0; i<100; i++) {
+        stars.push({
+            x: Math.random() * 800,
+            y: Math.random() * 300,
+            s: Math.random() * 2 + 0.5
+        });
+    }
+    starsRef.current = stars;
+  }, []);
   
   const currencySymbol = currencyMode === 'fun' ? 'FC' : 'RC';
 
@@ -86,6 +102,8 @@ const CrashGame: React.FC = () => {
     setMultiplier(finalValue);
     setHistory(prev => [finalValue, ...prev].slice(0, 5)); // Keep last 5
     if (requestRef.current) cancelAnimationFrame(requestRef.current);
+    setIsShaking(true);
+    setTimeout(() => setIsShaking(false), 400);
     drawGraph(finalValue, true);
   };
 
@@ -114,67 +132,69 @@ const CrashGame: React.FC = () => {
 
     // Gradient Background
     const bgGradient = ctx.createLinearGradient(0, 0, 0, height);
-    bgGradient.addColorStop(0, '#1a202c');
-    bgGradient.addColorStop(1, '#2d3748');
+    bgGradient.addColorStop(0, '#0f172a');
+    bgGradient.addColorStop(1, '#1e293b');
     ctx.fillStyle = bgGradient;
     ctx.fillRect(0, 0, width, height);
 
-    // Draw Grid Lines (Static for now, could move)
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    for(let i=1; i<5; i++) {
-        const y = height - (height/5)*i;
-        ctx.moveTo(0, y);
-        ctx.lineTo(width, y);
-    }
-    ctx.stroke();
+    // Draw Stars (Parallax)
+    const elapsed = gameState === 'FLYING' ? (Date.now() - startTimeRef.current) / 1000 : 0;
+    ctx.fillStyle = '#ffffff';
+    starsRef.current.forEach(star => {
+        const x = (star.x - elapsed * 50 * star.s) % width;
+        const finalX = x < 0 ? x + width : x;
+        ctx.globalAlpha = Math.random() * 0.5 + 0.5;
+        ctx.beginPath();
+        ctx.arc(finalX, star.y, star.s, 0, Math.PI * 2);
+        ctx.fill();
+    });
+    ctx.globalAlpha = 1.0;
 
-    // Draw Curve
-    // Map multiplier to Y. As multiplier grows, we scale the graph down so the rocket stays roughly in view
-    // Viewport range: 1.00 to max(2.00, currentMultiplier * 1.2)
+    // Viewport mapping
     const maxY = Math.max(2.00, currentMultiplier * 1.1);
     const minY = 1.00;
-    const scaleY = (val: number) => height - ((val - minY) / (maxY - minY)) * height * 0.8 - 20; // 20px padding bottom
+    const scaleY = (val: number) => height - ((val - minY) / (maxY - minY)) * height * 0.8 - 20;
     
-    // Time mapping: X axis stretches as time goes on
-    // Just draw a bezier curve representing growth
+    const rocketX = width * 0.8;
+    const rocketY = scaleY(currentMultiplier);
+
+    // Add trail particles
+    if (gameState === 'FLYING' && !isCrashed) {
+        particlesRef.current.push({ x: rocketX, y: rocketY, life: 1.0 });
+    }
+    particlesRef.current = particlesRef.current.filter(p => p.life > 0);
+    particlesRef.current.forEach(p => {
+        p.x -= 2;
+        p.life -= 0.02;
+        ctx.beginPath();
+        ctx.fillStyle = `rgba(245, 158, 11, ${p.life})`;
+        ctx.arc(p.x, p.y, 3 * p.life, 0, Math.PI * 2);
+        ctx.fill();
+    });
+
+    // Draw Curve
     ctx.beginPath();
     ctx.strokeStyle = isCrashed ? '#ef4444' : (hasCashedOut ? '#10b981' : '#f59e0b');
     ctx.lineWidth = 4;
+    ctx.shadowBlur = 10;
+    ctx.shadowColor = ctx.strokeStyle as string;
     ctx.moveTo(0, height - 20);
-    
-    // Simple quadratic curve visual
-    const rocketX = width * 0.8;
-    const rocketY = scaleY(currentMultiplier);
-    
     ctx.quadraticCurveTo(width * 0.4, height - 20, rocketX, rocketY);
     ctx.stroke();
-
-    // Draw Area under curve
-    ctx.lineTo(rocketX, height);
-    ctx.lineTo(0, height);
-    ctx.fillStyle = isCrashed ? 'rgba(239, 68, 68, 0.2)' : (hasCashedOut ? 'rgba(16, 185, 129, 0.2)' : 'rgba(245, 158, 11, 0.2)');
-    ctx.fill();
+    ctx.shadowBlur = 0;
 
     // Draw Rocket / Dot
-    ctx.beginPath();
-    ctx.fillStyle = isCrashed ? '#ef4444' : '#ffffff';
-    ctx.arc(rocketX, rocketY, 6, 0, Math.PI * 2);
-    ctx.fill();
-    
-    // Rocket Emoji
     if (!isCrashed) {
         ctx.font = "24px Arial";
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
-        ctx.fillText("🚀", rocketX, rocketY - 20);
+        ctx.fillText("🚀", rocketX, rocketY - 10);
     } else {
-        ctx.font = "24px Arial";
-        ctx.fillText("💥", rocketX, rocketY - 20);
+        ctx.font = "32px Arial";
+        ctx.fillText("💥", rocketX, rocketY);
     }
 
-  }, [hasCashedOut]);
+  }, [hasCashedOut, gameState]);
 
   useEffect(() => {
       // Initial Draw
@@ -215,7 +235,7 @@ const CrashGame: React.FC = () => {
       </div>
 
       {/* Game Display */}
-      <div className="relative w-full bg-gray-900 rounded-2xl overflow-hidden shadow-2xl border border-gray-700">
+      <div className={`relative w-full bg-gray-900 rounded-2xl overflow-hidden shadow-2xl border border-gray-700 ${isShaking ? 'animate-crash-shake' : ''}`}>
           <canvas ref={canvasRef} className="w-full block" />
           
           {/* Overlay Info */}
@@ -321,6 +341,25 @@ const CrashGame: React.FC = () => {
               )}
           </div>
       </div>
+
+      <style>{`
+        @keyframes crash-shake {
+            0% { transform: translate(1px, 1px) rotate(0deg); }
+            10% { transform: translate(-1px, -2px) rotate(-1deg); }
+            20% { transform: translate(-3px, 0px) rotate(1deg); }
+            30% { transform: translate(3px, 2px) rotate(0deg); }
+            40% { transform: translate(1px, -1px) rotate(1deg); }
+            50% { transform: translate(-1px, 2px) rotate(-1deg); }
+            60% { transform: translate(-3px, 1px) rotate(0deg); }
+            70% { transform: translate(3px, 1px) rotate(-1deg); }
+            80% { transform: translate(-1px, -1px) rotate(1deg); }
+            90% { transform: translate(1px, 2px) rotate(0deg); }
+            100% { transform: translate(1px, -2px) rotate(-1deg); }
+        }
+        .animate-crash-shake {
+            animation: crash-shake 0.1s infinite;
+        }
+      `}</style>
     </div>
   );
 };

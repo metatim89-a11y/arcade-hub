@@ -114,19 +114,18 @@ const KenoGame: React.FC = () => {
         if (isMatch) {
             style.backgroundColor = 'var(--keno-match-color)';
             style.color = 'white';
-            className = 'keno-win';
+            className = 'animate-keno-match';
         } else if (isSelected) {
             style.backgroundColor = 'var(--keno-miss-color)';
             style.color = 'white';
-            className = 'keno-miss';
         } else if (isDrawn) {
             style.backgroundColor = 'var(--keno-drawn-color)';
-            style.color = '#111827'; // gray-900
+            style.color = '#111827';
         }
     } else if (phase === 'drawing' && isDrawn) {
         style.backgroundColor = 'var(--keno-drawn-color)';
-        style.color = '#111827'; // gray-900
-        className = 'keno-draw-pop';
+        style.color = '#111827';
+        className = 'animate-keno-pop';
     } else if (isSelected) {
         style.backgroundColor = 'var(--keno-selected-color)';
         style.color = 'white';
@@ -142,7 +141,7 @@ const KenoGame: React.FC = () => {
   return (
     <div className="flex flex-col items-center gap-4 text-center p-2 md:p-4">
       <h2 className="text-3xl font-bold" style={{ color: 'var(--primary-text-color)' }}>Keno</h2>
-      <div className="grid grid-cols-10 gap-1">
+      <div className={`grid grid-cols-10 gap-1 ${phase === 'drawing' ? 'keno-drawing-grid' : ''}`}>
         {Array.from({ length: 80 }, (_, i) => i + 1).map((num) => {
           const { style, className } = getNumberStyleAndClass(num);
           return (
@@ -180,6 +179,34 @@ const KenoGame: React.FC = () => {
           Play Again
         </GlassButton>
       )}
+
+      <style>{`
+        @keyframes keno-pop {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.4); }
+            100% { transform: scale(1); }
+        }
+        .animate-keno-pop {
+            animation: keno-pop 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+            z-index: 10;
+        }
+        @keyframes keno-match {
+            0%, 100% { box-shadow: 0 0 5px #fff, 0 0 10px var(--keno-match-color); transform: scale(1); }
+            50% { box-shadow: 0 0 15px #fff, 0 0 30px var(--keno-match-color); transform: scale(1.1); }
+        }
+        .animate-keno-match {
+            animation: keno-match 1s infinite ease-in-out;
+            z-index: 20;
+        }
+        @keyframes grid-pulse {
+            0% { opacity: 0.8; }
+            50% { opacity: 1; }
+            100% { opacity: 0.8; }
+        }
+        .keno-drawing-grid {
+            animation: grid-pulse 2s infinite ease-in-out;
+        }
+      `}</style>
     </div>
   );
 };

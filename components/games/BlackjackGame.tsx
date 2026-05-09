@@ -222,32 +222,41 @@ const BlackjackGame: React.FC = () => {
   };
 
   // --- UI ---
-  const CardView: React.FC<{ card: Card, index: number }> = ({ card, index }) => (
-    <div 
-        className={`relative w-16 h-24 md:w-24 md:h-36 transition-all duration-500 animate-slide-in`}
-        style={{ animationDelay: `${index * 150}ms` }}
-    >
-        {card.isHidden ? (
-            <div className="absolute inset-0 bg-gradient-to-br from-blue-700 to-blue-900 rounded-xl border-4 border-white shadow-xl flex items-center justify-center">
-                <div className="w-12 h-20 border-2 border-blue-400/20 rounded-lg flex items-center justify-center">
-                    <span className="text-3xl opacity-20">🂠</span>
+  const CardView: React.FC<{ card: Card, index: number }> = ({ card, index }) => {
+    const [isFlipped, setIsFlipped] = useState(card.isHidden);
+
+    useEffect(() => {
+        setIsFlipped(card.isHidden);
+    }, [card.isHidden]);
+
+    return (
+        <div 
+            className="relative w-16 h-24 md:w-24 md:h-36 perspective-1000 animate-deal-in"
+            style={{ animationDelay: `${index * 100}ms` }}
+        >
+            <div className={`relative w-full h-full transition-transform duration-700 preserve-3d ${!isFlipped ? 'rotate-y-180' : ''}`}>
+                {/* Back of Card */}
+                <div className="absolute inset-0 backface-hidden bg-gradient-to-br from-blue-700 to-blue-900 rounded-xl border-4 border-white shadow-xl flex items-center justify-center">
+                    <div className="w-12 h-20 border-2 border-blue-400/20 rounded-lg flex items-center justify-center">
+                        <span className="text-3xl opacity-20">🂠</span>
+                    </div>
+                </div>
+                {/* Front of Card */}
+                <div className="absolute inset-0 backface-hidden rotate-y-180 bg-white rounded-xl shadow-xl flex flex-col justify-between p-2 border border-gray-200">
+                    <div className={`text-sm md:text-xl font-black leading-none ${['♥', '♦'].includes(card.suit) ? 'text-red-600' : 'text-black'}`}>
+                        {card.rank}<br/>{card.suit}
+                    </div>
+                    <div className={`text-3xl md:text-5xl self-center ${['♥', '♦'].includes(card.suit) ? 'text-red-600' : 'text-black'}`}>
+                        {card.suit}
+                    </div>
+                    <div className={`text-sm md:text-xl font-black leading-none rotate-180 ${['♥', '♦'].includes(card.suit) ? 'text-red-600' : 'text-black'}`}>
+                        {card.rank}<br/>{card.suit}
+                    </div>
                 </div>
             </div>
-        ) : (
-            <div className="absolute inset-0 bg-white rounded-xl shadow-xl flex flex-col justify-between p-2 border border-gray-200">
-                <div className={`text-sm md:text-xl font-black leading-none ${['♥', '♦'].includes(card.suit) ? 'text-red-600' : 'text-black'}`}>
-                    {card.rank}<br/>{card.suit}
-                </div>
-                <div className={`text-3xl md:text-5xl self-center ${['♥', '♦'].includes(card.suit) ? 'text-red-600' : 'text-black'}`}>
-                    {card.suit}
-                </div>
-                <div className={`text-sm md:text-xl font-black leading-none rotate-180 ${['♥', '♦'].includes(card.suit) ? 'text-red-600' : 'text-black'}`}>
-                    {card.rank}<br/>{card.suit}
-                </div>
-            </div>
-        )}
-    </div>
-  );
+        </div>
+    );
+  };
 
   return (
     <div className="flex flex-col items-center w-full max-w-4xl p-6 bg-gradient-to-b from-green-800 to-green-950 rounded-[40px] border-[12px] border-[#3e2723] shadow-[0_40px_100px_rgba(0,0,0,0.8)] relative overflow-hidden">
@@ -347,12 +356,17 @@ const BlackjackGame: React.FC = () => {
       </div>
 
       <style>{`
-        @keyframes slide-in {
-            from { transform: translateY(-50px); opacity: 0; }
-            to { transform: translateY(0); opacity: 1; }
+        .perspective-1000 { perspective: 1000px; }
+        .preserve-3d { transform-style: preserve-3d; }
+        .backface-hidden { backface-visibility: hidden; }
+        .rotate-y-180 { transform: rotateY(180deg); }
+        
+        @keyframes deal-in {
+            from { transform: translate(200px, -200px) rotate(20deg); opacity: 0; }
+            to { transform: translate(0, 0) rotate(0deg); opacity: 1; }
         }
-        .animate-slide-in {
-            animation: slide-in 0.4s ease-out forwards;
+        .animate-deal-in {
+            animation: deal-in 0.6s cubic-bezier(0.23, 1, 0.32, 1) forwards;
         }
       `}</style>
     </div>

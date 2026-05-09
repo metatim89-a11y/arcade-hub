@@ -1,0 +1,7 @@
+# .project.bashaliases - Arcade Hub
+# Project aliases
+
+alias build='npm run build'
+alias dev='npm run dev'
+alias preview='npm run preview'
+alias dump='./dump'

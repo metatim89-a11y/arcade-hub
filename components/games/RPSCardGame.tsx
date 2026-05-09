@@ -143,12 +143,12 @@ const RPSCardGame: React.FC<RPSCardGameProps> = ({ playMode }) => {
                 {board.map(card => (
                     <div
                         key={card.id}
-                        className="relative w-20 h-20 md:w-24 md:h-24 perspective"
+                        className="relative w-20 h-20 md:w-24 md:h-24 perspective-1000"
                         onClick={() => handleCardClick(card.id)}
                     >
-                        <div className={`card-inner ${card.isFlipped ? 'is-flipped' : ''} ${card.isMatched ? 'is-matched' : ''}`}>
-                            <div className="card-front bg-blue-600 hover:bg-blue-500 rounded-lg cursor-pointer"></div>
-                            <div className="card-back bg-gray-700 rounded-lg flex items-center justify-center text-4xl">
+                        <div className={`card-inner ${card.isFlipped ? 'is-flipped' : ''} ${card.isMatched ? 'is-matched shadow-[0_0_20px_rgba(34,197,94,0.6)]' : ''}`}>
+                            <div className="card-front bg-blue-600 hover:bg-blue-500 rounded-lg cursor-pointer shadow-[inset_0_0_20px_rgba(0,0,0,0.3)] border-2 border-white/10"></div>
+                            <div className="card-back bg-gray-700 rounded-lg flex items-center justify-center text-4xl border-2 border-white/20 shadow-xl">
                                 {card.symbol}
                             </div>
                         </div>
@@ -157,6 +157,38 @@ const RPSCardGame: React.FC<RPSCardGameProps> = ({ playMode }) => {
                 ))}
             </div>
             {gameOver && <GlassButton onClick={handleReset} className="mt-4 text-xl py-3">Play Again</GlassButton>}
+
+            <style>{`
+                .perspective-1000 { perspective: 1000px; }
+                .card-inner {
+                    width: 100%; height: 100%; position: relative;
+                    transform-style: preserve-3d; transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+                }
+                .is-flipped { transform: rotateY(180deg); }
+                .is-matched { opacity: 0.8; transform: rotateY(180deg) scale(0.95); }
+                .card-front, .card-back {
+                    position: absolute; width: 100%; height: 100%;
+                    backface-visibility: hidden; border-radius: 12px;
+                }
+                .card-back { transform: rotateY(180deg); }
+                
+                .stun-flash-effect {
+                    position: absolute; inset: -20%; background: radial-gradient(circle, #fff, transparent);
+                    animation: flash 0.4s ease-out forwards; pointer-events: none;
+                }
+                @keyframes flash {
+                    0% { transform: scale(0.2); opacity: 1; }
+                    100% { transform: scale(2); opacity: 0; }
+                }
+                .stun-particle {
+                    position: absolute; width: 8px; height: 8px; background: #fbbf24; border-radius: 50%;
+                    animation: particle 0.6s ease-out forwards;
+                }
+                @keyframes particle {
+                    0% { transform: translate(0,0) scale(1); opacity: 1; }
+                    100% { transform: translate(var(--x-end), var(--y-end)) scale(0); opacity: 0; }
+                }
+            `}</style>
         </div>
     );
 };
