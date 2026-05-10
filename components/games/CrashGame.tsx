@@ -1,4 +1,5 @@
-
+// File: components/games/CrashGame.tsx
+// Version: 1.0.1
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useCoinSystem } from '../../context/CoinContext';
 import GlassButton from '../ui/GlassButton';
@@ -23,7 +24,8 @@ const CrashGame: React.FC = () => {
   const startTimeRef = useRef<number>(0);
   const crashPointRef = useRef<number>(0);
   const starsRef = useRef<{x: number, y: number, s: number}[]>([]);
-  const particlesRef = useRef<{x: number, y: number, life: number}[]>([]);
+  const particlesRef = useRef<{x: number, y: number, life: number, color: string, vx: number, vy: number}[]>([]);
+  const multiplierRef = useRef<number>(1.00);
   const [isShaking, setIsShaking] = useState(false);
 
   // Initialize stars
@@ -40,81 +42,6 @@ const CrashGame: React.FC = () => {
   }, []);
   
   const currencySymbol = currencyMode === 'fun' ? 'FC' : 'RC';
-
-  // --- Game Logic ---
-
-  const generateCrashPoint = () => {
-    // 1% chance of instant crash (1.00x)
-    // E = 0.99 / (1 - U)
-    const r = Math.random();
-    const crash = 0.99 / (1 - r);
-    return Math.max(1.00, Math.floor(crash * 100) / 100);
-  };
-
-  const startGame = () => {
-    if (!canBet(bet)) return;
-    
-    subtractCoins(bet, 'Crash Bet');
-    setGameState('COUNTDOWN');
-    setCountdown(3);
-    setMultiplier(1.00);
-    setHasCashedOut(false);
-    setCashedOutAt(null);
-    crashPointRef.current = generateCrashPoint();
-
-    const timer = setInterval(() => {
-      setCountdown((prev) => {
-        if (prev <= 1) {
-          clearInterval(timer);
-          startFlying();
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-  };
-
-  const startFlying = () => {
-    setGameState('FLYING');
-    startTimeRef.current = Date.now();
-    loop();
-  };
-
-  const loop = () => {
-    const now = Date.now();
-    const elapsed = (now - startTimeRef.current) / 1000; // seconds
-    
-    // Growth function: M = e^(0.06 * t) 
-    // This creates a nice accelerating curve
-    const currentM = Math.pow(Math.E, 0.1 * elapsed); // Slower start
-    
-    if (currentM >= crashPointRef.current) {
-      handleCrash(crashPointRef.current);
-    } else {
-      setMultiplier(currentM);
-      drawGraph(currentM);
-      requestRef.current = requestAnimationFrame(loop);
-    }
-  };
-
-  const handleCrash = (finalValue: number) => {
-    setGameState('CRASHED');
-    setMultiplier(finalValue);
-    setHistory(prev => [finalValue, ...prev].slice(0, 5)); // Keep last 5
-    if (requestRef.current) cancelAnimationFrame(requestRef.current);
-    setIsShaking(true);
-    setTimeout(() => setIsShaking(false), 400);
-    drawGraph(finalValue, true);
-  };
-
-  const handleCashOut = () => {
-    if (gameState === 'FLYING' && !hasCashedOut) {
-      setHasCashedOut(true);
-      setCashedOutAt(multiplier);
-      const winnings = Math.floor(bet * multiplier);
-      addCoins(winnings, 'Crash Cashout');
-    }
-  };
 
   // --- Rendering ---
 
@@ -143,7 +70,7 @@ const CrashGame: React.FC = () => {
     starsRef.current.forEach(star => {
         const x = (star.x - elapsed * 50 * star.s) % width;
         const finalX = x < 0 ? x + width : x;
-        ctx.globalAlpha = Math.random() * 0.5 + 0.5;
+        ctx.globalAlpha = 0.5;
         ctx.beginPath();
         ctx.arc(finalX, star.y, star.s, 0, Math.PI * 2);
         ctx.fill();
@@ -160,17 +87,30 @@ const CrashGame: React.FC = () => {
 
     // Add trail particles
     if (gameState === 'FLYING' && !isCrashed) {
-        particlesRef.current.push({ x: rocketX, y: rocketY, life: 1.0 });
+        for (let i = 0; i < 3; i++) {
+            particlesRef.current.push({ 
+                x: rocketX, 
+                y: rocketY, 
+                life: 1.0,
+                color: Math.random() > 0.5 ? '#f59e0b' : '#ef4444',
+                vx: -Math.random() * 2 - 1,
+                vy: (Math.random() - 0.5) * 2
+            });
+        }
     }
-    particlesRef.current = particlesRef.current.filter(p => p.life > 0);
+    
     particlesRef.current.forEach(p => {
-        p.x -= 2;
+        p.x += p.vx;
+        p.y += p.vy;
         p.life -= 0.02;
         ctx.beginPath();
-        ctx.fillStyle = `rgba(245, 158, 11, ${p.life})`;
-        ctx.arc(p.x, p.y, 3 * p.life, 0, Math.PI * 2);
+        ctx.fillStyle = p.color;
+        ctx.globalAlpha = p.life;
+        ctx.arc(p.x, p.y, 4 * p.life, 0, Math.PI * 2);
         ctx.fill();
     });
+    ctx.globalAlpha = 1.0;
+    particlesRef.current = particlesRef.current.filter(p => p.life > 0);
 
     // Draw Curve
     ctx.beginPath();
@@ -196,31 +136,97 @@ const CrashGame: React.FC = () => {
 
   }, [hasCashedOut, gameState]);
 
+  const handleCrash = useCallback((finalValue: number) => {
+    setGameState('CRASHED');
+    setMultiplier(finalValue);
+    setHistory(prev => [finalValue, ...prev].slice(0, 5));
+    if (requestRef.current) cancelAnimationFrame(requestRef.current);
+    setIsShaking(true);
+    setTimeout(() => setIsShaking(false), 400);
+    drawGraph(finalValue, true);
+  }, [drawGraph]);
+
+  const loop = useCallback(() => {
+    const now = Date.now();
+    const elapsed = (now - startTimeRef.current) / 1000;
+    const currentM = Math.pow(Math.E, 0.1 * elapsed);
+    
+    multiplierRef.current = currentM;
+    
+    if (currentM >= crashPointRef.current) {
+      handleCrash(crashPointRef.current);
+    } else {
+      setMultiplier(currentM);
+      drawGraph(currentM);
+      requestRef.current = requestAnimationFrame(loop);
+    }
+  }, [handleCrash, drawGraph]);
+
+  // --- Game Logic ---
+
+  const generateCrashPoint = () => {
+    const r = Math.random();
+    const crash = 0.99 / (1 - r);
+    return Math.max(1.00, Math.floor(crash * 100) / 100);
+  };
+
+  const startGame = () => {
+    if (!canBet(bet)) return;
+    
+    subtractCoins(bet, 'Crash Bet');
+    setGameState('COUNTDOWN');
+    setCountdown(3);
+    setMultiplier(1.00);
+    multiplierRef.current = 1.00;
+    setHasCashedOut(false);
+    setCashedOutAt(null);
+    crashPointRef.current = generateCrashPoint();
+
+    const timer = setInterval(() => {
+      setCountdown((prev) => {
+        if (prev <= 1) {
+          clearInterval(timer);
+          setGameState('FLYING');
+          startTimeRef.current = Date.now();
+          loop();
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+  };
+
+  const handleCashOut = () => {
+    if (gameState === 'FLYING' && !hasCashedOut) {
+      const currentMultiplier = multiplierRef.current;
+      setHasCashedOut(true);
+      setCashedOutAt(currentMultiplier);
+      const winnings = Math.floor(bet * currentMultiplier);
+      addCoins(winnings, 'Crash Cashout');
+    }
+  };
+
   useEffect(() => {
-      // Initial Draw
       drawGraph(1.00);
       return () => {
           if (requestRef.current) cancelAnimationFrame(requestRef.current);
       }
   }, [drawGraph]);
 
-  // Auto-resize canvas
   useEffect(() => {
       const canvas = canvasRef.current;
       if (canvas) {
           const parent = canvas.parentElement;
           if (parent) {
               canvas.width = parent.clientWidth;
-              canvas.height = 300; // Fixed height
-              drawGraph(multiplier, gameState === 'CRASHED');
+              canvas.height = 300;
+              drawGraph(multiplierRef.current, gameState === 'CRASHED');
           }
       }
-  }, [multiplier, gameState, drawGraph]);
+  }, [gameState, drawGraph]);
 
   return (
     <div className="flex flex-col items-center w-full max-w-4xl gap-6 p-4">
-      
-      {/* Header & History */}
       <div className="w-full flex justify-between items-center bg-gray-800/50 p-3 rounded-xl backdrop-blur-sm">
           <div className="flex items-center gap-2">
             <h2 className="text-2xl font-bold text-white">🚀 CRASH</h2>
@@ -234,25 +240,19 @@ const CrashGame: React.FC = () => {
           </div>
       </div>
 
-      {/* Game Display */}
       <div className={`relative w-full bg-gray-900 rounded-2xl overflow-hidden shadow-2xl border border-gray-700 ${isShaking ? 'animate-crash-shake' : ''}`}>
           <canvas ref={canvasRef} className="w-full block" />
-          
-          {/* Overlay Info */}
           <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-              
               {gameState === 'COUNTDOWN' && (
                   <div className="text-6xl font-black text-white animate-pulse">
                       Start in {countdown}
                   </div>
               )}
-
               {gameState === 'IDLE' && (
                   <div className="text-xl text-gray-400 font-mono">
                       Ready to launch
                   </div>
               )}
-
               {(gameState === 'FLYING' || gameState === 'CRASHED') && (
                    <div className={`text-6xl md:text-8xl font-black tabular-nums tracking-tighter drop-shadow-lg ${
                        gameState === 'CRASHED' ? 'text-red-500' : (hasCashedOut ? 'text-green-400' : 'text-white')
@@ -260,11 +260,9 @@ const CrashGame: React.FC = () => {
                        {multiplier.toFixed(2)}x
                    </div>
               )}
-              
               {gameState === 'CRASHED' && (
                   <div className="text-2xl text-red-500 font-bold mt-2">CRASHED</div>
               )}
-
               {hasCashedOut && (
                   <div className="text-2xl text-green-400 font-bold mt-2 bg-black/50 px-4 py-1 rounded-full border border-green-500/30 backdrop-blur-md">
                       Cashed out at {cashedOutAt?.toFixed(2)}x (+{Math.floor(bet * (cashedOutAt || 1))} {currencySymbol})
@@ -273,10 +271,7 @@ const CrashGame: React.FC = () => {
           </div>
       </div>
 
-      {/* Controls */}
       <div className="flex flex-col md:flex-row gap-4 w-full items-stretch justify-center bg-gray-800/40 p-4 rounded-2xl">
-          
-          {/* Bet Controls */}
           <div className="flex-1 flex flex-col gap-2">
               <label className="text-gray-400 text-sm font-bold ml-1">BET AMOUNT ({currencySymbol})</label>
               <div className="flex items-center gap-2 bg-gray-900 p-1 rounded-xl border border-gray-700">
@@ -312,7 +307,6 @@ const CrashGame: React.FC = () => {
               </div>
           </div>
 
-          {/* Action Button */}
           <div className="flex-1 flex items-center">
               {gameState === 'IDLE' || gameState === 'CRASHED' ? (
                    <GlassButton 

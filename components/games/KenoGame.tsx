@@ -1,5 +1,6 @@
-
-import React, { useState, useEffect } from 'react';
+// File: components/games/KenoGame.tsx
+// Version: 1.0.1
+import React, { useState, useEffect, useCallback, memo } from 'react';
 import { useCoinSystem } from '../../context/CoinContext';
 import GlassButton from '../ui/GlassButton';
 
@@ -8,9 +9,60 @@ const PAYOUTS = new Map<number, number>([
 ]);
 const MAX_PICK = 10;
 const DRAW_COUNT = 20;
-const DRAW_INTERVAL_MS = 100;
 
 type GamePhase = 'betting' | 'drawing' | 'results';
+
+interface KenoNumberProps {
+    num: number;
+    isSelected: boolean;
+    isDrawn: boolean;
+    phase: GamePhase;
+    onClick: (num: number) => void;
+    disabled: boolean;
+}
+
+const KenoNumber = memo(({ num, isSelected, isDrawn, phase, onClick, disabled }: KenoNumberProps) => {
+    const isMatch = isSelected && isDrawn;
+    
+    let style: React.CSSProperties = {};
+    let className = 'w-7 h-7 sm:w-8 sm:h-8 md:w-9 md:h-9 text-xs md:text-sm rounded-full font-bold transition-all duration-300 ';
+
+    if (phase === 'results') {
+        if (isMatch) {
+            style.backgroundColor = 'var(--keno-match-color, #10b981)';
+            style.color = 'white';
+            className += 'animate-keno-match';
+        } else if (isSelected) {
+            style.backgroundColor = 'var(--keno-miss-color, #ef4444)';
+            style.color = 'white';
+        } else if (isDrawn) {
+            style.backgroundColor = 'var(--keno-drawn-color, #f59e0b)';
+            style.color = '#111827';
+        } else {
+            className += 'bg-gray-800 hover:bg-gray-700';
+        }
+    } else if (phase === 'drawing' && isDrawn) {
+        style.backgroundColor = 'var(--keno-drawn-color, #f59e0b)';
+        style.color = '#111827';
+        className += 'animate-keno-pop';
+    } else if (isSelected) {
+        style.backgroundColor = 'var(--keno-selected-color, #3b82f6)';
+        style.color = 'white';
+    } else {
+        className += 'bg-gray-800 hover:bg-gray-700';
+    }
+
+    return (
+        <button
+            onClick={() => onClick(num)}
+            disabled={disabled}
+            className={className}
+            style={style}
+        >
+            {num}
+        </button>
+    );
+});
 
 const KenoGame: React.FC = () => {
   const { canBet, subtractCoins, addCoins, currencyMode } = useCoinSystem();
@@ -23,16 +75,17 @@ const KenoGame: React.FC = () => {
 
   const isDrawing = phase === 'drawing';
 
-  const toggleNumber = (num: number) => {
-    if (phase !== 'betting') return;
-    const newSelection = new Set(selectedNumbers);
-    if (newSelection.has(num)) {
-      newSelection.delete(num);
-    } else if (newSelection.size < MAX_PICK) {
-      newSelection.add(num);
-    }
-    setSelectedNumbers(newSelection);
-  };
+  const toggleNumber = useCallback((num: number) => {
+    setSelectedNumbers(prev => {
+        const newSelection = new Set(prev);
+        if (newSelection.has(num)) {
+            newSelection.delete(num);
+        } else if (newSelection.size < MAX_PICK) {
+            newSelection.add(num);
+        }
+        return newSelection;
+    });
+  }, []);
 
   const handleQuickPick = () => {
     if (phase !== 'betting') return;
@@ -70,15 +123,25 @@ const KenoGame: React.FC = () => {
     while (finalDrawSet.size < DRAW_COUNT) {
       const randIndex = Math.floor(Math.random() * allNumbers.length);
       const randNum = allNumbers[randIndex];
-      if (!finalDrawSet.has(randNum)) {
-        finalDrawSet.add(randNum);
-      }
+      finalDrawSet.add(randNum);
     }
     
     const finalDrawArray = Array.from(finalDrawSet);
-
+    
+    // Animation loop
     for (let i = 0; i < DRAW_COUNT; i++) {
-        await new Promise(res => setTimeout(res, DRAW_INTERVAL_MS));
+        await new Promise(res => {
+            const start = performance.now();
+            const delay = 100;
+            const step = (now: number) => {
+                if (now - start >= delay) {
+                    res(true);
+                } else {
+                    requestAnimationFrame(step);
+                }
+            };
+            requestAnimationFrame(step);
+        });
         setDrawnNumbers(prev => new Set(prev).add(finalDrawArray[i]));
     }
     
@@ -98,64 +161,25 @@ const KenoGame: React.FC = () => {
   const handlePlayAgain = () => {
       setPhase('betting');
       setDrawnNumbers(new Set());
-      setSelectedNumbers(new Set());
-      setFeedback('Select up to 10 numbers and place your bet!');
+      // selectedNumbers is PERSISTENT now
+      setFeedback('Pick more numbers or draw again!');
   }
-
-  const getNumberStyleAndClass = (num: number) => {
-    const isSelected = selectedNumbers.has(num);
-    const isDrawn = drawnNumbers.has(num);
-    const isMatch = isSelected && isDrawn;
-    
-    let style: React.CSSProperties = {};
-    let className = '';
-
-    if (phase === 'results') {
-        if (isMatch) {
-            style.backgroundColor = 'var(--keno-match-color)';
-            style.color = 'white';
-            className = 'animate-keno-match';
-        } else if (isSelected) {
-            style.backgroundColor = 'var(--keno-miss-color)';
-            style.color = 'white';
-        } else if (isDrawn) {
-            style.backgroundColor = 'var(--keno-drawn-color)';
-            style.color = '#111827';
-        }
-    } else if (phase === 'drawing' && isDrawn) {
-        style.backgroundColor = 'var(--keno-drawn-color)';
-        style.color = '#111827';
-        className = 'animate-keno-pop';
-    } else if (isSelected) {
-        style.backgroundColor = 'var(--keno-selected-color)';
-        style.color = 'white';
-    }
-    
-    if (Object.keys(style).length === 0) {
-        className += ' bg-gray-800 hover:bg-gray-700';
-    }
-
-    return { style, className };
-  };
 
   return (
     <div className="flex flex-col items-center gap-4 text-center p-2 md:p-4">
       <h2 className="text-3xl font-bold" style={{ color: 'var(--primary-text-color)' }}>Keno</h2>
       <div className={`grid grid-cols-10 gap-1 ${phase === 'drawing' ? 'keno-drawing-grid' : ''}`}>
-        {Array.from({ length: 80 }, (_, i) => i + 1).map((num) => {
-          const { style, className } = getNumberStyleAndClass(num);
-          return (
-            <button
-              key={num}
-              onClick={() => toggleNumber(num)}
-              disabled={phase !== 'betting'}
-              className={`w-7 h-7 sm:w-8 sm:h-8 md:w-9 md:h-9 text-xs md:text-sm rounded-full font-bold transition-all duration-300 ${className}`}
-              style={style}
-            >
-              {num}
-            </button>
-          );
-        })}
+        {Array.from({ length: 80 }, (_, i) => i + 1).map((num) => (
+            <KenoNumber
+                key={num}
+                num={num}
+                isSelected={selectedNumbers.has(num)}
+                isDrawn={drawnNumbers.has(num)}
+                phase={phase}
+                onClick={toggleNumber}
+                disabled={phase !== 'betting'}
+            />
+        ))}
       </div>
       <div className="bg-black/20 p-3 rounded-lg text-center w-full min-h-[40px] flex items-center justify-center text-yellow-300 font-semibold">{feedback}</div>
       <div className="flex flex-wrap items-center justify-center gap-2 md:gap-4">
@@ -171,7 +195,7 @@ const KenoGame: React.FC = () => {
         </div>
       </div>
       {phase !== 'results' ? (
-        <GlassButton onClick={handleDraw} disabled={isDrawing} className="w-full max-w-sm text-xl py-3">
+        <GlassButton onClick={handleDraw} disabled={isDrawing} className="w-full max-sm text-xl py-3">
           {isDrawing ? `Drawing... (${drawnNumbers.size}/${DRAW_COUNT})` : `Draw (${selectedNumbers.size}/${MAX_PICK})`}
         </GlassButton>
       ) : (
@@ -191,8 +215,8 @@ const KenoGame: React.FC = () => {
             z-index: 10;
         }
         @keyframes keno-match {
-            0%, 100% { box-shadow: 0 0 5px #fff, 0 0 10px var(--keno-match-color); transform: scale(1); }
-            50% { box-shadow: 0 0 15px #fff, 0 0 30px var(--keno-match-color); transform: scale(1.1); }
+            0%, 100% { box-shadow: 0 0 5px #fff, 0 0 10px var(--keno-match-color, #10b981); transform: scale(1); }
+            50% { box-shadow: 0 0 15px #fff, 0 0 30px var(--keno-match-color, #10b981); transform: scale(1.1); }
         }
         .animate-keno-match {
             animation: keno-match 1s infinite ease-in-out;

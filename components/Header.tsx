@@ -48,6 +48,7 @@ const Header: React.FC<HeaderProps> = ({ mode, setMode, simple = false, onProfil
 
         {user && (
             <div className="flex items-center gap-3">
+                <WalletMultiButton className="!bg-black/30 !h-10 !text-xs !py-0 !px-4 !rounded-full !border !border-white/20 hover:!bg-black/50" />
                 <button 
                     onClick={onProfileClick}
                     className={`flex items-center gap-2 px-3 py-1.5 rounded-full transition-colors ${isProfileActive ? 'bg-yellow-400 text-black' : 'bg-black/30 text-white hover:bg-black/40'}`}
@@ -78,9 +79,6 @@ const Header: React.FC<HeaderProps> = ({ mode, setMode, simple = false, onProfil
                         <div className={`py-1 px-3 rounded-xl shadow-inner shadow-black/50 transition-colors ${currencyMode === 'real' ? 'bg-green-500 text-gray-900' : 'bg-gray-900/70 text-green-400/60'}`}>
                         Real: <span>{Math.floor(realCoins)}</span>
                         </div>
-                    </div>
-                    <div className="hidden sm:block">
-                        <WalletMultiButton className="!bg-black/30 !h-8 !text-xs !py-0 !px-4 !rounded-full !border !border-white/20 hover:!bg-black/50" />
                     </div>
                 </div>
                 )}

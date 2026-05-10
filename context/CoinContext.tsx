@@ -55,7 +55,10 @@ interface CoinContextType {
   resetCoins: () => void;
   canBet: (amount: number) => boolean;
   transactions: Transaction[];
-  isProcessing: boolean; // Locking mechanism
+  isProcessing: boolean;
+  houseFunds: number;
+  notification: string | null;
+  clearNotification: () => void;
 }
 
 const CoinContext = createContext<CoinContextType | undefined>(undefined);
@@ -64,6 +67,8 @@ export const CoinProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const { user } = useAuth();
   const [funCoins, setFunCoins] = useState<number>(1000);
   const [realCoins, setRealCoins] = useState<number>(10);
+  const [houseFunds, setHouseFunds] = useState<number>(1000000); 
+  const [notification, setNotification] = useState<string | null>(null);
   const [currencyMode, setCurrencyMode] = useState<CurrencyMode>('fun');
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
@@ -130,23 +135,31 @@ export const CoinProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     setTransactions(prev => [newTx, ...prev].slice(0, 100));
   }, [currencyMode]);
 
+  const clearNotification = useCallback(() => setNotification(null), []);
+
   const addCoins = useCallback((amount: number, reason: string = 'Game Win', targetCurrency?: CurrencyMode) => {
     if (amount <= 0) return;
     
-    setIsProcessing(true);
     const target = targetCurrency || currencyMode;
+    if (target === 'real' && amount > houseFunds) {
+        setNotification('House funds are too low for this payout.');
+        return;
+    }
+
+    setIsProcessing(true);
     
     if (target === 'fun') {
         setFunCoins(prev => prev + amount);
     } else {
         setRealCoins(prev => prev + amount);
+        setHouseFunds(prev => prev - amount);
     }
     
     logTransaction('credit', amount, reason, target);
     
     // Tiny delay to ensure React state batching completes before releasing lock
     setTimeout(() => setIsProcessing(false), 50);
-  }, [currencyMode, logTransaction]);
+  }, [currencyMode, logTransaction, houseFunds]);
 
   const subtractCoins = useCallback((amount: number, reason: string = 'Game Bet', targetCurrency?: CurrencyMode): boolean => {
     if (amount <= 0 || isProcessing) return false;
@@ -195,8 +208,13 @@ export const CoinProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       resetCoins,
       canBet,
       transactions,
-      isProcessing
-    }}>
+      isProcessing,
+      houseFunds,
+      notification,
+      clearNotification
+      }}
+      >
+
       {children}
     </CoinContext.Provider>
   );

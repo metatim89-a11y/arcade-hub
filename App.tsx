@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { CoinProvider } from './context/CoinContext';
 import { SolanaProvider } from './context/SolanaContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { useCoinSystem } from './context/CoinContext';
 import { GameMode, Game } from './types';
 import { ADULT_GAMES, UNDER18_GAMES } from './constants';
 import Header from './components/Header';
@@ -13,9 +14,11 @@ import LoginPage from './components/auth/LoginPage';
 import SignupPage from './components/auth/SignupPage';
 import VerificationPage from './components/auth/VerificationPage';
 import ProfilePage from './components/profile/ProfilePage';
+import GlobalChat from './components/ui/GlobalChat';
 
 const AppContent: React.FC = () => {
   const { user, isAuthenticated, isLoading, verificationPendingEmail } = useAuth();
+  const { notification, clearNotification } = useCoinSystem();
   const [mode, setMode] = useState<GameMode>(GameMode.Under18);
   const [games] = useState(() => {
       // Initial games logic - effect below updates it
@@ -86,6 +89,12 @@ const AppContent: React.FC = () => {
         isProfileActive={showProfile}
       />
       <main className="flex-grow flex flex-col items-center w-full">
+        {notification && (
+            <div className="fixed top-24 z-[100] bg-red-600 text-white px-6 py-3 rounded-full shadow-2xl animate-bounce flex items-center gap-3">
+                <span>⚠️ {notification}</span>
+                <button onClick={clearNotification} className="bg-white/20 hover:bg-white/30 rounded-full w-6 h-6 flex items-center justify-center">✕</button>
+            </div>
+        )}
         {showProfile ? (
             <ProfilePage onBack={() => setShowProfile(false)} />
         ) : (
@@ -97,6 +106,7 @@ const AppContent: React.FC = () => {
             />
         )}
       </main>
+      <GlobalChat />
       <Footer />
     </div>
   );
