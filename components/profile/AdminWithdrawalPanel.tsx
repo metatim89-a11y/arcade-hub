@@ -51,6 +51,9 @@ const AdminWithdrawalPanel: React.FC = () => {
             const recipient = new PublicKey(request.userAddress);
             const lamports = Math.floor(request.netSol * LAMPORTS_PER_SOL);
 
+            // Fetch fresh blockhash
+            const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash('confirmed');
+
             const transaction = new Transaction().add(
                 SystemProgram.transfer({
                     fromPubkey: publicKey,
@@ -59,12 +62,10 @@ const AdminWithdrawalPanel: React.FC = () => {
                 })
             );
 
-            const {
-                context: { slot: minContextSlot },
-                value: { blockhash, lastValidBlockHeight }
-            } = await connection.getLatestBlockhashAndContext();
+            transaction.recentBlockhash = blockhash;
+            transaction.feePayer = publicKey;
 
-            const signature = await sendTransaction(transaction, connection, { minContextSlot });
+            const signature = await sendTransaction(transaction, connection);
             await connection.confirmTransaction({ blockhash, lastValidBlockHeight, signature });
 
             // Mark as Paid in Global Registry
@@ -76,9 +77,10 @@ const AdminWithdrawalPanel: React.FC = () => {
             
             alert(`Payout Successful! Sig: ${signature.slice(0, 8)}...`);
             loadRequests();
-        } catch (err: any) {
-            console.error('Payout failed:', err);
-            alert(`Payout Failed: ${err.message}`);
+        } catch (error: any) {
+            console.error("[payout-logic.sh] Error: " + error.message);
+            alert(`Payout Failed: ${error.message}`);
+            throw error;
         } finally {
             setIsPaying(null);
         }
