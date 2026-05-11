@@ -1,5 +1,5 @@
 
-// constants.tsx v0.0.9 - Game Registry
+// constants.tsx v0.0.10 - Game Registry
 import { Game } from './types';
 import KenoGame from './components/games/KenoGame';
 import PlinkoGame from './components/games/PlinkoGame';
@@ -17,7 +17,7 @@ import CoinPusherGame from './components/games/CoinPusherGame';
 import RPSCardGame from './components/games/RPSCardGame';
 import TicTacToeGame from './components/games/TicTacToeGame';
 
-export const APP_VERSION = '0.0.9';
+export const APP_VERSION = '0.0.10';
 
 export const ADULT_GAMES: Game[] = [
     { id: 'wheel', label: 'Spin Wheel', component: SpinWheelGame },
