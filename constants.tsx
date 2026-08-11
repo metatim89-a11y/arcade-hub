@@ -34,7 +34,7 @@ export const ADULT_GAMES: Game[] = [
 export const UNDER18_GAMES: Game[] = [
     { id: 'worm', label: 'Worm.io', component: WormGame },
     { id: 'connect4', label: 'Connect Four', component: ConnectFourGame },
-    { id: 'rubikscube', label: "Rubik's Cube", component: RubiksCubeGame },
+    { id: 'rubikscube', label: 'Color Recall', component: RubiksCubeGame },
     { id: 'mancala', label: 'Mancala', component: MancalaGame },
     { id: 'rps', label: 'RPS Cards', component: RPSCardGame },
     { id: 'tictactoe', label: 'Tic Tac Toe', component: TicTacToeGame },

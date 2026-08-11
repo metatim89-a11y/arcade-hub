@@ -7,12 +7,10 @@ const SHELF_WIDTH = 320;
 const SHELF_HEIGHT = 420;
 const PUSHER_HOME_Y = 64;
 const PUSHER_EXTENDED_Y = 215;
-const LOWER_PUSHER_HOME_Y = 266;
-const LOWER_PUSHER_EXTENDED_Y = 350;
 const MIN_PUSH_MS = 1400;
 const MAX_PUSH_MS = 2800;
 const SLOW_ZONE_Y = SHELF_HEIGHT * 0.7;
-const PRIZE_EDGE_Y = 394;
+const PRIZE_EDGE_Y = SHELF_HEIGHT + 8;
 const GUTTER_WIDTH = 44;
 const BET_AMOUNT = 10;
 const PAYOUT_PER_COIN = 5;
@@ -48,10 +46,9 @@ type DisplayCoin = {
 type DisplayFrame = {
   coins: DisplayCoin[];
   pusherY: number;
-  lowerPusherY: number;
   cycleProgress: number;
   strokeDuration: number;
-  activePusher: 'upper' | 'lower';
+  isAdvancing: boolean;
 };
 
 type PayoutBatch = {
@@ -68,10 +65,9 @@ const CoinPusherGame: React.FC = () => {
   const [frame, setFrame] = useState<DisplayFrame>({
     coins: [],
     pusherY: PUSHER_HOME_Y,
-    lowerPusherY: LOWER_PUSHER_HOME_Y,
     cycleProgress: 0,
     strokeDuration: MIN_PUSH_MS,
-    activePusher: 'upper'
+    isAdvancing: true
   });
   const [isDropping, setIsDropping] = useState(false);
   const [feedback, setFeedback] = useState('Tap the shelf to drop a coin. The pusher runs automatically.');
@@ -143,8 +139,9 @@ const CoinPusherGame: React.FC = () => {
       friction: 0.05,
       restitution: 0.04
     };
-    const leftWall = Matter.Bodies.rectangle(-8, SHELF_HEIGHT / 2, 16, SHELF_HEIGHT, wallOptions);
-    const rightWall = Matter.Bodies.rectangle(SHELF_WIDTH + 8, SHELF_HEIGHT / 2, 16, SHELF_HEIGHT, wallOptions);
+    // Rails stop at 70% so crowded coins can genuinely spill off either side of the final run.
+    const leftWall = Matter.Bodies.rectangle(-8, SLOW_ZONE_Y / 2, 16, SLOW_ZONE_Y, wallOptions);
+    const rightWall = Matter.Bodies.rectangle(SHELF_WIDTH + 8, SLOW_ZONE_Y / 2, 16, SLOW_ZONE_Y, wallOptions);
     const backWall = Matter.Bodies.rectangle(SHELF_WIDTH / 2, -8, SHELF_WIDTH, 16, wallOptions);
     const pusher = Matter.Bodies.rectangle(SHELF_WIDTH / 2, PUSHER_HOME_Y, SHELF_WIDTH - 22, 42, {
       isStatic: true,
@@ -152,19 +149,7 @@ const CoinPusherGame: React.FC = () => {
       restitution: 0.02,
       label: 'pusher'
     });
-    const lowerPusher = Matter.Bodies.rectangle(
-      SHELF_WIDTH / 2,
-      LOWER_PUSHER_HOME_Y,
-      SHELF_WIDTH - 22,
-      20,
-      {
-        isStatic: true,
-        friction: 0.08,
-        restitution: 0.02,
-        label: 'lower-pusher'
-      }
-    );
-    Matter.World.add(world, [leftWall, rightWall, backWall, pusher, lowerPusher]);
+    Matter.World.add(world, [leftWall, rightWall, backWall, pusher]);
 
     const startingCoins: Matter.Body[] = [];
     const addStartingRow = (row: number, y: number) => {
@@ -208,14 +193,9 @@ const CoinPusherGame: React.FC = () => {
       }
       const cycleProgress = Math.min(1, (time - strokeStartedAt) / strokeDuration);
       const easedProgress = easeInOut(cycleProgress);
-      // The linked drive keeps the plates opposite: as one advances, the other retracts.
-      const upperTravel = upperIsAdvancing ? easedProgress : 1 - easedProgress;
-      const lowerTravel = 1 - upperTravel;
-      const pusherY = PUSHER_HOME_Y + upperTravel * (PUSHER_EXTENDED_Y - PUSHER_HOME_Y);
-      const lowerPusherY = LOWER_PUSHER_HOME_Y
-        + lowerTravel * (LOWER_PUSHER_EXTENDED_Y - LOWER_PUSHER_HOME_Y);
+      const pusherTravel = upperIsAdvancing ? easedProgress : 1 - easedProgress;
+      const pusherY = PUSHER_HOME_Y + pusherTravel * (PUSHER_EXTENDED_Y - PUSHER_HOME_Y);
       Matter.Body.setPosition(pusher, { x: SHELF_WIDTH / 2, y: pusherY }, true);
-      Matter.Body.setPosition(lowerPusher, { x: SHELF_WIDTH / 2, y: lowerPusherY }, true);
 
       Matter.Engine.update(engine, delta);
 
@@ -224,14 +204,16 @@ const CoinPusherGame: React.FC = () => {
       for (const body of world.bodies) {
         if (body.label !== 'coin') continue;
 
-        // The playfield is continuous. Extra drag in the final 30% makes the prize approach deliberate.
-        body.frictionAir = body.position.y >= SLOW_ZONE_Y ? 0.22 : 0.09;
-        if (body.position.y >= SLOW_ZONE_Y) {
-          Matter.Body.setVelocity(body, { x: body.velocity.x * 0.985, y: body.velocity.y * 0.975 });
-        }
+        // The last 30% is a slower open run: its sides are unrailed, but collection is only at the bottom.
+        body.frictionAir = body.position.y >= SLOW_ZONE_Y ? 0.14 : 0.09;
+        const radius = body.circleRadius ?? QUARTER_RADIUS;
+        const slippedOffSide = body.position.y >= SLOW_ZONE_Y
+          && (body.position.x < -radius || body.position.x > SHELF_WIDTH + radius);
+        if (slippedOffSide) gutterCoins.push(body);
         if (body.position.y > PRIZE_EDGE_Y) {
-          if (body.position.x < GUTTER_WIDTH || body.position.x > SHELF_WIDTH - GUTTER_WIDTH) gutterCoins.push(body);
-          else prizeCoins.push(body);
+          if (body.position.x < GUTTER_WIDTH || body.position.x > SHELF_WIDTH - GUTTER_WIDTH) {
+            if (!gutterCoins.includes(body)) gutterCoins.push(body);
+          } else prizeCoins.push(body);
         }
       }
 
@@ -257,10 +239,9 @@ const CoinPusherGame: React.FC = () => {
         setFrame({
           coins,
           pusherY,
-          lowerPusherY,
           cycleProgress,
           strokeDuration,
-          activePusher: upperIsAdvancing ? 'upper' : 'lower'
+          isAdvancing: upperIsAdvancing
         });
       }
 
@@ -427,8 +408,8 @@ const CoinPusherGame: React.FC = () => {
 
       <div className="coin-pusher-machine">
         <div className="coin-pusher-topbar">
-          <span>OPPOSED PUSHERS · RANDOM 1.4–2.8S</span>
-          <span>{frame.activePusher.toUpperCase()} · {secondsToSwitch.toFixed(1)}S</span>
+          <span>SINGLE AUTO PUSHER · RANDOM 1.4–2.8S</span>
+          <span>{frame.isAdvancing ? 'PUSHING' : 'RETURNING'} · {secondsToSwitch.toFixed(1)}S</span>
         </div>
         <div
           className={`coin-pusher-shelf${isDropping ? ' dropping' : ''}`}
@@ -452,12 +433,6 @@ const CoinPusherGame: React.FC = () => {
           </div>
           <div className="coin-pusher-plate" style={{ top: `${((frame.pusherY - 21) / SHELF_HEIGHT) * 100}%` }}>
             <div className="coin-pusher-plate-face">AUTO PUSH</div>
-          </div>
-          <div
-            className="coin-pusher-lower-plate"
-            style={{ top: `${((frame.lowerPusherY - 10) / SHELF_HEIGHT) * 100}%` }}
-          >
-            <span>OPPOSED PUSH</span>
           </div>
           {bumpersActive && [
             { x: 82, y: 318 }, { x: 160, y: 346 }, { x: 238, y: 318 }, { x: 112, y: 376 }, { x: 208, y: 376 }
@@ -508,7 +483,7 @@ const CoinPusherGame: React.FC = () => {
         >
           {isDropping ? 'DROPPING…' : `DROP AT ${Math.round(aimPercent)}% · ${BET_AMOUNT} ${currencySymbol}`}
         </button>
-        <p>One continuous table—no ledges. The final 30% slows every coin; center drops pay and both edge gutters do not.</p>
+        <p>One pusher and one continuous table. The final 30% has open sides: only coins reaching the center tray at the very end pay.</p>
       </div>
 
       <style>{`
@@ -522,6 +497,7 @@ const CoinPusherGame: React.FC = () => {
         .coin-pusher-coin{position:absolute;z-index:3;display:grid;place-items:center;height:auto;aspect-ratio:1;pointer-events:none;border:2px solid #777;border-radius:50%;background:radial-gradient(circle at 32% 27%,#fff 0,#cdd2d5 25%,#8c9499 72%,#555d62 100%);box-shadow:0 3px 5px rgba(0,0,0,.45),inset 0 0 0 2px rgba(255,255,255,.2);color:#42494d;font:bold clamp(5px,2.2vw,9px)/1 sans-serif;will-change:left,top,transform}.coin-pusher-coin.penny{border-color:#814626;background:radial-gradient(circle at 32% 27%,#ffd09d 0,#bd713f 30%,#854525 72%,#542916 100%);color:#5f2d17}.coin-pusher-coin.dime{border-style:double}.coin-pusher-coin.quarter{box-shadow:0 3px 5px rgba(0,0,0,.45),inset 0 0 0 2px rgba(255,255,255,.25),inset 0 0 0 4px rgba(60,66,70,.18)}.coin-pusher-coin.lower{filter:saturate(.92) brightness(.92)}.coin-pusher-coin.player{z-index:4;box-shadow:0 0 0 2px #55c8f3,0 0 13px rgba(87,199,240,.72),inset 0 0 0 2px rgba(255,255,255,.25)}
         .coin-pusher-tray{display:flex;justify-content:space-between;align-items:center;padding:13px 8px;color:#91a3b5;font-size:10px;font-weight:800;letter-spacing:.12em}.coin-pusher-tray strong{color:#f4cd58;font-size:15px;letter-spacing:.02em}
         .coin-pusher-controls{display:grid;gap:10px;width:min(100%,520px);margin:18px auto 2px}.coin-pusher-controls label{color:#aab9c6;font-size:12px;font-weight:750}.coin-pusher-controls input{width:100%;accent-color:#62c8ef}.coin-pusher-controls>button{width:100%;padding:15px;border:1px solid #d99d24;border-radius:10px;background:linear-gradient(#f5c94e,#d88718);box-shadow:0 5px 0 #84500e;color:#2e2108;font-size:16px;font-weight:950;letter-spacing:.04em;cursor:pointer}.coin-pusher-controls>button:active:not(:disabled){transform:translateY(4px);box-shadow:0 1px 0 #84500e}.coin-pusher-controls button:disabled{filter:saturate(.25);opacity:.62;cursor:not-allowed}.coin-pusher-powers{display:grid;grid-template-columns:repeat(3,1fr);gap:7px}.coin-pusher-powers button{display:grid;place-items:center;gap:2px;min-width:0;padding:9px 4px;border:1px solid #365b70;border-radius:8px;background:linear-gradient(#17384b,#0b2331);color:#dff6ff;cursor:pointer}.coin-pusher-powers span{font-size:20px}.coin-pusher-powers strong{font-size:9px;letter-spacing:.08em}.coin-pusher-powers small{color:#78a4b7;font-size:7px}.coin-pusher-controls p{margin:3px 0 0;text-align:center;color:#8496a8;font-size:11px}
+        .coin-pusher-gutter{z-index:2;top:70%;bottom:0;height:auto;background:linear-gradient(90deg,rgba(5,10,14,.72),rgba(18,29,37,.08));border-top:1px solid rgba(97,113,123,.35)}.coin-pusher-gutter.left{border-right:2px dashed rgba(113,137,150,.28)}.coin-pusher-gutter.right{border-left:2px dashed rgba(113,137,150,.28);background:linear-gradient(270deg,rgba(5,10,14,.72),rgba(18,29,37,.08))}
         @keyframes pusher-pulse{0%,68%,100%{transform:scale(1);filter:brightness(1)}34%{transform:scale(1.2);filter:brightness(1.35)}}
         @media(max-width:520px){.coin-pusher-game{padding:12px;border-radius:12px}.coin-pusher-header{align-items:flex-end}.coin-pusher-header h2{font-size:22px}.coin-pusher-rules{font-size:10px}.coin-pusher-machine{padding:8px 8px 0}.coin-pusher-controls{margin-top:13px}}
       `}</style>

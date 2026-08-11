@@ -239,7 +239,7 @@ const MancalaGame: React.FC<MancalaProps> = ({ playMode, playerNames }) => {
             
             {/* Middle: Board (centered) */}
             <div className="flex items-center justify-center">
-                <div className="w-full max-w-6xl flex items-center justify-center gap-3 md:gap-6">
+                <div className="w-full max-w-5xl flex items-center justify-center gap-3 md:gap-4">
                     {/* Player 2 Score */}
                     <div className="w-20 md:w-28 text-center">
                         <div className="font-bold text-lg -mb-1">{p2Name}</div>
@@ -315,9 +315,9 @@ const MancalaGame: React.FC<MancalaProps> = ({ playMode, playerNames }) => {
             <button onClick={() => handleReset()} className="justify-self-center bg-yellow-500 text-gray-900 font-bold py-2 px-6 rounded-lg hover:bg-yellow-400 transition-colors"> Reset Game </button>
 
             <style>{`
-                .mancala-board { position: relative; min-height: 300px; box-shadow: inset 0 0 32px rgba(54,20,4,.72), 0 16px 30px rgba(0,0,0,.32); }
-                .mancala-board .mancala-pit { min-height: 118px; border-radius: 44%; }
-                .mancala-board .mancala-store { min-height: 250px; border-radius: 42%; }
+                .mancala-board { position: relative; min-height: 240px; box-shadow: inset 0 0 32px rgba(54,20,4,.72), 0 16px 30px rgba(0,0,0,.32); }
+                .mancala-board .mancala-pit { min-height: 92px; border-radius: 44%; }
+                .mancala-board .mancala-store { min-height: 198px; border-radius: 42%; }
                 .mancala-board .stone { width: 23%; height: 23%; border: 1px solid rgba(255,255,255,.35); box-shadow: inset -3px -4px 5px rgba(0,0,0,.34), inset 2px 2px 4px rgba(255,255,255,.5), 0 3px 4px rgba(0,0,0,.38); }
                 .stone-ruby { background: radial-gradient(circle at 30% 25%,#ffb5ba,#d92f45 48%,#6d0d1a); }
                 .stone-sapphire { background: radial-gradient(circle at 30% 25%,#b8e0ff,#347bd1 48%,#153869); }
