@@ -186,7 +186,7 @@ const GameArea: React.FC<GameAreaProps> = ({ games, selectedGame, onSelectGame, 
           className={`w-full h-full flex flex-col items-center justify-center ${previousGameProps ? 'game-transition-in' : ''}`}
           style={{
             paddingBlock: 'var(--game-area-padding-y)',
-            paddingInline: 'var(--game-area-padding-x)',
+            paddingInline: activeGameProps.game.id === 'slots' ? 'clamp(.35rem, 2vw, 1rem)' : 'var(--game-area-padding-x)',
           }}
         >
             <ActiveGameComponent 

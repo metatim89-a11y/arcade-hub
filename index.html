@@ -347,67 +347,7 @@
 
   .solution-controls { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
   
-  /* Coin Pusher Styles */
-  .cp-game-wrapper { width: 100%; height: 100%; min-height: 600px; background-color: #0d1a2e; color: #e0e0e0; display: flex; font-family: 'Arial', sans-serif; border-radius: 12px; overflow: hidden; }
-  .cp-header { display: flex; justify-content: space-between; align-items: center; padding: 12px; background: #12233f; border-bottom: 1px solid #2e456b; }
-  .cp-main-content { flex-grow: 1; display: flex; flex-direction: column; position: relative; }
-  
-  .coin-pusher-scene { flex-grow: 1; display: flex; justify-content: center; align-items: center; perspective: 1000px; overflow: hidden; background: radial-gradient(circle at center, #1a2b4a, #0d1a2e); }
-  .coin-pusher-world { transform-style: preserve-3d; transform: rotateX(45deg) rotateZ(0deg) translateY(-30px); width: 320px; height: 400px; position: relative; }
-  
-  .pusher-bed { 
-      position: absolute; 
-      inset: 0; 
-      background: #1c3256; 
-      border: 8px solid #2e456b; 
-      border-radius: 4px; 
-      transform: translateZ(-20px); 
-      box-shadow: inset 0 0 30px rgba(0,0,0,0.8);
-  }
-  
-  .pusher-wall {
-      position: absolute;
-      background: linear-gradient(to right, #d4af37, #ffd700, #d4af37);
-      height: 40px;
-      width: 100%;
-      transform-origin: top;
-      transform: translateZ(20px);
-      box-shadow: 0 0 15px rgba(255, 215, 0, 0.3);
-  }
-  
-  @keyframes coin-pulse-rotate {
-    0% { transform: rotateY(0deg); filter: brightness(1); }
-    50% { filter: brightness(1.2); }
-    100% { transform: rotateY(360deg); filter: brightness(1); }
-  }
-  .animate-coin {
-      animation: coin-pulse-rotate 6s infinite linear;
-  }
-
-  .cp-coin {
-    position: absolute;
-    width: 26px; height: 26px;
-    background: radial-gradient(circle at 30% 30%, #fff, #ffd700 60%);
-    border-radius: 50%;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.5), inset 0 0 2px rgba(255,255,255,0.5);
-    transition: transform 0.1s linear;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 14px;
-    color: #b8860b;
-    font-weight: bold;
-  }
-  .cp-coin::before { content: '$'; }
-
-  .cp-controls-wrapper { padding: 16px; background: #08111f; border-top: 1px solid #2e456b; }
-  .cp-action-btn { width: 100%; padding: 16px; border-radius: 8px; border: none; font-size: 18px; font-weight: bold; cursor: pointer; transition: all 0.1s; text-transform: uppercase; letter-spacing: 1px; }
-  .cp-action-btn.primary { background: linear-gradient(to bottom, #ffd700, #f59e0b); color: #3d2500; box-shadow: 0 4px 0 #b45309; }
-  .cp-action-btn.primary:active { transform: translateY(4px); box-shadow: none; }
-  .cp-action-btn:disabled { background: #4b5563; color: #9ca3af; cursor: not-allowed; box-shadow: none; }
-  
 </style>
-<link rel="stylesheet" href="/index.css">
 </head>
   <body>
     <div id="root" class="w-full"></div>

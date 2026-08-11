@@ -3,43 +3,22 @@ import React, { createContext, useState, useEffect, useContext, ReactNode, useCa
 import { CurrencyMode, Transaction } from '../types';
 import { useAuth } from './AuthContext';
 
-// --- Security Utilities ---
-// These are private to this file to prevent external tampering
-const SECRET_SALT = 'ARCADE_HUB_SECURE_SALT_v1';
+// --- API Utilities ---
+const API_BASE = 'http://localhost:3001/api';
 
-async function generateIntegrityHash(data: string): Promise<string> {
-    const encoder = new TextEncoder();
-    const dataWithSalt = encoder.encode(data + SECRET_SALT);
-    const hashBuffer = await crypto.subtle.digest('SHA-256', dataWithSalt);
-    const hashArray = Array.from(new Uint8Array(hashBuffer));
-    return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-}
-
-async function secureSave(key: string, value: any) {
-    const stringValue = JSON.stringify(value);
-    const hash = await generateIntegrityHash(stringValue);
-    localStorage.setItem(key, btoa(stringValue)); // Simple obfuscation
-    localStorage.setItem(`${key}_hash`, hash);
-}
-
-async function secureLoad(key: string): Promise<any | null> {
-    const obfuscatedValue = localStorage.getItem(key);
-    const storedHash = localStorage.getItem(`${key}_hash`);
-    
-    if (!obfuscatedValue || !storedHash) return null;
+async function fetchFromBackend(endpoint: string, method: string = 'GET', body?: any, wallet?: string) {
+    const headers: any = { 'Content-Type': 'application/json' };
+    if (wallet) headers['x-wallet-address'] = wallet;
 
     try {
-        const stringValue = atob(obfuscatedValue);
-        const calculatedHash = await generateIntegrityHash(stringValue);
-        
-        if (calculatedHash !== storedHash) {
-            console.error(`Security Alert: Tampering detected in ${key}! Integrity check failed.`);
-            return null; // Data is corrupted/tampered
-        }
-        
-        return JSON.parse(stringValue);
-    } catch (e) {
-        console.error(`Security Alert: Failed to decode ${key}. Data may be corrupted.`);
+        const response = await fetch(`${API_BASE}${endpoint}`, {
+            method,
+            headers,
+            body: body ? JSON.stringify(body) : undefined
+        });
+        return await response.json();
+    } catch (error) {
+        console.error(`Backend Error (${endpoint}):`, error);
         return null;
     }
 }
@@ -50,8 +29,9 @@ interface CoinContextType {
   currencyMode: CurrencyMode;
   setCurrencyMode: (mode: CurrencyMode) => void;
   coins: number; 
-  addCoins: (amount: number, reason?: string, targetCurrency?: CurrencyMode) => void;
-  subtractCoins: (amount: number, reason?: string, targetCurrency?: CurrencyMode) => boolean;
+  addCoins: (amount: number, reason?: string, targetCurrency?: CurrencyMode) => Promise<boolean>;
+  subtractCoins: (amount: number, reason?: string, targetCurrency?: CurrencyMode) => Promise<boolean>;
+  syncBalance: () => Promise<void>;
   resetCoins: () => void;
   canBet: (amount: number) => boolean;
   transactions: Transaction[];
@@ -66,62 +46,41 @@ const CoinContext = createContext<CoinContextType | undefined>(undefined);
 export const CoinProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const { user } = useAuth();
   const [funCoins, setFunCoins] = useState<number>(1000);
-  const [realCoins, setRealCoins] = useState<number>(10);
+  const [realCoins, setRealCoins] = useState<number>(0);
   const [houseFunds, setHouseFunds] = useState<number>(1000000); 
   const [notification, setNotification] = useState<string | null>(null);
   const [currencyMode, setCurrencyMode] = useState<CurrencyMode>('fun');
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
   const [isLoaded, setIsLoaded] = useState<boolean>(false);
+  const localFunCoinsKey = user ? `arcade_fun_coins_${user.id}` : 'arcade_fun_coins_guest';
 
-  // Load secure data when user changes
+  // Load data from backend when user changes
   useEffect(() => {
-    const initializeStorage = async () => {
+    const initializeFromBackend = async () => {
       if (user) {
-        const userId = user.id;
-        const loadedFun = await secureLoad(`funCoins_${userId}`);
-        const loadedReal = await secureLoad(`realCoins_${userId}`);
-        const loadedTx = await secureLoad(`transactions_${userId}`);
+        const userId = user.id; // Wallet address
+        const data = await fetchFromBackend('/auth', 'POST', { wallet: userId });
         
-        // If loaded data is null (failed integrity check), we reset to defaults for safety
-        if (loadedFun !== null) setFunCoins(Number(loadedFun));
-        if (loadedReal !== null) setRealCoins(Number(loadedReal));
-        if (loadedTx !== null) setTransactions(loadedTx);
+        if (data) {
+            setFunCoins(data.funCoins);
+            setRealCoins(data.realCoins);
+        } else {
+            const savedFunCoins = Number(localStorage.getItem(localFunCoinsKey));
+            setFunCoins(Number.isFinite(savedFunCoins) && savedFunCoins >= 0 ? savedFunCoins : 1000);
+        }
       } else {
         setFunCoins(1000);
-        setRealCoins(10);
+        setRealCoins(0);
         setTransactions([]);
       }
       setIsLoaded(true);
     };
 
-    initializeStorage();
-  }, [user]);
-
-  // Save balances whenever they change, but only after initial load
-  useEffect(() => {
-    if (!isLoaded || !user) return;
-
-    const saveBalances = async () => {
-        await secureSave(`funCoins_${user.id}`, funCoins);
-        await secureSave(`realCoins_${user.id}`, realCoins);
-    };
-    saveBalances();
-  }, [funCoins, realCoins, user, isLoaded]);
-
-  // Save transactions
-  useEffect(() => {
-    if (!isLoaded || !user) return;
-
-    const saveTransactions = async () => {
-        await secureSave(`transactions_${user.id}`, transactions);
-    };
-    saveTransactions();
-  }, [transactions, user, isLoaded]);
-
+    initializeFromBackend();
+  }, [user, localFunCoinsKey]);
 
   const activeBalance = currencyMode === 'fun' ? funCoins : realCoins;
-  const updateActiveBalance = currencyMode === 'fun' ? setFunCoins : setRealCoins;
 
   const logTransaction = useCallback((type: 'credit' | 'debit', amount: number, reason: string, currency: CurrencyMode = currencyMode) => {
     const newTx: Transaction = {
@@ -137,60 +96,107 @@ export const CoinProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const clearNotification = useCallback(() => setNotification(null), []);
 
-  const addCoins = useCallback((amount: number, reason: string = 'Game Win', targetCurrency?: CurrencyMode) => {
-    if (amount <= 0) return;
+  const addCoins = useCallback(async (amount: number, reason: string = 'Game Win', targetCurrency?: CurrencyMode) => {
+    if (amount <= 0 || !user) return false;
     
     const target = targetCurrency || currencyMode;
     if (target === 'real' && amount > houseFunds) {
         setNotification('House funds are too low for this payout.');
-        return;
+        return false;
     }
 
     setIsProcessing(true);
     
-    if (target === 'fun') {
-        setFunCoins(prev => prev + amount);
-    } else {
-        setRealCoins(prev => prev + amount);
-        setHouseFunds(prev => prev - amount);
-    }
-    
-    logTransaction('credit', amount, reason, target);
-    
-    // Tiny delay to ensure React state batching completes before releasing lock
-    setTimeout(() => setIsProcessing(false), 50);
-  }, [currencyMode, logTransaction, houseFunds]);
+    const result = await fetchFromBackend('/game/result', 'POST', {
+        wallet: user.id,
+        type: 'credit',
+        amount,
+        reason,
+        currency: target
+    }, user.id);
 
-  const subtractCoins = useCallback((amount: number, reason: string = 'Game Bet', targetCurrency?: CurrencyMode): boolean => {
-    if (amount <= 0 || isProcessing) return false;
+    if (result && result.success) {
+        if (target === 'fun') setFunCoins(result.funCoins);
+        else setRealCoins(result.realCoins);
+        logTransaction('credit', amount, reason, target);
+        setIsProcessing(false);
+        return true;
+    }
+
+    if (!result && target === 'fun') {
+        setFunCoins(current => {
+            const next = current + amount;
+            localStorage.setItem(localFunCoinsKey, String(next));
+            return next;
+        });
+        logTransaction('credit', amount, reason, target);
+        setIsProcessing(false);
+        return true;
+    }
+
+    if (!result && target === 'real') setNotification('Real Coin service is offline. Switch to Fun Coins to play locally.');
+
+    setIsProcessing(false);
+    return false;
+  }, [currencyMode, localFunCoinsKey, logTransaction, houseFunds, user]);
+
+  const subtractCoins = useCallback(async (amount: number, reason: string = 'Game Bet', targetCurrency?: CurrencyMode): Promise<boolean> => {
+    if (amount <= 0 || isProcessing || !user) return false;
 
     const target = targetCurrency || currencyMode;
-    const balance = target === 'fun' ? funCoins : realCoins;
 
-    // Check balance before locking
-    if (balance >= amount) {
-      setIsProcessing(true);
-      
-      if (target === 'fun') {
-          setFunCoins(prev => prev - amount);
-      } else {
-          setRealCoins(prev => prev - amount);
-      }
-      
-      logTransaction('debit', amount, reason, target);
-      
-      setTimeout(() => setIsProcessing(false), 50);
-      return true;
+    setIsProcessing(true);
+
+    const result = await fetchFromBackend('/game/result', 'POST', {
+        wallet: user.id,
+        type: 'debit',
+        amount,
+        reason,
+        currency: target
+    }, user.id);
+
+    if (result && result.success) {
+        if (target === 'fun') setFunCoins(result.funCoins);
+        else setRealCoins(result.realCoins);
+        logTransaction('debit', amount, reason, target);
+        setIsProcessing(false);
+        return true;
     }
+
+    if (!result && target === 'fun' && funCoins >= amount) {
+        const next = funCoins - amount;
+        setFunCoins(next);
+        localStorage.setItem(localFunCoinsKey, String(next));
+        logTransaction('debit', amount, reason, target);
+        setIsProcessing(false);
+        return true;
+    }
+
+    if (!result && target === 'real') setNotification('Real Coin service is offline. Switch to Fun Coins to play locally.');
     
+    setIsProcessing(false);
     return false;
-  }, [funCoins, realCoins, currencyMode, isProcessing, logTransaction]);
+  }, [currencyMode, funCoins, isProcessing, localFunCoinsKey, logTransaction, user]);
+
+  const syncBalance = useCallback(async () => {
+    if (user) {
+        const data = await fetchFromBackend('/balance', 'GET', undefined, user.id);
+      if (data) {
+          setFunCoins(data.funCoins);
+          setRealCoins(data.realCoins);
+      } else {
+          const savedFunCoins = Number(localStorage.getItem(localFunCoinsKey));
+          if (Number.isFinite(savedFunCoins) && savedFunCoins >= 0) setFunCoins(savedFunCoins);
+      }
+    }
+  }, [user, localFunCoinsKey]);
 
   const resetCoins = useCallback(() => {
       setFunCoins(1000);
-      setRealCoins(10);
+      localStorage.setItem(localFunCoinsKey, '1000');
+      setRealCoins(0);
       setTransactions([]);
-  }, []);
+  }, [localFunCoinsKey]);
 
   const canBet = useCallback((amount: number) => {
     return activeBalance >= amount && amount > 0 && !isProcessing;
@@ -205,6 +211,7 @@ export const CoinProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       coins: activeBalance,
       addCoins, 
       subtractCoins, 
+      syncBalance,
       resetCoins,
       canBet,
       transactions,
