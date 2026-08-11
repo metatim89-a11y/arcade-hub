@@ -1,6 +1,6 @@
 
 // App.tsx v0.0.7 - Core Application Shell
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { CoinProvider } from './context/CoinContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { useCoinSystem } from './context/CoinContext';
@@ -15,6 +15,7 @@ import VerificationPage from './components/auth/VerificationPage';
 import ProfilePage from './components/profile/ProfilePage';
 import GlobalChat from './components/ui/GlobalChat';
 import { AdminSettingsProvider } from './context/AdminSettingsContext';
+import { recordSiteEvent } from './lib/analytics';
 
 const AppContent: React.FC = () => {
   const { user, isAuthenticated, isLoading, verificationPendingEmail } = useAuth();
@@ -30,6 +31,10 @@ const AppContent: React.FC = () => {
   const [authView, setAuthView] = useState<'login' | 'signup'>('login');
   const [showProfile, setShowProfile] = useState(false);
 
+  useEffect(() => {
+    void recordSiteEvent('page_view', undefined, user && !user.isGuest ? user.id : undefined);
+  }, [user?.id]);
+
   // Handle Game Mode switching
   const handleSetMode = (newMode: GameMode) => {
     if (mode !== newMode) {
@@ -37,6 +42,11 @@ const AppContent: React.FC = () => {
       const newGames = newMode === GameMode.Adult ? ADULT_GAMES : UNDER18_GAMES;
       setSelectedGame(newGames[0]);
     }
+  };
+
+  const handleSelectGame = (game: Game) => {
+    setSelectedGame(game);
+    void recordSiteEvent('game_opened', game.id, user && !user.isGuest ? user.id : undefined);
   };
 
   if (isLoading) {
@@ -101,7 +111,7 @@ const AppContent: React.FC = () => {
             <GameArea 
                 games={activeGames} 
                 selectedGame={activeGames.find(g => g.id === selectedGame.id) || activeGames[0]} 
-                onSelectGame={setSelectedGame} 
+                onSelectGame={handleSelectGame}
                 mode={mode}
             />
         )}

@@ -5,13 +5,15 @@ import { useCoinSystem } from '../../context/CoinContext';
 import GlassButton from '../ui/GlassButton';
 
 const ProfilePage: React.FC<{ onBack: () => void }> = ({ onBack }) => {
-  const { user, updateProfile } = useAuth();
+  const { user, updateProfile, changePassword } = useAuth();
   const { funCoins, realCoins, transactions } = useCoinSystem();
   
   // Profile State
   const [isEditing, setIsEditing] = useState(false);
   const [bio, setBio] = useState(user?.bio || '');
   const [avatar, setAvatar] = useState(user?.avatar || '');
+  const [newPassword, setNewPassword] = useState('');
+  const [accountMessage, setAccountMessage] = useState('');
   const [activeTab, setActiveTab] = useState<'overview' | 'history' | 'dev'>('overview');
   const [historyFilter, setHistoryFilter] = useState<'all' | 'gaming'>('all');
 
@@ -24,9 +26,30 @@ const ProfilePage: React.FC<{ onBack: () => void }> = ({ onBack }) => {
 
   if (!user) return null;
 
-  const handleSave = () => {
-    updateProfile({ bio, avatar });
-    setIsEditing(false);
+  const handleSave = async () => {
+    setAccountMessage('');
+    try {
+      await updateProfile({ bio, avatar });
+      setIsEditing(false);
+      setAccountMessage('Profile saved.');
+    } catch (error) {
+      setAccountMessage(error instanceof Error ? error.message : 'Unable to save profile.');
+    }
+  };
+
+  const handlePasswordChange = async () => {
+    setAccountMessage('');
+    if (newPassword.length < 6) {
+      setAccountMessage('Password must be at least 6 characters.');
+      return;
+    }
+    try {
+      await changePassword(newPassword);
+      setNewPassword('');
+      setAccountMessage('Password updated securely.');
+    } catch (error) {
+      setAccountMessage(error instanceof Error ? error.message : 'Unable to update password.');
+    }
   };
 
   // Filter transactions
@@ -166,6 +189,16 @@ const ProfilePage: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                             </div>
                         )}
                     </div>
+                    {!user.isGuest && (
+                        <div className="w-full rounded-xl border border-white/10 bg-black/25 p-3 text-left">
+                            <label className="ml-1 text-[10px] font-bold uppercase text-gray-500">Change Password</label>
+                            <div className="mt-1 flex gap-2">
+                                <input type="password" minLength={6} value={newPassword} onChange={(event) => setNewPassword(event.target.value)} className="min-w-0 flex-1 rounded border border-gray-600 bg-gray-800 p-2 text-xs text-white outline-none focus:border-yellow-400" placeholder="New password" />
+                                <button type="button" onClick={handlePasswordChange} className="rounded bg-blue-600 px-3 text-xs font-bold text-white hover:bg-blue-500">Update</button>
+                            </div>
+                        </div>
+                    )}
+                    {accountMessage && <p className="mt-3 text-xs text-yellow-200">{accountMessage}</p>}
                 </div>
 
                 {/* Stats & Balances */}

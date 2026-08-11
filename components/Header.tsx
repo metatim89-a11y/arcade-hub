@@ -1,5 +1,5 @@
 
-import React, { useRef, useState } from 'react';
+import React, { useState } from 'react';
 import { GameMode } from '../types';
 import { useCoinSystem } from '../context/CoinContext';
 import { useAuth } from '../context/AuthContext';
@@ -20,35 +20,15 @@ const Header: React.FC<HeaderProps> = ({ mode, setMode, simple = false, onProfil
   const { user, logout } = useAuth();
   const isCasinoMode = mode === GameMode.Adult;
   const [showAdmin, setShowAdmin] = useState(false);
-  const adminSequenceRef = useRef({ step: 0, lastAt: 0 });
-
-  const handleVersionClick = () => {
-      const now = Date.now();
-      const sequence = adminSequenceRef.current;
-      if (now - sequence.lastAt > 8000) sequence.step = 0;
-      sequence.lastAt = now;
-      sequence.step = sequence.step >= 1 && sequence.step <= 4 ? sequence.step + 1 : 0;
-  };
 
   const handleProfileClick = () => {
-      const now = Date.now();
-      const sequence = adminSequenceRef.current;
-      if (now - sequence.lastAt > 8000) sequence.step = 0;
-      if (sequence.step === 5) {
-          sequence.step = 0;
-          sequence.lastAt = 0;
-          setShowAdmin(true);
-          return;
-      }
-      sequence.step = 1;
-      sequence.lastAt = now;
       onProfileClick?.();
   };
 
   const versionButton = (
-      <button type="button" onClick={handleVersionClick} className="absolute top-2 right-3 z-10 rounded px-1.5 py-0.5 text-[9px] font-bold tracking-wider text-white/45 hover:text-white/75" title={`Arcade Hub version ${APP_VERSION}`}>
+      <span className="absolute top-2 right-3 z-10 rounded px-1.5 py-0.5 text-[9px] font-bold tracking-wider text-white/45" title={`Arcade Hub version ${APP_VERSION}`}>
           v{APP_VERSION}
-      </button>
+      </span>
   );
   const disclaimer = (
       <div className="w-full rounded-lg border border-amber-300/35 bg-black/35 px-3 py-2 text-center text-[10px] font-bold uppercase tracking-wide text-amber-100 md:text-xs">
@@ -96,6 +76,15 @@ const Header: React.FC<HeaderProps> = ({ mode, setMode, simple = false, onProfil
                     <img src={user.avatar} alt="avatar" className="w-8 h-8 rounded-full border border-white/50" />
                     <span className="font-semibold hidden sm:inline">{user.username}</span>
                 </button>
+                {user.isAdmin && (
+                    <button
+                        type="button"
+                        onClick={() => setShowAdmin(true)}
+                        className="rounded-lg border border-sky-300/50 bg-sky-950/60 px-3 py-2 text-xs font-bold text-sky-100 hover:bg-sky-900/70"
+                    >
+                        Admin
+                    </button>
+                )}
                 <button 
                     onClick={logout}
                     className="text-xs text-red-200 hover:text-red-100 hover:underline"

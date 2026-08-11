@@ -1,6 +1,7 @@
-
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, ReactNode, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import type { User as SupabaseUser } from '@supabase/supabase-js';
 import { User } from '../types';
+import { getSupabase, isSupabaseConfigured } from '../lib/supabase';
 
 interface AuthContextType {
   user: User | null;
@@ -9,63 +10,47 @@ interface AuthContextType {
   login: (identifier: string, password: string) => Promise<void>;
   loginAsGuest: () => Promise<void>;
   signup: (username: string, email: string, password: string) => Promise<void>;
-  verifyEmail: (email: string, code: string) => Promise<boolean>;
+  resendVerification: (email: string) => Promise<void>;
   cancelVerification: () => void;
-  logout: () => void;
-  updateProfile: (data: Partial<User>) => void;
+  logout: () => Promise<void>;
+  updateProfile: (data: Partial<User>) => Promise<void>;
+  changePassword: (password: string) => Promise<void>;
   verificationPendingEmail: string | null;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
+const GUEST_SESSION_KEY = 'arcade_guest_session';
+const ADMIN_LOGIN_EMAIL = String(import.meta.env.VITE_ADMIN_EMAIL || '');
 
-// Default Users Configuration
-const ADMIN_USER = {
-  id: 'admin_root_001',
-  username: '5ides5ales',
-  email: '5ide4ustle5ales@gmail.com',
-  password: 'admin',
-  isVerified: true,
-  verificationCode: null,
-  joinedAt: new Date().toISOString(),
-  avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Admin',
-  bio: 'System Administrator'
+const defaultAvatar = (seed: string) => `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(seed)}`;
+
+const removeLegacyPasswordStorage = () => {
+  window.localStorage.removeItem('arcade_users');
+  window.localStorage.removeItem('arcade_session');
 };
 
-const TEST_USER = {
-  id: 'test_user_001',
-  username: '5idespi',
-  email: 'test@5ides.com',
-  password: 'password',
-  isVerified: true,
-  verificationCode: null,
-  joinedAt: new Date().toISOString(),
-  avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=5idespi',
-  bio: 'Test Account'
+const loadPlayer = async (authUser: SupabaseUser): Promise<User> => {
+  const supabase = getSupabase();
+  const [{ data: profile, error: profileError }, { data: adminAssignment, error: adminError }] = await Promise.all([
+    supabase.from('profiles').select('display_name, bio, avatar_url, created_at').eq('id', authUser.id).maybeSingle(),
+    supabase.from('admin_users').select('user_id').eq('user_id', authUser.id).maybeSingle(),
+  ]);
+
+  if (profileError) throw profileError;
+  if (adminError) throw adminError;
+
+  const username = profile?.display_name || String(authUser.user_metadata?.display_name || authUser.email?.split('@')[0] || 'Player');
+  return {
+    id: authUser.id,
+    username,
+    email: authUser.email || '',
+    isVerified: Boolean(authUser.email_confirmed_at),
+    avatar: profile?.avatar_url || defaultAvatar(username),
+    bio: profile?.bio || '',
+    joinedAt: profile?.created_at || authUser.created_at,
+    isAdmin: Boolean(adminAssignment),
+  };
 };
-
-// Mock database helper
-const getStoredUsers = (): any[] => {
-    const stored = localStorage.getItem('arcade_users');
-    let users = stored ? JSON.parse(stored) : [];
-    
-    // Ensure Admin user exists and has updated username
-    const adminIdx = users.findIndex((u: any) => u.email === ADMIN_USER.email);
-    if (adminIdx === -1) {
-        users.push(ADMIN_USER);
-    } else {
-        users[adminIdx].username = ADMIN_USER.username; // Update username if email matches
-    }
-
-    // Ensure Test user exists
-    if (!users.find((u: any) => u.username === TEST_USER.username)) {
-        users.push(TEST_USER);
-    }
-    
-    localStorage.setItem('arcade_users', JSON.stringify(users));
-    return users;
-};
-
-const saveStoredUsers = (users: any[]) => localStorage.setItem('arcade_users', JSON.stringify(users));
 
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
@@ -73,187 +58,166 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [verificationPendingEmail, setVerificationPendingEmail] = useState<string | null>(null);
 
   useEffect(() => {
-    // Check for active session
-    const sessionUser = localStorage.getItem('arcade_session');
-    if (sessionUser) {
-      setUser(JSON.parse(sessionUser));
-    } else {
-        // Initialize DB on load to ensure Admin exists even if no session
-        getStoredUsers();
+    removeLegacyPasswordStorage();
+    const guest = window.localStorage.getItem(GUEST_SESSION_KEY);
+
+    if (!isSupabaseConfigured) {
+      if (guest) setUser(JSON.parse(guest));
+      setIsLoading(false);
+      return;
     }
-    setIsLoading(false);
+
+    const supabase = getSupabase();
+    let active = true;
+
+    const applyAuthUser = async (authUser: SupabaseUser | null) => {
+      if (!active) return;
+      if (!authUser) {
+        setUser(guest ? JSON.parse(guest) : null);
+        setIsLoading(false);
+        return;
+      }
+
+      try {
+        const player = await loadPlayer(authUser);
+        if (active) setUser(player);
+      } catch (error) {
+        console.error('Unable to load player profile', error);
+        if (active) setUser(null);
+      } finally {
+        if (active) setIsLoading(false);
+      }
+    };
+
+    void supabase.auth.getUser().then(({ data, error }) => {
+      if (error) console.error('Unable to restore session', error);
+      return applyAuthUser(data.user);
+    });
+
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session) window.localStorage.removeItem(GUEST_SESSION_KEY);
+      void applyAuthUser(session?.user ?? null);
+    });
+
+    return () => {
+      active = false;
+      listener.subscription.unsubscribe();
+    };
   }, []);
 
-  const login = async (identifier: string, password: string) => {
+  const login = useCallback(async (identifier: string, password: string) => {
     setIsLoading(true);
-    // Simulate API delay
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    try {
+      const normalized = identifier.trim().toLowerCase();
+      if (normalized === 'admin' && !ADMIN_LOGIN_EMAIL) {
+        throw new Error('The administrator login alias is not configured.');
+      }
+      const email = normalized === 'admin' ? ADMIN_LOGIN_EMAIL : normalized;
+      if (!email.includes('@')) throw new Error('Use your email address to sign in. The administrator may use “admin”.');
 
-    const users = getStoredUsers();
-    
-    // Check if identifier matches email OR username
-    const foundUser = users.find(u => 
-        (u.email.toLowerCase() === identifier.toLowerCase() || u.username.toLowerCase() === identifier.toLowerCase()) && 
-        u.password === password
-    );
-
-    if (!foundUser) {
+      const { data, error } = await getSupabase().auth.signInWithPassword({ email, password });
+      if (error) throw error;
+      if (!data.user) throw new Error('Sign in did not return a user.');
+      window.localStorage.removeItem(GUEST_SESSION_KEY);
+      setUser(await loadPlayer(data.user));
+    } finally {
       setIsLoading(false);
-      throw new Error('Invalid username/email or password');
     }
+  }, []);
 
-    if (!foundUser.isVerified) {
-      setIsLoading(false);
-      setVerificationPendingEmail(foundUser.email);
-      throw new Error('Account not verified. Please check your email.');
-    }
-
-    const { password: _, verificationCode: __, ...safeUser } = foundUser;
-    setUser(safeUser);
-    localStorage.setItem('arcade_session', JSON.stringify(safeUser));
-    setIsLoading(false);
-  };
-
-  const loginAsGuest = async () => {
-    setIsLoading(true);
-    await new Promise(resolve => setTimeout(resolve, 600));
-
+  const loginAsGuest = useCallback(async () => {
     const guestUser: User = {
-      id: `guest_${Date.now()}`,
+      id: `guest_${crypto.randomUUID()}`,
       username: 'Guest Player',
       email: '',
-      isVerified: true, // Guests are implicitly verified to play
-      avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${Date.now()}`,
+      isVerified: true,
+      avatar: defaultAvatar(crypto.randomUUID()),
       bio: 'Just passing through...',
       joinedAt: new Date().toISOString(),
-      isGuest: true
+      isGuest: true,
+      isAdmin: false,
     };
-
+    window.localStorage.setItem(GUEST_SESSION_KEY, JSON.stringify(guestUser));
     setUser(guestUser);
-    localStorage.setItem('arcade_session', JSON.stringify(guestUser));
-    setIsLoading(false);
-  };
+  }, []);
 
-  const signup = async (username: string, email: string, password: string) => {
+  const signup = useCallback(async (username: string, email: string, password: string) => {
     setIsLoading(true);
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    try {
+      const redirectTo = new URL(import.meta.env.BASE_URL, window.location.origin).toString();
+      const { data, error } = await getSupabase().auth.signUp({
+        email: email.trim().toLowerCase(),
+        password,
+        options: { data: { display_name: username.trim() }, emailRedirectTo: redirectTo },
+      });
+      if (error) throw error;
 
-    const users = getStoredUsers();
-    
-    if (users.find(u => u.email.toLowerCase() === email.toLowerCase())) {
+      if (data.session && data.user) {
+        setUser(await loadPlayer(data.user));
+      } else {
+        setVerificationPendingEmail(email.trim().toLowerCase());
+      }
+    } finally {
       setIsLoading(false);
-      throw new Error('Email already exists');
     }
+  }, []);
 
-    if (users.find(u => u.username.toLowerCase() === username.toLowerCase())) {
-        setIsLoading(false);
-        throw new Error('Username already taken');
+  const resendVerification = useCallback(async (email: string) => {
+    const redirectTo = new URL(import.meta.env.BASE_URL, window.location.origin).toString();
+    const { error } = await getSupabase().auth.resend({ type: 'signup', email, options: { emailRedirectTo: redirectTo } });
+    if (error) throw error;
+  }, []);
+
+  const cancelVerification = useCallback(() => setVerificationPendingEmail(null), []);
+
+  const logout = useCallback(async () => {
+    window.localStorage.removeItem(GUEST_SESSION_KEY);
+    if (isSupabaseConfigured) {
+      const { error } = await getSupabase().auth.signOut();
+      if (error) console.error('Unable to end Supabase session', error);
     }
-
-    // Generate a mock 6-digit code
-    const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
-    
-    // In a real app, this would send an email. Here we log it.
-    console.log(`%c[Email Service] Verification code for ${email}: ${verificationCode}`, "color: #4ade80; font-weight: bold; font-size: 14px;");
-    
-    const newUser = {
-      id: Date.now().toString(),
-      username,
-      email,
-      password,
-      isVerified: false,
-      verificationCode,
-      joinedAt: new Date().toISOString(),
-      avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${username}`,
-      bio: 'Ready to play!'
-    };
-
-    users.push(newUser);
-    saveStoredUsers(users);
-    setVerificationPendingEmail(email);
-    setIsLoading(false);
-  };
-
-  const verifyEmail = async (email: string, code: string): Promise<boolean> => {
-    setIsLoading(true);
-    await new Promise(resolve => setTimeout(resolve, 800));
-
-    const users = getStoredUsers();
-    const userIndex = users.findIndex(u => u.email === email);
-
-    if (userIndex === -1) {
-      setIsLoading(false);
-      throw new Error('User not found');
-    }
-
-    if (users[userIndex].verificationCode === code) {
-      users[userIndex].isVerified = true;
-      users[userIndex].verificationCode = null; // Clear code
-      saveStoredUsers(users);
-      
-      // Auto login
-      const { password: _, ...safeUser } = users[userIndex];
-      setUser(safeUser);
-      localStorage.setItem('arcade_session', JSON.stringify(safeUser));
-      
-      setVerificationPendingEmail(null);
-      setIsLoading(false);
-      return true;
-    }
-
-    setIsLoading(false);
-    return false;
-  };
-
-  const cancelVerification = () => {
-      setVerificationPendingEmail(null);
-  };
-
-  const logout = () => {
     setUser(null);
-    localStorage.removeItem('arcade_session');
-  };
+  }, []);
 
-  const updateProfile = (data: Partial<User>) => {
-    if (!user) return;
-    const updatedUser = { ...user, ...data };
-    setUser(updatedUser);
-    localStorage.setItem('arcade_session', JSON.stringify(updatedUser));
+  const updateProfile = useCallback(async (data: Partial<User>) => {
+    if (!user || user.isGuest) return;
+    const updates = {
+      display_name: data.username ?? user.username,
+      bio: data.bio ?? user.bio ?? null,
+      avatar_url: data.avatar ?? user.avatar ?? null,
+      last_seen_at: new Date().toISOString(),
+    };
+    const { error } = await getSupabase().from('profiles').update(updates).eq('id', user.id);
+    if (error) throw error;
+    setUser((current) => current ? { ...current, ...data } : current);
+  }, [user]);
 
-    // Update DB only if not guest (guests are not in DB)
-    if (!user.isGuest) {
-        const users = getStoredUsers();
-        const idx = users.findIndex(u => u.id === user.id);
-        if (idx !== -1) {
-        users[idx] = { ...users[idx], ...data };
-        saveStoredUsers(users);
-        }
-    }
-  };
+  const changePassword = useCallback(async (password: string) => {
+    if (!user || user.isGuest) throw new Error('Guest accounts do not have passwords.');
+    const { error } = await getSupabase().auth.updateUser({ password });
+    if (error) throw error;
+  }, [user]);
 
-  return (
-    <AuthContext.Provider value={{ 
-      user, 
-      isAuthenticated: !!user, 
-      isLoading, 
-      login, 
-      loginAsGuest,
-      signup, 
-      verifyEmail,
-      cancelVerification,
-      logout, 
-      updateProfile,
-      verificationPendingEmail
-    }}>
-      {children}
-    </AuthContext.Provider>
-  );
+  const value = useMemo(() => ({
+    user,
+    isAuthenticated: Boolean(user),
+    isLoading,
+    login,
+    loginAsGuest,
+    signup,
+    resendVerification,
+    cancelVerification,
+    logout,
+    updateProfile,
+    changePassword,
+    verificationPendingEmail,
+  }), [cancelVerification, changePassword, isLoading, login, loginAsGuest, logout, resendVerification, signup, updateProfile, user, verificationPendingEmail]);
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
 
 export const useAuth = () => {
   const context = useContext(AuthContext);
-  if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
+  if (!context) throw new Error('useAuth must be used within an AuthProvider');
   return context;
 };

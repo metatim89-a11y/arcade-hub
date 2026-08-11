@@ -24,6 +24,7 @@ export interface User {
   bio?: string;
   joinedAt: string;
   isGuest?: boolean;
+  isAdmin?: boolean;
 }
 
 export interface Transaction {
