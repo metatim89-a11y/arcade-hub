@@ -101,7 +101,7 @@ const SlotsGame: React.FC = () => {
     }
     const credited = await addCoins(amount, 'Slots Win', roundCurrency);
     if (!mountedRef.current) return;
-    if (!credited) { setPhase('IDLE'); setAutoSpin(false); setStatus('The payout service did not confirm this win.'); return; }
+    if (!credited) { setPhase('IDLE'); setAutoSpin(false); setStatus('The virtual-credit update could not be applied.'); return; }
     setLastWin(amount); setWinInfo({ winningPaylines: lines, totalWin: amount }); setPhase('WIN');
     setStatus(label);
     if (amount >= totalBet * 10) celebrate(amount >= totalBet * 30 ? 'MEGA WIN' : 'BIG WIN', amount);
@@ -207,7 +207,7 @@ const SlotsGame: React.FC = () => {
       const grandTotal = round.baseWin + bonusWin;
       const credited = await addCoins(grandTotal, 'Slots Hold & Spin Win', round.currency);
       if (!mountedRef.current) return;
-      if (!credited) { setPhase('IDLE'); setAutoSpin(false); setStatus('Bonus payout was not confirmed.'); return; }
+      if (!credited) { setPhase('IDLE'); setAutoSpin(false); setStatus('The bonus credit could not be applied.'); return; }
       setLastWin(grandTotal); setWinInfo({ winningPaylines: round.winningLines, totalWin: grandTotal }); setPhase('WIN');
       setStatus(`${fullBoard ? 'FULL VAULT 2×! ' : ''}Hold & Spin won ${grandTotal} ${round.currency === 'fun' ? 'FC' : 'RC'}!`);
       celebrate(fullBoard ? 'FULL VAULT' : grandTotal >= totalBet * 10 ? 'BONUS WIN' : 'VAULT WIN', grandTotal);

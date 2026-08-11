@@ -3,7 +3,6 @@ import React, { useRef, useState } from 'react';
 import { GameMode } from '../types';
 import { useCoinSystem } from '../context/CoinContext';
 import { useAuth } from '../context/AuthContext';
-import { WalletMultiButton } from '@solana/wallet-adapter-react-ui';
 import { APP_VERSION } from '../constants';
 import AdminPanel from './admin/AdminPanel';
 
@@ -21,17 +20,29 @@ const Header: React.FC<HeaderProps> = ({ mode, setMode, simple = false, onProfil
   const { user, logout } = useAuth();
   const isCasinoMode = mode === GameMode.Adult;
   const [showAdmin, setShowAdmin] = useState(false);
-  const versionClicksRef = useRef({ count: 0, lastAt: 0 });
+  const adminSequenceRef = useRef({ step: 0, lastAt: 0 });
 
   const handleVersionClick = () => {
       const now = Date.now();
-      const clicks = versionClicksRef.current;
-      clicks.count = now - clicks.lastAt > 2500 ? 1 : clicks.count + 1;
-      clicks.lastAt = now;
-      if (clicks.count >= 5) {
-          clicks.count = 0;
+      const sequence = adminSequenceRef.current;
+      if (now - sequence.lastAt > 8000) sequence.step = 0;
+      sequence.lastAt = now;
+      sequence.step = sequence.step >= 1 && sequence.step <= 4 ? sequence.step + 1 : 0;
+  };
+
+  const handleProfileClick = () => {
+      const now = Date.now();
+      const sequence = adminSequenceRef.current;
+      if (now - sequence.lastAt > 8000) sequence.step = 0;
+      if (sequence.step === 5) {
+          sequence.step = 0;
+          sequence.lastAt = 0;
           setShowAdmin(true);
+          return;
       }
+      sequence.step = 1;
+      sequence.lastAt = now;
+      onProfileClick?.();
   };
 
   const versionButton = (
@@ -39,17 +50,23 @@ const Header: React.FC<HeaderProps> = ({ mode, setMode, simple = false, onProfil
           v{APP_VERSION}
       </button>
   );
+  const disclaimer = (
+      <div className="w-full rounded-lg border border-amber-300/35 bg-black/35 px-3 py-2 text-center text-[10px] font-bold uppercase tracking-wide text-amber-100 md:text-xs">
+          🚧 Site building in progress · Arcade Hub does not pay out real money · All coins and RC are virtual with no cash value · Monthly cash-prize tournaments will be announced with separate official rules and eligibility requirements
+      </div>
+  );
 
   const buttonClasses = "text-sm md:text-base border-none py-2 px-4 rounded-lg bg-gray-800 text-yellow-400 cursor-pointer shadow-md transition-colors duration-200";
   const activeButtonClasses = "bg-yellow-400 text-gray-800";
 
   if (simple) {
       return (
-        <header className="relative flex justify-center items-center p-6 bg-gradient-to-r from-[#a87c4f] to-[#7e3c3c] shadow-lg border-b-2 border-yellow-400/20 w-full">
+        <header className="relative flex flex-col justify-center items-center gap-4 p-6 bg-gradient-to-r from-[#a87c4f] to-[#7e3c3c] shadow-lg border-b-2 border-yellow-400/20 w-full">
             {versionButton}
             <h1 className="text-3xl md:text-4xl tracking-wider text-yellow-400 [text-shadow:0_2px_8px_rgba(182,137,45,0.26),0_0_2px_#fff] font-bold">
             🎲 Game Arcade Hub
             </h1>
+            {disclaimer}
             {showAdmin && <AdminPanel onClose={() => setShowAdmin(false)} />}
         </header>
       );
@@ -72,9 +89,8 @@ const Header: React.FC<HeaderProps> = ({ mode, setMode, simple = false, onProfil
 
         {user && (
             <div className="flex items-center gap-3">
-                <WalletMultiButton className="!bg-black/30 !h-10 !text-xs !py-0 !px-4 !rounded-full !border !border-white/20 hover:!bg-black/50" />
                 <button 
-                    onClick={onProfileClick}
+                    onClick={handleProfileClick}
                     className={`flex items-center gap-2 px-3 py-1.5 rounded-full transition-colors ${isProfileActive ? 'bg-yellow-400 text-black' : 'bg-black/30 text-white hover:bg-black/40'}`}
                 >
                     <img src={user.avatar} alt="avatar" className="w-8 h-8 rounded-full border border-white/50" />
@@ -101,7 +117,7 @@ const Header: React.FC<HeaderProps> = ({ mode, setMode, simple = false, onProfil
                         Fun: <span>{Math.floor(funCoins)}</span>
                         </div>
                         <div className={`py-1 px-3 rounded-xl shadow-inner shadow-black/50 transition-colors ${currencyMode === 'real' ? 'bg-green-500 text-gray-900' : 'bg-gray-900/70 text-green-400/60'}`}>
-                        Real: <span>{Math.floor(realCoins)}</span>
+                        Virtual RC: <span>{Math.floor(realCoins)}</span>
                         </div>
                     </div>
                 </div>
@@ -135,6 +151,7 @@ const Header: React.FC<HeaderProps> = ({ mode, setMode, simple = false, onProfil
             </div>
         </div>
       )}
+      {disclaimer}
       {showAdmin && <AdminPanel onClose={() => setShowAdmin(false)} />}
     </header>
   );

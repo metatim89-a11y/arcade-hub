@@ -264,10 +264,6 @@ const CrashGame: React.FC = () => {
     const cleanBet = Math.min(MAX_BET, Math.max(MIN_BET, Math.floor(bet)));
     setBet(cleanBet);
 
-    if (currencyMode === 'real') {
-      setMessage('Real Coin Crash is disabled until a server-authoritative round service is connected.');
-      return;
-    }
     if (!canBet(cleanBet)) {
       setMessage(`You need at least ${cleanBet} ${currencySymbol} to launch.`);
       return;
@@ -325,12 +321,6 @@ const CrashGame: React.FC = () => {
   useEffect(() => {
     autoTargetRef.current = autoTarget;
   }, [autoTarget]);
-
-  useEffect(() => {
-    if (currencyMode === 'real' && controlsOpen) {
-      setMessage('Real Coin Crash is disabled until a server-authoritative round service is connected.');
-    }
-  }, [controlsOpen, currencyMode]);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -453,7 +443,7 @@ const CrashGame: React.FC = () => {
             <button
               type="button"
               className="crash-action launch"
-              disabled={!controlsOpen || isStarting || isProcessing || !canBet(bet) || currencyMode === 'real'}
+              disabled={!controlsOpen || isStarting || isProcessing || !canBet(bet)}
               onClick={() => void startGame()}
             >
               <small>{isStarting ? 'CONFIRMING BET' : gameState === 'CRASHED' ? 'NEXT FLIGHT' : 'PLACE BET'}</small>
@@ -466,7 +456,7 @@ const CrashGame: React.FC = () => {
       <footer className="crash-footer">
         <span>1.00× minimum</span>
         <span>1% mathematical edge</span>
-        <span>{currencyMode === 'fun' ? 'Fun Coin mode' : 'Real Coin rounds unavailable'}</span>
+        <span>{currencyMode === 'fun' ? 'Fun Coin mode' : 'Virtual RC mode · no cash value'}</span>
       </footer>
 
       <style>{`

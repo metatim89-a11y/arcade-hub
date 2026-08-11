@@ -2,7 +2,6 @@
 // App.tsx v0.0.7 - Core Application Shell
 import React, { useState } from 'react';
 import { CoinProvider } from './context/CoinContext';
-import { SolanaProvider } from './context/SolanaContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { useCoinSystem } from './context/CoinContext';
 import { GameMode, Game } from './types';
@@ -118,9 +117,7 @@ function App() {
     <AuthProvider>
         <AdminSettingsProvider>
             <CoinProvider>
-                <SolanaProvider>
-                    <AppContent />
-                </SolanaProvider>
+                <AppContent />
             </CoinProvider>
         </AdminSettingsProvider>
     </AuthProvider>

@@ -9,6 +9,9 @@ const Footer: React.FC = () => {
         <p>
           Arcade Hub <span className="text-yellow-400/20 text-xs">v{APP_VERSION}</span> · Made by 5idescoder
         </p>
+        <p className="max-w-3xl px-4 text-[10px] font-bold uppercase leading-relaxed tracking-wide text-amber-200/70">
+          Site building in progress. Arcade Hub does not pay out real money. All gameplay balances are virtual and have no cash value. Monthly cash-prize tournaments will use separate official rules, eligibility requirements, and winner verification.
+        </p>
         <a 
           href="https://github.com/5idescoder" 
           className="text-yellow-400/60 hover:text-yellow-400 hover:underline transition-colors flex items-center gap-1"

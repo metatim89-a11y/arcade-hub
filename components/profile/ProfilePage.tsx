@@ -3,8 +3,6 @@ import React, { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useCoinSystem } from '../../context/CoinContext';
 import GlassButton from '../ui/GlassButton';
-import BankingPanel from './BankingPanel';
-import AdminWithdrawalPanel from './AdminWithdrawalPanel';
 
 const ProfilePage: React.FC<{ onBack: () => void }> = ({ onBack }) => {
   const { user, updateProfile } = useAuth();
@@ -14,8 +12,8 @@ const ProfilePage: React.FC<{ onBack: () => void }> = ({ onBack }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [bio, setBio] = useState(user?.bio || '');
   const [avatar, setAvatar] = useState(user?.avatar || '');
-  const [activeTab, setActiveTab] = useState<'overview' | 'history' | 'dev' | 'banking'>('overview');
-  const [historyFilter, setHistoryFilter] = useState<'all' | 'gaming' | 'banking'>('all');
+  const [activeTab, setActiveTab] = useState<'overview' | 'history' | 'dev'>('overview');
+  const [historyFilter, setHistoryFilter] = useState<'all' | 'gaming'>('all');
 
   // Dev/Git State
   const [currentBranch, setCurrentBranch] = useState('main');
@@ -33,9 +31,7 @@ const ProfilePage: React.FC<{ onBack: () => void }> = ({ onBack }) => {
 
   // Filter transactions
   const filteredTransactions = transactions.filter(tx => {
-      const isBanking = tx.reason.toLowerCase().includes('solana') || tx.reason.toLowerCase().includes('withdraw');
-      if (historyFilter === 'banking') return isBanking;
-      if (historyFilter === 'gaming') return !isBanking;
+      if (historyFilter === 'gaming') return true;
       return true;
   });
 
@@ -99,12 +95,6 @@ const ProfilePage: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                     className={`px-6 py-2 rounded-lg text-sm font-bold transition-all whitespace-nowrap ${activeTab === 'history' ? 'bg-yellow-400 text-black shadow-lg' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}
                 >
                     History
-                </button>
-                <button 
-                    onClick={() => setActiveTab('banking')}
-                    className={`px-6 py-2 rounded-lg text-sm font-bold transition-all whitespace-nowrap ${activeTab === 'banking' ? 'bg-green-500 text-white shadow-lg shadow-green-500/30' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}
-                >
-                    💰 Banking
                 </button>
                 <button 
                     onClick={() => setActiveTab('dev')}
@@ -178,13 +168,6 @@ const ProfilePage: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                     </div>
                 </div>
 
-                {/* Admin Withdrawal Panel (Only for 5ides5ales) */}
-                {user.username === '5ides5ales' && (
-                    <div className="md:col-span-3">
-                        <AdminWithdrawalPanel />
-                    </div>
-                )}
-
                 {/* Stats & Balances */}
                 <div className="md:col-span-2 flex flex-col gap-6">
                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -198,8 +181,9 @@ const ProfilePage: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                          {/* Real Balance */}
                          <div className="bg-gradient-to-br from-green-500/10 to-emerald-500/5 border border-green-500/20 rounded-2xl p-6 relative overflow-hidden">
                              <div className="absolute top-0 right-0 p-4 opacity-10 text-6xl">💵</div>
-                             <h3 className="text-gray-400 text-sm font-bold uppercase tracking-wider mb-2">Real Coins Balance</h3>
+                             <h3 className="text-gray-400 text-sm font-bold uppercase tracking-wider mb-2">Virtual Arcade Credits</h3>
                              <div className="text-4xl font-black text-green-400">{Math.floor(realCoins).toLocaleString()} <span className="text-lg">RC</span></div>
+                             <p className="mt-2 text-[10px] font-bold uppercase tracking-wide text-green-200/50">No cash value · no withdrawal</p>
                          </div>
                      </div>
 
@@ -238,13 +222,6 @@ const ProfilePage: React.FC<{ onBack: () => void }> = ({ onBack }) => {
             </div>
         )}
 
-        {/* BANKING TAB */}
-        {activeTab === 'banking' && (
-            <div className="max-w-2xl mx-auto">
-                <BankingPanel />
-            </div>
-        )}
-
         {/* HISTORY TAB */}
         {activeTab === 'history' && (
             <div className="bg-gray-900/80 border border-gray-700 rounded-2xl p-6 backdrop-blur-sm">
@@ -262,12 +239,6 @@ const ProfilePage: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                             className={`px-4 py-1.5 rounded-md text-xs font-bold transition-all ${historyFilter === 'gaming' ? 'bg-yellow-400 text-black shadow-md' : 'text-gray-400 hover:text-white'}`}
                         >
                             Gaming
-                        </button>
-                        <button 
-                            onClick={() => setHistoryFilter('banking')}
-                            className={`px-4 py-1.5 rounded-md text-xs font-bold transition-all ${historyFilter === 'banking' ? 'bg-yellow-400 text-black shadow-md' : 'text-gray-400 hover:text-white'}`}
-                        >
-                            Banking
                         </button>
                     </div>
                 </div>

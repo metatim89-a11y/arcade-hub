@@ -55,7 +55,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
             <section className="admin-balance-card">
               <div><span>COIN BALANCES</span><small>Reset or assign the current browser’s balances.</small></div>
               <label>Fun Coins<input type="number" min="0" step="1" value={nextFunCoins} onChange={(event) => setNextFunCoins(event.target.value)} /></label>
-              <label>Real Coins<input type="number" min="0" step="1" value={nextRealCoins} onChange={(event) => setNextRealCoins(event.target.value)} /></label>
+              <label>Virtual RC<input type="number" min="0" step="1" value={nextRealCoins} onChange={(event) => setNextRealCoins(event.target.value)} /></label>
               <div className="admin-balance-actions"><button type="button" onClick={() => { setNextFunCoins('1000'); setNextRealCoins('0'); setCoinBalances(1000, 0); }}>RESET DEFAULTS</button><button type="button" className="primary" onClick={saveBalances}>APPLY BALANCES</button></div>
             </section>
             <section className="admin-rtp-card">

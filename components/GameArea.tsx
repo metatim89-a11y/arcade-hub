@@ -36,7 +36,7 @@ const GameOptionsSelector: React.FC<{
           Play with Fun Coins
         </button>
         <button onClick={() => setCurrencyMode('real')} className={`${buttonClass} ${currencyMode === 'real' ? 'bg-green-500 text-gray-900' : 'bg-gray-700 text-green-400 hover:bg-gray-600'}`}>
-          Play with Real Coins
+          Play with Virtual RC
         </button>
       </div>
     );
