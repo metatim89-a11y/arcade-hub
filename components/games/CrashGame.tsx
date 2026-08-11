@@ -14,6 +14,7 @@ const MIN_BET = 10;
 const MAX_BET = 100000;
 const COUNTDOWN_SECONDS = 3;
 const GROWTH_RATE = 0.115;
+const CRASH_RTP = 0.95;
 
 const secureRandom = () => {
   const values = new Uint32Array(1);
@@ -22,7 +23,7 @@ const secureRandom = () => {
 };
 
 const generateCrashPoint = () => {
-  const point = 0.99 / (1 - secureRandom());
+  const point = CRASH_RTP / (1 - secureRandom());
   return Math.min(1000, Math.max(1, Math.floor(point * 100) / 100));
 };
 
@@ -64,7 +65,7 @@ const CrashGame: React.FC = () => {
   const [isStarting, setIsStarting] = useState(false);
   const [isPayoutPending, setIsPayoutPending] = useState(false);
   const [isShaking, setIsShaking] = useState(false);
-  const [message, setMessage] = useState('Set your bet and launch when ready.');
+  const [message, setMessage] = useState('Set your bet and launch when ready. Long-run RTP: 95%.');
 
   const currencySymbol = currencyMode === 'fun' ? 'FC' : 'RC';
   const controlsOpen = gameState === 'IDLE' || gameState === 'CRASHED';

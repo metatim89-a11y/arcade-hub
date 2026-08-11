@@ -60,7 +60,7 @@ const GameArea: React.FC<GameAreaProps> = ({ games, selectedGame, onSelectGame, 
   const [feedback, setFeedback] = useState('');
   const [playMode, setPlayMode] = useState<PlayMode>('vsPlayer');
   const [playerNames, setPlayerNames] = useState({ player1: 'Player 1', player2: 'Player 2' });
-  const { currencyMode } = useCoinSystem();
+  const { currencyMode, aesthetics, equippedAesthetics } = useCoinSystem();
 
   const gameProps = { game: selectedGame, playMode, currencyMode, mode, playerNames };
   const [activeGameProps, setActiveGameProps] = useState(gameProps);
@@ -127,6 +127,16 @@ const GameArea: React.FC<GameAreaProps> = ({ games, selectedGame, onSelectGame, 
   const ActiveGameComponent = activeGameProps.game.component;
   const PreviousGameComponent = previousGameProps?.game.component;
   const activeNeedsNaturalHeight = activeGameProps.game.id === 'mancala';
+  const equippedAesthetic = aesthetics.find((item) => item.id === equippedAesthetics[activeGameProps.game.id]);
+  const aestheticPattern = equippedAesthetic ? (() => {
+    switch (equippedAesthetic.visualKey) {
+      case 'gold': return `radial-gradient(circle at 50% 0%, ${equippedAesthetic.accentColor}44, transparent 42%), linear-gradient(135deg, ${equippedAesthetic.gradientFrom}, ${equippedAesthetic.gradientTo})`;
+      case 'galaxy': return `radial-gradient(circle at 18% 24%, #ffffffaa 0 1px, transparent 2px), radial-gradient(circle at 78% 35%, #ffffff88 0 1px, transparent 2px), linear-gradient(135deg, ${equippedAesthetic.gradientFrom}, ${equippedAesthetic.gradientTo})`;
+      case 'ember': return `radial-gradient(circle at 50% 100%, ${equippedAesthetic.accentColor}55, transparent 45%), linear-gradient(145deg, ${equippedAesthetic.gradientFrom}, ${equippedAesthetic.gradientTo})`;
+      case 'frost': return `repeating-linear-gradient(120deg, transparent 0 28px, ${equippedAesthetic.accentColor}12 29px 31px), linear-gradient(135deg, ${equippedAesthetic.gradientFrom}, ${equippedAesthetic.gradientTo})`;
+      default: return `repeating-linear-gradient(0deg, transparent 0 8px, ${equippedAesthetic.accentColor}12 9px 10px), linear-gradient(135deg, ${equippedAesthetic.gradientFrom}, ${equippedAesthetic.gradientTo})`;
+    }
+  })() : undefined;
 
   return (
     <div className="flex flex-col items-center w-full px-4 py-6 md:py-8">
@@ -167,7 +177,17 @@ const GameArea: React.FC<GameAreaProps> = ({ games, selectedGame, onSelectGame, 
       {/* Game Canvas */}
       <div 
         className={`w-full ${gameAreaSizeClass} min-h-[420px] rounded-3xl mb-4 ${activeNeedsNaturalHeight ? 'overflow-visible' : 'overflow-hidden'} transition-colors duration-500 relative ${themeClasses}`}
+        style={equippedAesthetic ? {
+          backgroundImage: aestheticPattern,
+          border: `2px solid ${equippedAesthetic.accentColor}`,
+          boxShadow: `0 0 34px ${equippedAesthetic.accentColor}66, inset 0 0 28px ${equippedAesthetic.accentColor}18`,
+        } : undefined}
       >
+        {equippedAesthetic && (
+          <div className="absolute right-3 top-3 z-20 rounded-full border bg-black/70 px-3 py-1 text-[10px] font-black uppercase tracking-widest" style={{ borderColor: equippedAesthetic.accentColor, color: equippedAesthetic.accentColor }}>
+            {equippedAesthetic.name}
+          </div>
+        )}
         {PreviousGameComponent && previousGameProps && (
             <div 
               className="absolute inset-0 flex flex-col items-center justify-center game-transition-out"

@@ -13,6 +13,7 @@ import LoginPage from './components/auth/LoginPage';
 import SignupPage from './components/auth/SignupPage';
 import VerificationPage from './components/auth/VerificationPage';
 import ProfilePage from './components/profile/ProfilePage';
+import AestheticShopPage from './components/shop/AestheticShopPage';
 import GlobalChat from './components/ui/GlobalChat';
 import { AdminSettingsProvider } from './context/AdminSettingsContext';
 import { recordSiteEvent } from './lib/analytics';
@@ -30,6 +31,7 @@ const AppContent: React.FC = () => {
   // View States for Auth/Profile
   const [authView, setAuthView] = useState<'login' | 'signup'>('login');
   const [showProfile, setShowProfile] = useState(false);
+  const [showShop, setShowShop] = useState(false);
 
   useEffect(() => {
     void recordSiteEvent('page_view', undefined, user && !user.isGuest ? user.id : undefined);
@@ -94,9 +96,11 @@ const AppContent: React.FC = () => {
       <Header 
         mode={mode} 
         setMode={handleSetMode} 
-        onProfileClick={() => setShowProfile(true)} 
-        onHomeClick={() => setShowProfile(false)}
+        onProfileClick={() => { setShowProfile(true); setShowShop(false); }}
+        onShopClick={() => { setShowShop(true); setShowProfile(false); }}
+        onHomeClick={() => { setShowProfile(false); setShowShop(false); }}
         isProfileActive={showProfile}
+        isShopActive={showShop}
       />
       <main className="flex-grow flex flex-col items-center w-full">
         {notification && (
@@ -107,6 +111,8 @@ const AppContent: React.FC = () => {
         )}
         {showProfile ? (
             <ProfilePage onBack={() => setShowProfile(false)} />
+        ) : showShop ? (
+            <AestheticShopPage onBack={() => setShowShop(false)} />
         ) : (
             <GameArea 
                 games={activeGames} 

@@ -85,6 +85,11 @@ const BALL_COLORS: Record<RiskLevel, string> = {
     High: '#ef4444'    // Red
 };
 
+// Every displayed bucket is scaled together, preserving the shape of each risk
+// curve while keeping the long-run return inside the published 87–95% band.
+const RTP_BY_RISK: Record<RiskLevel, number> = { Low: 95, Medium: 92, High: 87 };
+const RTP_SCALE_BY_RISK: Record<RiskLevel, number> = { Low: 95 / 99, Medium: 92 / 99, High: 87 / 99 };
+
 const PlinkoGame: React.FC = () => {
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const { canBet, subtractCoins, addCoins, currencyMode } = useCoinSystem();
@@ -110,7 +115,8 @@ const PlinkoGame: React.FC = () => {
 
     // Computed Multipliers
     const multipliers = useMemo(() => {
-        return MULTIPLIER_DATA[rows]?.[risk] || MULTIPLIER_DATA[16]['Medium'];
+        const values = MULTIPLIER_DATA[rows]?.[risk] || MULTIPLIER_DATA[16]['Medium'];
+        return values.map((value) => Number((value * RTP_SCALE_BY_RISK[risk]).toFixed(2)));
     }, [rows, risk]);
 
     // Physics Constants
@@ -401,6 +407,9 @@ const PlinkoGame: React.FC = () => {
                 <h2 className="text-2xl font-bold text-yellow-400 flex items-center gap-2 mb-2">
                     <span className="text-3xl">💎</span> Plinko
                 </h2>
+                <div className="-mt-3 text-center text-[11px] font-bold uppercase tracking-wider text-gray-400">
+                    {risk} risk · {RTP_BY_RISK[risk]}% RTP
+                </div>
                 
                 <div className="bg-black/30 p-4 rounded-xl border border-gray-700">
                     <label className="text-gray-400 text-xs font-bold uppercase mb-2 block">Bet Amount</label>

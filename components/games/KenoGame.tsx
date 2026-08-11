@@ -4,9 +4,17 @@ import React, { useState, useEffect, useCallback, memo } from 'react';
 import { useCoinSystem } from '../../context/CoinContext';
 import GlassButton from '../ui/GlassButton';
 
-const PAYOUTS = new Map<number, number>([
-    [3, 2], [4, 5], [5, 15], [6, 50], [7, 150], [8, 300], [9, 500], [10, 1000]
-]);
+// Pick-specific gross-return tables keep every selection count close to 90% RTP.
+const PAYOUTS: Record<number, Record<number, number>> = {
+  3: { 2: 3.2, 3: 32.4 },
+  4: { 2: 1.5, 3: 7.7, 4: 77.3 },
+  5: { 3: 4.4, 4: 32.6, 5: 217.5 },
+  6: { 3: 2.3, 4: 11.5, 5: 69, 6: 460.2 },
+  7: { 3: 1.1, 4: 4.6, 5: 34.4, 6: 183.6, 7: 1147.3 },
+  8: { 4: 4.1, 5: 16.3, 6: 81.7, 7: 408.6, 8: 2043 },
+  9: { 4: 1.9, 5: 9.6, 6: 38.4, 7: 192.1, 8: 960.7, 9: 3842.7 },
+  10: { 4: 1.1, 5: 4.4, 6: 21.8, 7: 109.1, 8: 545.6, 9: 2182.3, 10: 10911.7 },
+};
 const MAX_PICK = 10;
 const DRAW_COUNT = 20;
 
@@ -113,7 +121,11 @@ const KenoGame: React.FC = () => {
       return;
     }
     
-    subtractCoins(bet, 'Keno Bet');
+    const charged = await subtractCoins(bet, 'Keno Bet');
+    if (!charged) {
+      setFeedback('The bet was not charged, so the draw did not start.');
+      return;
+    }
     setPhase('drawing');
     setDrawnNumbers(new Set());
     setFeedback('Drawing numbers...');
@@ -146,12 +158,14 @@ const KenoGame: React.FC = () => {
     }
     
     const matches = [...selectedNumbers].filter(num => finalDrawSet.has(num)).length;
-    const payoutMultiplier = PAYOUTS.get(matches) || 0;
+    const payoutMultiplier = PAYOUTS[selectedNumbers.size]?.[matches] || 0;
     
     if (payoutMultiplier > 0) {
         const winnings = bet * payoutMultiplier;
-        addCoins(winnings, 'Keno Win');
-        setFeedback(`You matched ${matches} numbers and won ${winnings} ${currencySymbol}!`);
+        const credited = await addCoins(winnings, 'Keno Win');
+        setFeedback(credited
+          ? `You matched ${matches} numbers and won ${winnings} ${currencySymbol}!`
+          : `You matched ${matches}, but the payout was not confirmed.`);
     } else {
         setFeedback(`You matched ${matches} numbers. Better luck next time!`);
     }
@@ -167,7 +181,7 @@ const KenoGame: React.FC = () => {
 
   return (
     <div className="flex flex-col items-center gap-4 text-center p-2 md:p-4">
-      <h2 className="text-3xl font-bold" style={{ color: 'var(--primary-text-color)' }}>Keno</h2>
+      <div><h2 className="text-3xl font-bold" style={{ color: 'var(--primary-text-color)' }}>Keno</h2><small className="text-gray-400">90% RTP · payout changes with picks</small></div>
       <div className={`grid grid-cols-10 gap-1 ${phase === 'drawing' ? 'keno-drawing-grid' : ''}`}>
         {Array.from({ length: 80 }, (_, i) => i + 1).map((num) => (
             <KenoNumber

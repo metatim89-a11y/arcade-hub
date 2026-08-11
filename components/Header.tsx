@@ -5,6 +5,7 @@ import { useCoinSystem } from '../context/CoinContext';
 import { useAuth } from '../context/AuthContext';
 import { APP_VERSION } from '../constants';
 import AdminPanel from './admin/AdminPanel';
+import { profileFrameForLevel } from '../lib/profileRewards';
 
 interface HeaderProps {
   mode: GameMode;
@@ -12,14 +13,17 @@ interface HeaderProps {
   simple?: boolean; // For login/signup pages
   onProfileClick?: () => void;
   onHomeClick?: () => void;
+  onShopClick?: () => void;
   isProfileActive?: boolean;
+  isShopActive?: boolean;
 }
 
-const Header: React.FC<HeaderProps> = ({ mode, setMode, simple = false, onProfileClick, onHomeClick, isProfileActive }) => {
-  const { funCoins, realCoins, currencyMode, resetCoins } = useCoinSystem();
+const Header: React.FC<HeaderProps> = ({ mode, setMode, simple = false, onProfileClick, onHomeClick, onShopClick, isProfileActive, isShopActive }) => {
+  const { funCoins, realCoins, tickets, progression, currencyMode, resetCoins } = useCoinSystem();
   const { user, logout } = useAuth();
   const isCasinoMode = mode === GameMode.Adult;
   const [showAdmin, setShowAdmin] = useState(false);
+  const profileFrame = profileFrameForLevel(progression.level);
 
   const handleProfileClick = () => {
       onProfileClick?.();
@@ -73,7 +77,7 @@ const Header: React.FC<HeaderProps> = ({ mode, setMode, simple = false, onProfil
                     onClick={handleProfileClick}
                     className={`flex items-center gap-2 px-3 py-1.5 rounded-full transition-colors ${isProfileActive ? 'bg-yellow-400 text-black' : 'bg-black/30 text-white hover:bg-black/40'}`}
                 >
-                    <img src={user.avatar} alt="avatar" className="w-8 h-8 rounded-full border border-white/50" />
+                    <img src={user.avatar} alt="avatar" className="h-8 w-8 rounded-full border-2 object-cover" style={{ borderColor: profileFrame.color, boxShadow: `0 0 10px ${profileFrame.glow}` }} />
                     <span className="font-semibold hidden sm:inline">{user.username}</span>
                 </button>
                 {user.isAdmin && (
@@ -83,6 +87,11 @@ const Header: React.FC<HeaderProps> = ({ mode, setMode, simple = false, onProfil
                         className="rounded-lg border border-sky-300/50 bg-sky-950/60 px-3 py-2 text-xs font-bold text-sky-100 hover:bg-sky-900/70"
                     >
                         Admin
+                    </button>
+                )}
+                {!user.isGuest && (
+                    <button type="button" onClick={onShopClick} className={`rounded-lg border px-3 py-2 text-xs font-black transition ${isShopActive ? 'border-fuchsia-200 bg-fuchsia-500 text-white' : 'border-fuchsia-300/40 bg-fuchsia-950/60 text-fuchsia-100 hover:bg-fuchsia-900/70'}`}>
+                        ✨ Shop
                     </button>
                 )}
                 <button 
@@ -96,9 +105,15 @@ const Header: React.FC<HeaderProps> = ({ mode, setMode, simple = false, onProfil
       </div>
 
       {/* Bottom Row: Coins and Mode Switch (Only if not in profile view) */}
-      {!isProfileActive && (
+      {!isProfileActive && !isShopActive && (
         <div className="flex flex-wrap justify-between items-center gap-4 w-full border-t border-white/10 pt-2">
             <div className="flex items-center gap-4">
+                {!user?.isGuest && (
+                    <button type="button" onClick={handleProfileClick} className="flex gap-2 text-xs font-black">
+                        <span className="rounded-xl border border-purple-300/25 bg-purple-950/60 px-3 py-1.5 text-purple-200">LV {progression.level}</span>
+                        <span className="rounded-xl border border-cyan-300/25 bg-cyan-950/60 px-3 py-1.5 text-cyan-200">🎟 {tickets.toLocaleString()}</span>
+                    </button>
+                )}
                 {isCasinoMode && (
                 <div className="flex items-center gap-2">
                     <div className="flex gap-2 text-sm md:text-base font-bold">

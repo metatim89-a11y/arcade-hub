@@ -3,16 +3,13 @@ import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { useCoinSystem } from '../../context/CoinContext';
 
 const SEGMENTS = [
-    { color: '#FFD700', label: '2x', multiplier: 2 },
-    { color: '#C0C0C0', label: '0.5x', multiplier: 0.5 },
-    { color: '#CD7F32', label: '1.5x', multiplier: 1.5 },
-    { color: '#FFD700', label: '5x', multiplier: 5 },
-    { color: '#C0C0C0', label: '0.2x', multiplier: 0.2 },
-    { color: '#CD7F32', label: '1.5x', multiplier: 1.5 },
-    { color: '#FFD700', label: '2x', multiplier: 2 },
-    { color: '#C0C0C0', label: '0.5x', multiplier: 0.5 },
-    { color: '#8b0000', label: '10x', multiplier: 10 },
-    { color: '#C0C0C0', label: '0.2x', multiplier: 0.2 },
+    ...Array.from({ length: 6 }, (_, index) => ({ color: index % 2 ? '#5d2734' : '#361822', label: '0x', multiplier: 0 })),
+    ...Array.from({ length: 6 }, (_, index) => ({ color: index % 2 ? '#B8BEC9' : '#858c99', label: '0.5x', multiplier: 0.5 })),
+    ...Array.from({ length: 4 }, (_, index) => ({ color: index % 2 ? '#B77928' : '#D3973C', label: '1x', multiplier: 1 })),
+    { color: '#D6B84C', label: '1.5x', multiplier: 1.5 },
+    { color: '#A97E20', label: '1.5x', multiplier: 1.5 },
+    { color: '#F4D35E', label: '3x', multiplier: 3 },
+    { color: '#FFD700', label: '6x', multiplier: 6 },
 ];
 
 const SpinWheelGame: React.FC = () => {
@@ -218,7 +215,7 @@ const SpinWheelGame: React.FC = () => {
 
     return (
         <section className="wheel-game">
-            <div className="wheel-kicker">GLASS SERIES</div><h2>Spin Wheel</h2>
+            <div className="wheel-kicker">GLASS SERIES · 95% RTP</div><h2>Spin Wheel</h2>
             <div className="wheel-glass"><canvas ref={canvasRef} /></div>
             <div className="wheel-feedback" role="status">{feedback}</div>
             <div className="wheel-controls"><label>BET <span>{currencySymbol}</span></label><button onClick={() => setBet(value => Math.max(1, value - 1))} disabled={isSpinning}>−</button><input type="number" value={bet} onChange={event => setBet(Math.min(1000, Math.max(1, Number(event.target.value))))} disabled={isSpinning} /><button onClick={() => setBet(value => Math.min(1000, value + 1))} disabled={isSpinning}>+</button></div>

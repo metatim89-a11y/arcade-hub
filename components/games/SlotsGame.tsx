@@ -9,7 +9,11 @@ const STRIP_LENGTH = 32;
 const BONUS = '🪙';
 const SCATTER = '⭐';
 const WILD = '🚀';
-const SYMBOL_POOL = ['🍋', '🍋', '🍇', '🍇', '🍒', '🍒', '🔔', '💎', '7️⃣', '🎰', '🧠', WILD, BONUS, SCATTER];
+const SYMBOL_WEIGHTS: Array<[string, number]> = [
+  ['🍋', 20], ['🍇', 18], ['🍒', 16], ['🧠', 13], ['🔔', 10], ['🎰', 8],
+  ['💎', 6], ['7️⃣', 4], [WILD, 4], [BONUS, 4], [SCATTER, 4]
+];
+const SYMBOL_POOL = SYMBOL_WEIGHTS.flatMap(([symbol, weight]) => Array.from({ length: weight }, () => symbol));
 
 const PAYLINES = [
   [1, 1, 1, 1, 1], [0, 0, 0, 0, 0], [2, 2, 2, 2, 2],
@@ -17,11 +21,11 @@ const PAYLINES = [
 ];
 
 const PAYOUTS: Record<string, Record<number, number>> = {
-  [WILD]: { 5: 1000, 4: 200, 3: 50 }, '7️⃣': { 5: 500, 4: 100, 3: 25 },
-  '💎': { 5: 300, 4: 75, 3: 20 }, '🎰': { 5: 200, 4: 50, 3: 15 },
-  '🔔': { 5: 150, 4: 40, 3: 12 }, '🍒': { 5: 100, 4: 30, 3: 10 },
-  '🍇': { 5: 80, 4: 20, 3: 8 }, '🍋': { 5: 50, 4: 15, 3: 5 },
-  '🧠': { 5: 50, 4: 15, 3: 5 }
+  [WILD]: { 3: 81, 4: 337.5, 5: 1687.5 }, '7️⃣': { 3: 54, 4: 202.5, 5: 810 },
+  '💎': { 3: 40.5, 4: 135, 5: 540 }, '🎰': { 3: 27, 4: 81, 5: 337.5 },
+  '🔔': { 3: 20.25, 4: 54, 5: 202.5 }, '🧠': { 3: 13.5, 4: 40.5, 5: 135 },
+  '🍒': { 3: 10.13, 4: 27, 5: 81 }, '🍇': { 3: 8.1, 4: 20.25, 5: 60.75 },
+  '🍋': { 3: 6.75, 4: 16.88, 5: 47.25 }
 };
 
 type Phase = 'IDLE' | 'SPINNING' | 'BONUS' | 'WIN';
@@ -32,7 +36,7 @@ type Round = { currency: CurrencyMode; lineBet: number; baseWin: number; winning
 type Celebration = { title: string; amount: number };
 
 const randomSymbol = () => SYMBOL_POOL[Math.floor(Math.random() * SYMBOL_POOL.length)];
-const bonusValue = (lineBet: number) => [1, 1, 2, 2, 3, 5, 5, 10, 20, 50][Math.floor(Math.random() * 10)] * lineBet;
+const bonusValue = (lineBet: number) => [1, 1, 1, 2, 2, 3, 3, 5, 8, 15][Math.floor(Math.random() * 10)] * lineBet * .5;
 const freshReels = (): ReelState[] => Array.from({ length: REEL_COUNT }, () => ({
   symbols: Array.from({ length: VISIBLE_SYMBOLS }, randomSymbol), offset: 0, duration: 0, spinning: false
 }));
@@ -127,7 +131,7 @@ const SlotsGame: React.FC = () => {
     const scatterCount = layout.flat().filter((item) => item === SCATTER).length;
     let awardedSpins = 0;
     if (scatterCount >= 3) {
-      awardedSpins = wasFree ? 3 : 7;
+      awardedSpins = wasFree ? 2 : 6;
       setFreeSpins((current) => current + awardedSpins);
       total += totalBet * (scatterCount - 2) * multiplier;
     }
@@ -152,7 +156,7 @@ const SlotsGame: React.FC = () => {
     if (phase === 'SPINNING' || phase === 'BONUS' || isProcessing) return;
     const freeRound = freeSpins > 0;
     const powerSpin = !freeRound && power >= 5;
-    const multiplier = freeRound || powerSpin ? 2 : 1;
+    const multiplier = freeRound || powerSpin ? 1.5 : 1;
     if (!freeRound && !canBet(totalBet)) { setStatus(`You need ${totalBet} ${symbol} to spin.`); setAutoSpin(false); return; }
 
     clearTimers(); setCelebration(null); setAnticipation(false); setWinInfo(null); setLastWin(0);
@@ -195,7 +199,7 @@ const SlotsGame: React.FC = () => {
     setBonusRolling(true); setStatus(`Hold & Spin — ${respins} respin${respins === 1 ? '' : 's'} left.`);
     const timer = window.setTimeout(async () => {
       const current = bonusCellsRef.current; let landed = 0;
-      const next = current.map((value) => { if (value !== null || Math.random() >= .18) return value; landed += 1; return bonusValue(round.lineBet); });
+      const next = current.map((value) => { if (value !== null || Math.random() >= .12) return value; landed += 1; return bonusValue(round.lineBet); });
       bonusCellsRef.current = next; setBonusCells(next);
       const remaining = landed ? 3 : respins - 1;
       setRespins(remaining); setBonusRolling(false);
@@ -228,11 +232,11 @@ const SlotsGame: React.FC = () => {
 
   return (
     <section className={`volt-slots${anticipation ? ' anticipating' : ''}`}>
-      <header className="volt-header"><div><span>PREMIUM 5×3 SLOTS</span><h2>VOLT VAULT</h2></div><div className="volt-metrics"><span><small>BALANCE</small>{Math.floor(balance)} {symbol}</span><span><small>BET</small>{totalBet} {symbol}</span><span><small>LAST WIN</small>{lastWin} {symbol}</span></div></header>
-      <div className="feature-ribbon"><div><b>🪙 HOLD & SPIN</b><small>3+ COINS · RESETTING RESPINS</small></div><div><b>⭐ FREE SPINS</b><small>3+ STARS · 7 SPINS AT 2×</small></div><div className={power >= 5 ? 'ready' : ''}><b>⚡ POWER SPIN</b><small>{power >= 5 ? 'READY · 2× + WILD' : `${power}/5 CHARGED`}</small></div></div>
+      <header className="volt-header"><div><span>PREMIUM 5×3 SLOTS · 93% RTP</span><h2>VOLT VAULT</h2></div><div className="volt-metrics"><span><small>BALANCE</small>{Math.floor(balance)} {symbol}</span><span><small>BET</small>{totalBet} {symbol}</span><span><small>LAST WIN</small>{lastWin} {symbol}</span></div></header>
+      <div className="feature-ribbon"><div><b>🪙 HOLD & SPIN</b><small>3+ COINS · RESETTING RESPINS</small></div><div><b>⭐ FREE SPINS</b><small>3+ STARS · 6 SPINS AT 1.5×</small></div><div className={power >= 5 ? 'ready' : ''}><b>⚡ POWER SPIN</b><small>{power >= 5 ? 'READY · 1.5× + WILD' : `${power}/5 CHARGED`}</small></div></div>
       <div className="volt-machine">
         <div className="volt-lights" aria-hidden="true">{Array.from({ length: 24 }, (_, index) => <i key={index} />)}</div>
-        {freeSpins > 0 && <div className="free-spin-banner"><strong>FREE SPINS ACTIVE</strong><span>{freeSpins} REMAINING · ALL LINE WINS 2×</span></div>}
+        {freeSpins > 0 && <div className="free-spin-banner"><strong>FREE SPINS ACTIVE</strong><span>{freeSpins} REMAINING · ALL LINE WINS 1.5×</span></div>}
         {phase === 'BONUS' ? <div className={`vault-board${bonusRolling ? ' rolling' : ''}`}><div className="vault-title"><span>HOLD & SPIN VAULT</span><strong>{respins} RESPINS</strong></div><div className="vault-grid">{bonusCells.map((value, index) => <div key={index} className={value !== null ? 'held' : ''}>{value !== null ? <><span>🪙</span><strong>{value}</strong><small>{symbol}</small></> : <i>+</i>}</div>)}</div><p>Fill all 15 spaces to double the entire vault.</p></div> : (
           <div className="reel-deck">{reels.map((reel, reelIndex) => <div key={reelIndex} className={`volt-reel${reel.spinning ? ' spinning' : ''}`}><div className="volt-track" style={{ transform: `translate3d(0,-${reel.offset}px,0)`, transition: reel.spinning ? `transform ${reel.duration}s cubic-bezier(.08,.7,.1,1)` : 'none' }}>{reel.symbols.map((item, itemIndex) => { const row = reel.symbols.length === 3 ? itemIndex : itemIndex - (reel.symbols.length - 3); const curve = row === 0 ? ' top' : row === 1 ? ' center' : row === 2 ? ' bottom' : ''; return <div key={`${itemIndex}-${item}`} className={`volt-symbol${curve}${row >= 0 && winningCell(reelIndex, row) ? ' winner' : ''}`}><span>{item}</span></div>; })}</div></div>)}</div>
         )}
