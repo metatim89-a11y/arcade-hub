@@ -239,15 +239,15 @@ const MancalaGame: React.FC<MancalaProps> = ({ playMode, playerNames }) => {
             
             {/* Middle: Board (centered) */}
             <div className="flex items-center justify-center">
-                <div className="w-full max-w-5xl flex items-center justify-center gap-3 md:gap-4">
+                <div className="mancala-layout w-full max-w-4xl">
                     {/* Player 2 Score */}
-                    <div className="w-20 md:w-28 text-center">
+                    <div className="mancala-score mancala-score-p2 text-center">
                         <div className="font-bold text-lg -mb-1">{p2Name}</div>
                         <div className="text-4xl font-bold text-yellow-200 [text-shadow:0_2px_4px_rgba(0,0,0,0.6)]">{pits[PLAYER_2_STORE]}</div>
                     </div>
 
                     {/* Board and Pit Counts */}
-                    <div className="flex-grow">
+                    <div className="mancala-board-area min-w-0">
                         {/* Player 2 Pit Counts */}
                         <div className="grid grid-cols-[1.5fr_1fr_1fr_1fr_1fr_1fr_1fr_1.5fr] mb-1" style={{ gap: 'var(--mancala-pit-gap)'}}>
                             <div></div> {/* Spacer for P2 store */}
@@ -304,7 +304,7 @@ const MancalaGame: React.FC<MancalaProps> = ({ playMode, playerNames }) => {
                     </div>
 
                     {/* Player 1 Score */}
-                    <div className="w-20 md:w-28 text-center">
+                    <div className="mancala-score mancala-score-p1 text-center">
                         <div className="font-bold text-lg -mb-1">{p1Name}</div>
                         <div className="text-4xl font-bold text-yellow-200 [text-shadow:0_2px_4px_rgba(0,0,0,0.6)]">{pits[PLAYER_1_STORE]}</div>
                     </div>
@@ -316,6 +316,10 @@ const MancalaGame: React.FC<MancalaProps> = ({ playMode, playerNames }) => {
 
             <style>{`
                 .mancala-board { position: relative; min-height: 240px; box-shadow: inset 0 0 32px rgba(54,20,4,.72), 0 16px 30px rgba(0,0,0,.32); }
+                .mancala-layout { display: grid; grid-template-columns: 92px minmax(0,1fr) 92px; grid-template-areas: 'p2 board p1'; align-items: center; gap: 12px; }
+                .mancala-score-p2 { grid-area: p2; }
+                .mancala-score-p1 { grid-area: p1; }
+                .mancala-board-area { grid-area: board; }
                 .mancala-board .mancala-pit { min-height: 92px; border-radius: 44%; }
                 .mancala-board .mancala-store { min-height: 198px; border-radius: 42%; }
                 .mancala-board .stone { width: 23%; height: 23%; border: 1px solid rgba(255,255,255,.35); box-shadow: inset -3px -4px 5px rgba(0,0,0,.34), inset 2px 2px 4px rgba(255,255,255,.5), 0 3px 4px rgba(0,0,0,.38); }
@@ -341,7 +345,9 @@ const MancalaGame: React.FC<MancalaProps> = ({ playMode, playerNames }) => {
                     background-color: rgba(210, 105, 30, 0.4);
                     box-shadow: inset 0 0 15px #fbbf24;
                 }
-                @media(max-width: 760px) { .mancala-board { min-height: 190px; padding: 8px !important; } .mancala-board .mancala-pit { min-height: 66px; } .mancala-board .mancala-store { min-height: 145px; } .flying-mancala-stone { width: 19px; height: 19px; } }
+                @media(max-width: 900px) { .mancala-layout { grid-template-columns: 1fr 1fr; grid-template-areas: 'p2 p1' 'board board'; gap: 8px 12px; } .mancala-score { display: flex; align-items: center; justify-content: center; gap: 8px; } .mancala-score .text-4xl { font-size: 1.55rem; } }
+                @media(max-width: 760px) { .mancala-board { min-height: 150px; padding: 6px !important; border-width: 3px; } .mancala-board .mancala-pit { min-height: 54px; } .mancala-board .mancala-store { min-height: 116px; } .mancala-board .stone { width: 27%; height: 27%; } .flying-mancala-stone { width: 17px; height: 17px; } }
+                @media(max-width: 430px) { .mancala-board { min-height: 126px; } .mancala-board .mancala-pit { min-height: 43px; } .mancala-board .mancala-store { min-height: 94px; } .mancala-layout { gap: 5px; } }
             `}</style>
         </div>
     );

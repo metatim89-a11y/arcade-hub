@@ -15,6 +15,7 @@ import SignupPage from './components/auth/SignupPage';
 import VerificationPage from './components/auth/VerificationPage';
 import ProfilePage from './components/profile/ProfilePage';
 import GlobalChat from './components/ui/GlobalChat';
+import { AdminSettingsProvider } from './context/AdminSettingsContext';
 
 const AppContent: React.FC = () => {
   const { user, isAuthenticated, isLoading, verificationPendingEmail } = useAuth();
@@ -115,11 +116,13 @@ const AppContent: React.FC = () => {
 function App() {
   return (
     <AuthProvider>
-        <CoinProvider>
-            <SolanaProvider>
-                <AppContent />
-            </SolanaProvider>
-        </CoinProvider>
+        <AdminSettingsProvider>
+            <CoinProvider>
+                <SolanaProvider>
+                    <AppContent />
+                </SolanaProvider>
+            </CoinProvider>
+        </AdminSettingsProvider>
     </AuthProvider>
   );
 }

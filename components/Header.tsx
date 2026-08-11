@@ -1,9 +1,11 @@
 
-import React from 'react';
+import React, { useRef, useState } from 'react';
 import { GameMode } from '../types';
 import { useCoinSystem } from '../context/CoinContext';
 import { useAuth } from '../context/AuthContext';
 import { WalletMultiButton } from '@solana/wallet-adapter-react-ui';
+import { APP_VERSION } from '../constants';
+import AdminPanel from './admin/AdminPanel';
 
 interface HeaderProps {
   mode: GameMode;
@@ -18,22 +20,44 @@ const Header: React.FC<HeaderProps> = ({ mode, setMode, simple = false, onProfil
   const { funCoins, realCoins, currencyMode, resetCoins } = useCoinSystem();
   const { user, logout } = useAuth();
   const isCasinoMode = mode === GameMode.Adult;
+  const [showAdmin, setShowAdmin] = useState(false);
+  const versionClicksRef = useRef({ count: 0, lastAt: 0 });
+
+  const handleVersionClick = () => {
+      const now = Date.now();
+      const clicks = versionClicksRef.current;
+      clicks.count = now - clicks.lastAt > 2500 ? 1 : clicks.count + 1;
+      clicks.lastAt = now;
+      if (clicks.count >= 5) {
+          clicks.count = 0;
+          setShowAdmin(true);
+      }
+  };
+
+  const versionButton = (
+      <button type="button" onClick={handleVersionClick} className="absolute top-2 right-3 z-10 rounded px-1.5 py-0.5 text-[9px] font-bold tracking-wider text-white/45 hover:text-white/75" title={`Arcade Hub version ${APP_VERSION}`}>
+          v{APP_VERSION}
+      </button>
+  );
 
   const buttonClasses = "text-sm md:text-base border-none py-2 px-4 rounded-lg bg-gray-800 text-yellow-400 cursor-pointer shadow-md transition-colors duration-200";
   const activeButtonClasses = "bg-yellow-400 text-gray-800";
 
   if (simple) {
       return (
-        <header className="flex justify-center items-center p-6 bg-gradient-to-r from-[#a87c4f] to-[#7e3c3c] shadow-lg border-b-2 border-yellow-400/20 w-full">
+        <header className="relative flex justify-center items-center p-6 bg-gradient-to-r from-[#a87c4f] to-[#7e3c3c] shadow-lg border-b-2 border-yellow-400/20 w-full">
+            {versionButton}
             <h1 className="text-3xl md:text-4xl tracking-wider text-yellow-400 [text-shadow:0_2px_8px_rgba(182,137,45,0.26),0_0_2px_#fff] font-bold">
             🎲 Game Arcade Hub
             </h1>
+            {showAdmin && <AdminPanel onClose={() => setShowAdmin(false)} />}
         </header>
       );
   }
 
   return (
-    <header className="flex flex-col gap-4 p-4 md:p-6 bg-gradient-to-r from-[#a87c4f] to-[#7e3c3c] shadow-lg border-b-2 border-yellow-400/20 w-full">
+    <header className="relative flex flex-col gap-4 p-4 pt-7 md:p-6 md:pt-7 bg-gradient-to-r from-[#a87c4f] to-[#7e3c3c] shadow-lg border-b-2 border-yellow-400/20 w-full">
+      {versionButton}
       
       {/* Top Row: Title and User Controls */}
       <div className="flex flex-wrap justify-between items-center w-full gap-4">
@@ -111,6 +135,7 @@ const Header: React.FC<HeaderProps> = ({ mode, setMode, simple = false, onProfil
             </div>
         </div>
       )}
+      {showAdmin && <AdminPanel onClose={() => setShowAdmin(false)} />}
     </header>
   );
 };

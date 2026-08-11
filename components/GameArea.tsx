@@ -126,6 +126,7 @@ const GameArea: React.FC<GameAreaProps> = ({ games, selectedGame, onSelectGame, 
   
   const ActiveGameComponent = activeGameProps.game.component;
   const PreviousGameComponent = previousGameProps?.game.component;
+  const activeNeedsNaturalHeight = activeGameProps.game.id === 'mancala';
 
   return (
     <div className="flex flex-col items-center w-full px-4 py-6 md:py-8">
@@ -165,7 +166,7 @@ const GameArea: React.FC<GameAreaProps> = ({ games, selectedGame, onSelectGame, 
       
       {/* Game Canvas */}
       <div 
-        className={`w-full ${gameAreaSizeClass} min-h-[420px] rounded-3xl mb-4 overflow-hidden transition-colors duration-500 relative ${themeClasses}`}
+        className={`w-full ${gameAreaSizeClass} min-h-[420px] rounded-3xl mb-4 ${activeNeedsNaturalHeight ? 'overflow-visible' : 'overflow-hidden'} transition-colors duration-500 relative ${themeClasses}`}
       >
         {PreviousGameComponent && previousGameProps && (
             <div 
@@ -183,10 +184,10 @@ const GameArea: React.FC<GameAreaProps> = ({ games, selectedGame, onSelectGame, 
         )}
 
         <div 
-          className={`w-full h-full flex flex-col items-center justify-center ${previousGameProps ? 'game-transition-in' : ''}`}
+          className={`w-full ${activeNeedsNaturalHeight ? 'min-h-[420px] h-auto justify-start' : 'h-full justify-center'} flex flex-col items-center ${previousGameProps ? 'game-transition-in' : ''}`}
           style={{
             paddingBlock: 'var(--game-area-padding-y)',
-            paddingInline: activeGameProps.game.id === 'slots' ? 'clamp(.35rem, 2vw, 1rem)' : 'var(--game-area-padding-x)',
+            paddingInline: activeGameProps.game.id === 'slots' || activeGameProps.game.id === 'mancala' ? 'clamp(.35rem, 2vw, 1rem)' : 'var(--game-area-padding-x)',
           }}
         >
             <ActiveGameComponent 
