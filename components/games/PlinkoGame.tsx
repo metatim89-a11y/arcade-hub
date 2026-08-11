@@ -330,14 +330,15 @@ const PlinkoGame: React.FC = () => {
         };
     }, [updatePhysics]);
 
-    const dropBall = () => {
+    const dropBall = async () => {
         if (!canBet(bet)) {
             if (autoMode) setAutoMode(false);
             setFeedback('Insufficient Funds');
             setTimeout(() => setFeedback(''), 2000);
             return;
         }
-        subtractCoins(bet, 'Plinko Drop');
+        const success = await subtractCoins(bet, 'Plinko Drop');
+        if (!success) return;
         
         const canvas = canvasRef.current;
         if (!canvas) return;

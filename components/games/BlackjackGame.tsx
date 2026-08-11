@@ -81,7 +81,7 @@ const BlackjackGame: React.FC = () => {
   };
 
   // --- Game Actions ---
-  const dealGame = () => {
+  const dealGame = async () => {
     if (!canBet(baseBet)) {
       setMessage('Insufficient funds!');
       return;
@@ -90,7 +90,9 @@ const BlackjackGame: React.FC = () => {
     // Integrity: Ensure shoe is ready
     let currentShoe = shoe.length < SHUFFLE_THRESHOLD ? createShoe() : [...shoe];
     
-    subtractCoins(baseBet, 'Blackjack Bet');
+    const success = await subtractCoins(baseBet, 'Blackjack Bet');
+    if (!success) return;
+
     setCurrentBet(baseBet);
     
     const pHand: Card[] = [];
@@ -133,12 +135,14 @@ const BlackjackGame: React.FC = () => {
     setGameState('DEALER_TURN');
   };
 
-  const doubleDown = () => {
+  const doubleDown = async () => {
     if (!canBet(baseBet)) {
         setMessage("Not enough coins to double!");
         return;
     }
-    subtractCoins(baseBet, 'Blackjack Double');
+    const success = await subtractCoins(baseBet, 'Blackjack Double');
+    if (!success) return;
+
     setCurrentBet(prev => prev + baseBet);
     
     const { card, newShoe } = drawCard(shoe);
