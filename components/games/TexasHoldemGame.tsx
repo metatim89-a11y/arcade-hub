@@ -112,6 +112,7 @@ const CardView: React.FC<{ card?: Card; hidden?: boolean; newlyDealt?: boolean }
         <>
           <span className={red ? 'red' : ''}>{card.rank}</span>
           <strong className={red ? 'red' : ''}>{card.suit}</strong>
+          <b className={`card-rank-bottom${red ? ' red' : ''}`}>{card.rank}</b>
         </>
       )}
     </div>
@@ -471,7 +472,7 @@ const TexasHoldemGame: React.FC = () => {
               </div>
               {players.map((player, index) => {
                 const isActing = index === actionIndex;
-                const reveal = phase === 'SHOWDOWN' ? !player.folded : player.isHuman && isActing;
+                const reveal = phase === 'SHOWDOWN' ? !player.folded : player.isHuman;
                 const rank = phase === 'SHOWDOWN' && !player.folded ? evaluateHand([...player.hand, ...community]) : null;
                 return (
                   <div key={player.id} className={`poker-seat ${seatPositions[index]}${isActing ? ' acting' : ''}${player.folded ? ' folded' : ''}`}>
@@ -526,6 +527,9 @@ const TexasHoldemGame: React.FC = () => {
         .poker-seat.top,.poker-seat.bottom{display:flex;flex-direction:column}.poker-seat.top .seat-panel{order:-1;margin:0 0 7px}.poker-seat.left,.poker-seat.right{display:flex;align-items:center;width:246px;gap:8px}.poker-seat.left{flex-direction:row-reverse}.poker-seat.left .seat-panel,.poker-seat.right .seat-panel{width:142px;margin:0}.poker-seat.left .seat-cards,.poker-seat.right .seat-cards{width:96px;height:62px;flex:0 0 96px}.seat-cards{isolation:isolate}.seat-panel{isolation:isolate}.holdem-card{z-index:2;outline:1px solid rgba(255,255,255,.24)}
         @media(max-width:760px){.poker-seat.left,.poker-seat.right{width:184px;gap:5px}.poker-seat.left .seat-panel,.poker-seat.right .seat-panel{width:106px}.poker-seat.left .seat-cards,.poker-seat.right .seat-cards{width:73px;height:51px;flex-basis:73px}.poker-seat.left{left:-2px}.poker-seat.right{right:-2px}}
         @media(max-width:470px){.poker-seat.left,.poker-seat.right{width:150px;gap:3px}.poker-seat.left .seat-panel,.poker-seat.right .seat-panel{width:84px;padding:5px}.poker-seat.left .seat-cards,.poker-seat.right .seat-cards{width:63px;height:44px;flex-basis:63px}.poker-seat.left{left:-5px}.poker-seat.right{right:-5px}.seat-name strong{font-size:9px}.seat-stack{font-size:11px}.seat-badges{gap:2px}.seat-bet,.seat-state,.seat-rank{padding:2px 3px;font-size:6px}}
+        .seat-cards{z-index:20!important;overflow:visible}.seat-panel{z-index:1!important}.holdem-card{z-index:21!important;overflow:hidden}.holdem-card>span{z-index:2;font-size:15px}.holdem-card>strong{z-index:1}.card-rank-bottom{position:absolute;z-index:2;right:5px;bottom:3px;transform:rotate(180deg);color:#171717;font-size:15px;font-weight:950;line-height:1}.card-rank-bottom.red{color:#cf2838}
+        @media(max-width:760px){.holdem-card>span,.card-rank-bottom{font-size:13px}.holdem-card>span{top:3px;left:4px}.card-rank-bottom{right:4px;bottom:3px}}
+        @media(max-width:470px){.holdem-card,.holdem-card-slot{width:36px;height:50px}.seat-cards{height:54px}.poker-seat.left .seat-cards,.poker-seat.right .seat-cards{width:75px;height:50px;flex-basis:75px}.poker-seat.left,.poker-seat.right{width:162px}.holdem-card>span,.card-rank-bottom{font-size:14px}.holdem-card>strong{font-size:21px}}
       `}</style>
     </section>
   );
