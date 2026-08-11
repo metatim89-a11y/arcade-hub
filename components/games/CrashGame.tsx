@@ -1,360 +1,478 @@
-// File: components/games/CrashGame.tsx
-// Version: 1.0.1
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { CurrencyMode } from '../../types';
 import { useCoinSystem } from '../../context/CoinContext';
-import GlassButton from '../ui/GlassButton';
+
+type GameState = 'IDLE' | 'COUNTDOWN' | 'FLYING' | 'CRASHED';
+
+type Round = {
+  bet: number;
+  currency: CurrencyMode;
+  crashPoint: number;
+};
+
+const MIN_BET = 10;
+const MAX_BET = 100000;
+const COUNTDOWN_SECONDS = 3;
+const GROWTH_RATE = 0.115;
+
+const secureRandom = () => {
+  const values = new Uint32Array(1);
+  crypto.getRandomValues(values);
+  return (values[0] + 1) / 4294967297;
+};
+
+const generateCrashPoint = () => {
+  const point = 0.99 / (1 - secureRandom());
+  return Math.min(1000, Math.max(1, Math.floor(point * 100) / 100));
+};
 
 const CrashGame: React.FC = () => {
-  const { canBet, subtractCoins, addCoins, currencyMode } = useCoinSystem();
+  const { canBet, subtractCoins, addCoins, currencyMode, isProcessing } = useCoinSystem();
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  
-  // Game State
-  const [gameState, setGameState] = useState<'IDLE' | 'COUNTDOWN' | 'FLYING' | 'CRASHED'>('IDLE');
-  const [multiplier, setMultiplier] = useState(1.00);
+  const frameRef = useRef<number | null>(null);
+  const countdownRef = useRef<number | null>(null);
+  const shakeRef = useRef<number | null>(null);
+  const mountedRef = useRef(true);
+  const stateRef = useRef<GameState>('IDLE');
+  const multiplierRef = useRef(1);
+  const startedAtRef = useRef(0);
+  const startingRef = useRef(false);
+  const cashoutLockedRef = useRef(false);
+  const payoutPendingRef = useRef(false);
+  const roundRef = useRef<Round | null>(null);
+  const autoEnabledRef = useRef(false);
+  const autoTargetRef = useRef(2);
+  const starsRef = useRef(
+    Array.from({ length: 75 }, () => ({
+      x: Math.random(),
+      y: Math.random(),
+      size: 0.45 + Math.random() * 1.65,
+      speed: 0.3 + Math.random() * 0.9
+    }))
+  );
+
+  const [gameState, setGameState] = useState<GameState>('IDLE');
+  const [multiplier, setMultiplier] = useState(1);
   const [bet, setBet] = useState(10);
-  const [countdown, setCountdown] = useState(3);
+  const [countdown, setCountdown] = useState(COUNTDOWN_SECONDS);
   const [history, setHistory] = useState<number[]>([]);
-  
-  // Player State
   const [hasCashedOut, setHasCashedOut] = useState(false);
   const [cashedOutAt, setCashedOutAt] = useState<number | null>(null);
-  
-  // Refs for animation loop
-  const requestRef = useRef<number | undefined>(undefined);
-  const startTimeRef = useRef<number>(0);
-  const crashPointRef = useRef<number>(0);
-  const starsRef = useRef<{x: number, y: number, s: number}[]>([]);
-  const particlesRef = useRef<{x: number, y: number, life: number, color: string, vx: number, vy: number}[]>([]);
-  const multiplierRef = useRef<number>(1.00);
+  const [paidAmount, setPaidAmount] = useState(0);
+  const [autoEnabled, setAutoEnabled] = useState(false);
+  const [autoTarget, setAutoTarget] = useState(2);
+  const [isStarting, setIsStarting] = useState(false);
+  const [isPayoutPending, setIsPayoutPending] = useState(false);
   const [isShaking, setIsShaking] = useState(false);
+  const [message, setMessage] = useState('Set your bet and launch when ready.');
 
-  // Initialize stars
-  useEffect(() => {
-    const stars = [];
-    for(let i=0; i<100; i++) {
-        stars.push({
-            x: Math.random() * 800,
-            y: Math.random() * 300,
-            s: Math.random() * 2 + 0.5
-        });
-    }
-    starsRef.current = stars;
-  }, []);
-  
   const currencySymbol = currencyMode === 'fun' ? 'FC' : 'RC';
+  const controlsOpen = gameState === 'IDLE' || gameState === 'CRASHED';
 
-  // --- Rendering ---
+  const updateState = useCallback((next: GameState) => {
+    stateRef.current = next;
+    setGameState(next);
+  }, []);
 
-  const drawGraph = useCallback((currentMultiplier: number, isCrashed = false) => {
+  const drawScene = useCallback((current: number, phase: GameState, cashedOut: boolean) => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
+    const context = canvas.getContext('2d');
+    if (!context) return;
 
-    const width = canvas.width;
-    const height = canvas.height;
-    
-    // Clear
-    ctx.clearRect(0, 0, width, height);
+    const dpr = Math.max(1, window.devicePixelRatio || 1);
+    const width = canvas.width / dpr;
+    const height = canvas.height / dpr;
+    if (!width || !height) return;
+    context.setTransform(dpr, 0, 0, dpr, 0, 0);
+    context.clearRect(0, 0, width, height);
 
-    // Gradient Background
-    const bgGradient = ctx.createLinearGradient(0, 0, 0, height);
-    bgGradient.addColorStop(0, '#0f172a');
-    bgGradient.addColorStop(1, '#1e293b');
-    ctx.fillStyle = bgGradient;
-    ctx.fillRect(0, 0, width, height);
+    const sky = context.createLinearGradient(0, 0, 0, height);
+    sky.addColorStop(0, '#06121f');
+    sky.addColorStop(0.55, '#0b2032');
+    sky.addColorStop(1, '#102536');
+    context.fillStyle = sky;
+    context.fillRect(0, 0, width, height);
 
-    // Draw Stars (Parallax)
-    const elapsed = gameState === 'FLYING' ? (Date.now() - startTimeRef.current) / 1000 : 0;
-    ctx.fillStyle = '#ffffff';
-    starsRef.current.forEach(star => {
-        const x = (star.x - elapsed * 50 * star.s) % width;
-        const finalX = x < 0 ? x + width : x;
-        ctx.globalAlpha = 0.5;
-        ctx.beginPath();
-        ctx.arc(finalX, star.y, star.s, 0, Math.PI * 2);
-        ctx.fill();
-    });
-    ctx.globalAlpha = 1.0;
-
-    // Viewport mapping
-    const maxY = Math.max(2.00, currentMultiplier * 1.1);
-    const minY = 1.00;
-    const scaleY = (val: number) => height - ((val - minY) / (maxY - minY)) * height * 0.8 - 20;
-    
-    const rocketX = width * 0.8;
-    const rocketY = scaleY(currentMultiplier);
-
-    // Add trail particles
-    if (gameState === 'FLYING' && !isCrashed) {
-        for (let i = 0; i < 3; i++) {
-            particlesRef.current.push({ 
-                x: rocketX, 
-                y: rocketY, 
-                life: 1.0,
-                color: Math.random() > 0.5 ? '#f59e0b' : '#ef4444',
-                vx: -Math.random() * 2 - 1,
-                vy: (Math.random() - 0.5) * 2
-            });
-        }
+    const elapsed = phase === 'FLYING' ? (performance.now() - startedAtRef.current) / 1000 : 0;
+    for (const star of starsRef.current) {
+      const shifted = ((star.x * width - elapsed * 18 * star.speed) % width + width) % width;
+      context.globalAlpha = 0.25 + star.speed * 0.45;
+      context.fillStyle = '#dff4ff';
+      context.beginPath();
+      context.arc(shifted, star.y * height * 0.82, star.size, 0, Math.PI * 2);
+      context.fill();
     }
-    
-    particlesRef.current.forEach(p => {
-        p.x += p.vx;
-        p.y += p.vy;
-        p.life -= 0.02;
-        ctx.beginPath();
-        ctx.fillStyle = p.color;
-        ctx.globalAlpha = p.life;
-        ctx.arc(p.x, p.y, 4 * p.life, 0, Math.PI * 2);
-        ctx.fill();
-    });
-    ctx.globalAlpha = 1.0;
-    particlesRef.current = particlesRef.current.filter(p => p.life > 0);
+    context.globalAlpha = 1;
 
-    // Draw Curve
-    ctx.beginPath();
-    ctx.strokeStyle = isCrashed ? '#ef4444' : (hasCashedOut ? '#10b981' : '#f59e0b');
-    ctx.lineWidth = 4;
-    ctx.shadowBlur = 10;
-    ctx.shadowColor = ctx.strokeStyle as string;
-    ctx.moveTo(0, height - 20);
-    ctx.quadraticCurveTo(width * 0.4, height - 20, rocketX, rocketY);
-    ctx.stroke();
-    ctx.shadowBlur = 0;
+    const left = 30;
+    const bottom = height - 27;
+    const right = width - 30;
+    const top = 28;
+    context.strokeStyle = 'rgba(143, 190, 216, .1)';
+    context.lineWidth = 1;
+    for (let index = 0; index <= 5; index += 1) {
+      const y = top + ((bottom - top) / 5) * index;
+      context.beginPath();
+      context.moveTo(left, y);
+      context.lineTo(right, y);
+      context.stroke();
+    }
 
-    // Draw Rocket / Dot
-    if (!isCrashed) {
-        ctx.font = "24px Arial";
-        ctx.textAlign = "center";
-        ctx.textBaseline = "middle";
-        ctx.fillText("🚀", rocketX, rocketY - 10);
+    const flightProgress = Math.min(1, Math.log(Math.max(1, current)) / Math.log(12));
+    const rocketX = left + (right - left) * (0.12 + flightProgress * 0.76);
+    const rocketY = bottom - (bottom - top) * (0.1 + flightProgress * 0.76);
+    const accent = phase === 'CRASHED' ? '#ff5263' : cashedOut ? '#48dda6' : '#ffbd45';
+    const trail = context.createLinearGradient(left, bottom, rocketX, rocketY);
+    trail.addColorStop(0, 'rgba(255,189,69,0)');
+    trail.addColorStop(1, accent);
+    context.beginPath();
+    context.moveTo(left, bottom);
+    context.bezierCurveTo(width * 0.35, bottom, rocketX * 0.66, rocketY + 42, rocketX, rocketY);
+    context.strokeStyle = trail;
+    context.lineWidth = 5;
+    context.shadowBlur = 16;
+    context.shadowColor = accent;
+    context.stroke();
+    context.shadowBlur = 0;
+
+    if (phase === 'CRASHED') {
+      for (let ray = 0; ray < 12; ray += 1) {
+        const angle = (Math.PI * 2 * ray) / 12;
+        const inner = 7 + (ray % 2) * 4;
+        const outer = 25 + (ray % 3) * 6;
+        context.beginPath();
+        context.moveTo(rocketX + Math.cos(angle) * inner, rocketY + Math.sin(angle) * inner);
+        context.lineTo(rocketX + Math.cos(angle) * outer, rocketY + Math.sin(angle) * outer);
+        context.strokeStyle = ray % 2 ? '#ffbd45' : '#ff5263';
+        context.lineWidth = 3;
+        context.stroke();
+      }
+      context.fillStyle = '#fff2c5';
+      context.beginPath();
+      context.arc(rocketX, rocketY, 10, 0, Math.PI * 2);
+      context.fill();
     } else {
-        ctx.font = "32px Arial";
-        ctx.fillText("💥", rocketX, rocketY);
+      context.save();
+      context.translate(rocketX, rocketY);
+      context.rotate(-0.72);
+      context.fillStyle = '#e9f4fa';
+      context.beginPath();
+      context.moveTo(18, 0);
+      context.lineTo(-9, -9);
+      context.lineTo(-5, 0);
+      context.lineTo(-9, 9);
+      context.closePath();
+      context.fill();
+      context.fillStyle = '#62c9f2';
+      context.beginPath();
+      context.arc(4, 0, 4, 0, Math.PI * 2);
+      context.fill();
+      context.fillStyle = accent;
+      context.beginPath();
+      context.moveTo(-7, -4);
+      context.lineTo(-20, 0);
+      context.lineTo(-7, 4);
+      context.closePath();
+      context.fill();
+      context.restore();
     }
+  }, []);
 
-  }, [hasCashedOut, gameState]);
+  const resizeCanvas = useCallback(() => {
+    const canvas = canvasRef.current;
+    const parent = canvas?.parentElement;
+    if (!canvas || !parent) return;
+    const width = Math.max(280, parent.clientWidth);
+    const height = Math.max(260, Math.min(380, width * 0.48));
+    const dpr = Math.max(1, window.devicePixelRatio || 1);
+    canvas.width = Math.floor(width * dpr);
+    canvas.height = Math.floor(height * dpr);
+    canvas.style.width = `${width}px`;
+    canvas.style.height = `${height}px`;
+    drawScene(multiplierRef.current, stateRef.current, cashoutLockedRef.current);
+  }, [drawScene]);
 
-  const handleCrash = useCallback((finalValue: number) => {
-    setGameState('CRASHED');
-    setMultiplier(finalValue);
-    setHistory(prev => [finalValue, ...prev].slice(0, 5));
-    if (requestRef.current) cancelAnimationFrame(requestRef.current);
+  const finishCrash = useCallback((crashPoint: number) => {
+    if (stateRef.current !== 'FLYING') return;
+    multiplierRef.current = crashPoint;
+    setMultiplier(crashPoint);
+    updateState('CRASHED');
+    setHistory((current) => [crashPoint, ...current].slice(0, 8));
+    setMessage(cashoutLockedRef.current
+      ? `Round ended at ${crashPoint.toFixed(2)}×. Your cash-out was locked.`
+      : `Crashed at ${crashPoint.toFixed(2)}×. Better luck next flight.`);
     setIsShaking(true);
-    setTimeout(() => setIsShaking(false), 400);
-    drawGraph(finalValue, true);
-  }, [drawGraph]);
+    if (shakeRef.current) window.clearTimeout(shakeRef.current);
+    shakeRef.current = window.setTimeout(() => mountedRef.current && setIsShaking(false), 420);
+    drawScene(crashPoint, 'CRASHED', cashoutLockedRef.current);
+  }, [drawScene, updateState]);
 
-  const loop = useCallback(() => {
-    const now = Date.now();
-    const elapsed = (now - startTimeRef.current) / 1000;
-    const currentM = Math.pow(Math.E, 0.1 * elapsed);
-    
-    multiplierRef.current = currentM;
-    
-    if (currentM >= crashPointRef.current) {
-      handleCrash(crashPointRef.current);
-    } else {
-      setMultiplier(currentM);
-      drawGraph(currentM);
-      requestRef.current = requestAnimationFrame(loop);
+  const cashOut = useCallback(async (requestedMultiplier?: number) => {
+    const round = roundRef.current;
+    if (!round || stateRef.current !== 'FLYING' || cashoutLockedRef.current) return;
+
+    const liveMultiplier = Math.exp(GROWTH_RATE * ((performance.now() - startedAtRef.current) / 1000));
+    const cashoutMultiplier = Math.min(requestedMultiplier ?? liveMultiplier, liveMultiplier);
+    if (cashoutMultiplier >= round.crashPoint) {
+      finishCrash(round.crashPoint);
+      return;
     }
-  }, [handleCrash, drawGraph]);
 
-  // --- Game Logic ---
+    cashoutLockedRef.current = true;
+    payoutPendingRef.current = true;
+    setHasCashedOut(true);
+    setCashedOutAt(cashoutMultiplier);
+    setIsPayoutPending(true);
+    const winnings = Math.floor(round.bet * cashoutMultiplier * 100) / 100;
+    setMessage(`Cash-out locked at ${cashoutMultiplier.toFixed(2)}×. Confirming ${winnings.toFixed(2)} ${round.currency === 'fun' ? 'FC' : 'RC'}…`);
 
-  const generateCrashPoint = () => {
-    const r = Math.random();
-    const crash = 0.99 / (1 - r);
-    return Math.max(1.00, Math.floor(crash * 100) / 100);
-  };
+    const credited = await addCoins(winnings, 'Crash Cashout', round.currency);
+    payoutPendingRef.current = false;
+    if (!mountedRef.current) return;
+    setIsPayoutPending(false);
+    if (credited) {
+      setPaidAmount(winnings);
+      setMessage(`Paid ${winnings.toFixed(2)} ${round.currency === 'fun' ? 'FC' : 'RC'} at ${cashoutMultiplier.toFixed(2)}×.`);
+    } else {
+      setMessage('Cash-out was locked, but the payout service did not confirm payment.');
+    }
+  }, [addCoins, finishCrash]);
 
-  const startGame = () => {
-    if (!canBet(bet)) return;
-    
-    subtractCoins(bet, 'Crash Bet');
-    setGameState('COUNTDOWN');
-    setCountdown(3);
-    setMultiplier(1.00);
-    multiplierRef.current = 1.00;
+  const runFlight = useCallback(() => {
+    const round = roundRef.current;
+    if (!round || stateRef.current !== 'FLYING') return;
+    const current = Math.exp(GROWTH_RATE * ((performance.now() - startedAtRef.current) / 1000));
+    multiplierRef.current = current;
+
+    if (current >= round.crashPoint) {
+      finishCrash(round.crashPoint);
+      return;
+    }
+
+    if (autoEnabledRef.current && !cashoutLockedRef.current && current >= autoTargetRef.current) {
+      void cashOut(autoTargetRef.current);
+    }
+
+    setMultiplier(current);
+    drawScene(current, 'FLYING', cashoutLockedRef.current);
+    frameRef.current = requestAnimationFrame(runFlight);
+  }, [cashOut, drawScene, finishCrash]);
+
+  const startGame = useCallback(async () => {
+    if (startingRef.current || !controlsOpen || isProcessing) return;
+    const cleanBet = Math.min(MAX_BET, Math.max(MIN_BET, Math.floor(bet)));
+    setBet(cleanBet);
+
+    if (currencyMode === 'real') {
+      setMessage('Real Coin Crash is disabled until a server-authoritative round service is connected.');
+      return;
+    }
+    if (!canBet(cleanBet)) {
+      setMessage(`You need at least ${cleanBet} ${currencySymbol} to launch.`);
+      return;
+    }
+
+    startingRef.current = true;
+    setIsStarting(true);
+    setMessage('Confirming your bet…');
+    const charged = await subtractCoins(cleanBet, 'Crash Bet', currencyMode);
+    startingRef.current = false;
+    if (!mountedRef.current) return;
+    setIsStarting(false);
+    if (!charged) {
+      setMessage('The bet was not charged, so the round did not start.');
+      return;
+    }
+
+    const round: Round = { bet: cleanBet, currency: currencyMode, crashPoint: generateCrashPoint() };
+    roundRef.current = round;
+    cashoutLockedRef.current = false;
+    payoutPendingRef.current = false;
+    multiplierRef.current = 1;
+    setMultiplier(1);
     setHasCashedOut(false);
     setCashedOutAt(null);
-    crashPointRef.current = generateCrashPoint();
+    setPaidAmount(0);
+    setCountdown(COUNTDOWN_SECONDS);
+    updateState('COUNTDOWN');
+    setMessage(`${cleanBet} ${currencySymbol} accepted. Stand by for launch.`);
+    drawScene(1, 'COUNTDOWN', false);
 
-    const timer = setInterval(() => {
-      setCountdown((prev) => {
-        if (prev <= 1) {
-          clearInterval(timer);
-          setGameState('FLYING');
-          startTimeRef.current = Date.now();
-          loop();
-          return 0;
-        }
-        return prev - 1;
-      });
+    let remaining = COUNTDOWN_SECONDS;
+    countdownRef.current = window.setInterval(() => {
+      remaining -= 1;
+      if (remaining <= 0) {
+        if (countdownRef.current) window.clearInterval(countdownRef.current);
+        countdownRef.current = null;
+        if (!mountedRef.current) return;
+        updateState('FLYING');
+        startedAtRef.current = performance.now();
+        setMessage(autoEnabledRef.current
+          ? `Flying — auto cash-out armed at ${autoTargetRef.current.toFixed(2)}×.`
+          : 'Flying — cash out before the crash.');
+        frameRef.current = requestAnimationFrame(runFlight);
+      } else {
+        setCountdown(remaining);
+      }
     }, 1000);
-  };
+  }, [bet, canBet, controlsOpen, currencyMode, currencySymbol, drawScene, isProcessing, runFlight, subtractCoins, updateState]);
 
-  const handleCashOut = () => {
-    if (gameState === 'FLYING' && !hasCashedOut) {
-      const currentMultiplier = multiplierRef.current;
-      setHasCashedOut(true);
-      setCashedOutAt(currentMultiplier);
-      const winnings = Math.floor(bet * currentMultiplier);
-      addCoins(winnings, 'Crash Cashout');
+  useEffect(() => {
+    autoEnabledRef.current = autoEnabled;
+  }, [autoEnabled]);
+
+  useEffect(() => {
+    autoTargetRef.current = autoTarget;
+  }, [autoTarget]);
+
+  useEffect(() => {
+    if (currencyMode === 'real' && controlsOpen) {
+      setMessage('Real Coin Crash is disabled until a server-authoritative round service is connected.');
     }
-  };
+  }, [controlsOpen, currencyMode]);
 
   useEffect(() => {
-      drawGraph(1.00);
-      return () => {
-          if (requestRef.current) cancelAnimationFrame(requestRef.current);
-      }
-  }, [drawGraph]);
+    mountedRef.current = true;
+    resizeCanvas();
+    const parent = canvasRef.current?.parentElement;
+    const observer = parent ? new ResizeObserver(resizeCanvas) : null;
+    if (parent) observer?.observe(parent);
+    return () => {
+      mountedRef.current = false;
+      observer?.disconnect();
+      if (frameRef.current) cancelAnimationFrame(frameRef.current);
+      if (countdownRef.current) window.clearInterval(countdownRef.current);
+      if (shakeRef.current) window.clearTimeout(shakeRef.current);
+    };
+  }, [resizeCanvas]);
 
-  useEffect(() => {
-      const canvas = canvasRef.current;
-      if (canvas) {
-          const parent = canvas.parentElement;
-          if (parent) {
-              canvas.width = parent.clientWidth;
-              canvas.height = 300;
-              drawGraph(multiplierRef.current, gameState === 'CRASHED');
-          }
-      }
-  }, [gameState, drawGraph]);
+  const changeBet = (value: number) => setBet(Math.min(MAX_BET, Math.max(MIN_BET, Math.floor(value || MIN_BET))));
+  const roundBet = roundRef.current?.bet ?? bet;
+  const projectedPayout = Math.floor(roundBet * multiplier * 100) / 100;
 
   return (
-    <div className="flex flex-col items-center w-full max-w-4xl gap-6 p-4">
-      <div className="w-full flex justify-between items-center bg-gray-800/50 p-3 rounded-xl backdrop-blur-sm">
-          <div className="flex items-center gap-2">
-            <h2 className="text-2xl font-bold text-white">🚀 CRASH</h2>
-          </div>
-          <div className="flex gap-2 overflow-hidden">
-              {history.map((h, i) => (
-                  <div key={i} className={`px-2 py-1 rounded text-xs font-bold ${h >= 2.0 ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
-                      {h.toFixed(2)}x
-                  </div>
-              ))}
-          </div>
+    <section className="crash-game" aria-label="Crash game">
+      <header className="crash-header">
+        <div>
+          <div className="crash-kicker">ARCADE FLIGHT</div>
+          <h2>CRASH</h2>
+        </div>
+        <div className="crash-history" aria-label="Recent crash points">
+          {history.length === 0 && <span className="history-empty">NO FLIGHTS YET</span>}
+          {history.map((point, index) => (
+            <span key={`${point}-${index}`} className={point >= 2 ? 'high' : 'low'}>{point.toFixed(2)}×</span>
+          ))}
+        </div>
+      </header>
+
+      <div className={`crash-stage${isShaking ? ' shaking' : ''}`}>
+        <canvas ref={canvasRef} />
+        <div className="crash-readout" aria-live="polite">
+          {gameState === 'IDLE' && <small>READY FOR LAUNCH</small>}
+          {gameState === 'COUNTDOWN' && <small>LAUNCHING IN</small>}
+          <strong className={gameState === 'CRASHED' ? 'crashed' : hasCashedOut ? 'safe' : ''}>
+            {gameState === 'COUNTDOWN' ? countdown : `${multiplier.toFixed(2)}×`}
+          </strong>
+          {gameState === 'CRASHED' && <small className="crashed">FLIGHT ENDED</small>}
+          {hasCashedOut && (
+            <small className={isPayoutPending || paidAmount > 0 ? 'safe' : 'unconfirmed'}>
+              {isPayoutPending
+                ? 'PAYOUT PENDING'
+                : paidAmount > 0
+                  ? `SECURED ${paidAmount.toFixed(2)} ${roundRef.current?.currency === 'real' ? 'RC' : 'FC'}`
+                  : 'PAYOUT UNCONFIRMED'}
+            </small>
+          )}
+        </div>
       </div>
 
-      <div className={`relative w-full bg-gray-900 rounded-2xl overflow-hidden shadow-2xl border border-gray-700 ${isShaking ? 'animate-crash-shake' : ''}`}>
-          <canvas ref={canvasRef} className="w-full block" />
-          <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-              {gameState === 'COUNTDOWN' && (
-                  <div className="text-6xl font-black text-white animate-pulse">
-                      Start in {countdown}
-                  </div>
-              )}
-              {gameState === 'IDLE' && (
-                  <div className="text-xl text-gray-400 font-mono">
-                      Ready to launch
-                  </div>
-              )}
-              {(gameState === 'FLYING' || gameState === 'CRASHED') && (
-                   <div className={`text-6xl md:text-8xl font-black tabular-nums tracking-tighter drop-shadow-lg ${
-                       gameState === 'CRASHED' ? 'text-red-500' : (hasCashedOut ? 'text-green-400' : 'text-white')
-                   }`}>
-                       {multiplier.toFixed(2)}x
-                   </div>
-              )}
-              {gameState === 'CRASHED' && (
-                  <div className="text-2xl text-red-500 font-bold mt-2">CRASHED</div>
-              )}
-              {hasCashedOut && (
-                  <div className="text-2xl text-green-400 font-bold mt-2 bg-black/50 px-4 py-1 rounded-full border border-green-500/30 backdrop-blur-md">
-                      Cashed out at {cashedOutAt?.toFixed(2)}x (+{Math.floor(bet * (cashedOutAt || 1))} {currencySymbol})
-                  </div>
-              )}
-          </div>
+      <div className={`crash-message ${currencyMode === 'real' ? 'warning' : ''}`} role="status">
+        <span />{message}
       </div>
 
-      <div className="flex flex-col md:flex-row gap-4 w-full items-stretch justify-center bg-gray-800/40 p-4 rounded-2xl">
-          <div className="flex-1 flex flex-col gap-2">
-              <label className="text-gray-400 text-sm font-bold ml-1">BET AMOUNT ({currencySymbol})</label>
-              <div className="flex items-center gap-2 bg-gray-900 p-1 rounded-xl border border-gray-700">
-                  <button 
-                    onClick={() => setBet(Math.max(10, bet - 10))}
-                    disabled={gameState !== 'IDLE'}
-                    className="w-10 h-10 bg-gray-800 hover:bg-gray-700 rounded-lg font-bold text-xl disabled:opacity-50"
-                  >-</button>
-                  <input 
-                    type="number" 
-                    value={bet}
-                    onChange={(e) => setBet(Math.max(0, parseInt(e.target.value) || 0))}
-                    disabled={gameState !== 'IDLE'}
-                    className="flex-1 bg-transparent text-center text-xl font-bold focus:outline-none text-white"
-                  />
-                  <button 
-                    onClick={() => setBet(bet + 10)}
-                    disabled={gameState !== 'IDLE'}
-                    className="w-10 h-10 bg-gray-800 hover:bg-gray-700 rounded-lg font-bold text-xl disabled:opacity-50"
-                  >+</button>
-              </div>
-              <div className="flex gap-2">
-                  {[100, 500, 1000].map(amt => (
-                      <button 
-                        key={amt}
-                        onClick={() => setBet(amt)}
-                        disabled={gameState !== 'IDLE'}
-                        className="flex-1 bg-gray-800 hover:bg-gray-700 text-xs py-1 rounded border border-gray-700 disabled:opacity-50"
-                      >
-                          {amt}
-                      </button>
-                  ))}
-              </div>
+      <div className="crash-panel">
+        <div className="crash-bet-column">
+          <label htmlFor="crash-bet">BET AMOUNT <span>{currencySymbol}</span></label>
+          <div className="crash-bet-input">
+            <button type="button" disabled={!controlsOpen || isStarting} onClick={() => changeBet(bet - 10)}>−</button>
+            <input
+              id="crash-bet"
+              type="number"
+              min={MIN_BET}
+              max={MAX_BET}
+              value={bet}
+              disabled={!controlsOpen || isStarting}
+              onChange={(event) => changeBet(Number(event.target.value))}
+            />
+            <button type="button" disabled={!controlsOpen || isStarting} onClick={() => changeBet(bet + 10)}>+</button>
           </div>
+          <div className="crash-presets">
+            {[10, 50, 100, 500].map((amount) => (
+              <button key={amount} type="button" disabled={!controlsOpen || isStarting} onClick={() => changeBet(amount)}>{amount}</button>
+            ))}
+          </div>
+        </div>
 
-          <div className="flex-1 flex items-center">
-              {gameState === 'IDLE' || gameState === 'CRASHED' ? (
-                   <GlassButton 
-                     onClick={startGame}
-                     disabled={!canBet(bet)}
-                     className="w-full h-full min-h-[60px] text-2xl !bg-green-500 hover:!bg-green-400 text-black shadow-[0_0_20px_rgba(34,197,94,0.4)]"
-                   >
-                       PLACE BET
-                   </GlassButton>
-              ) : gameState === 'COUNTDOWN' ? (
-                   <GlassButton disabled className="w-full h-full min-h-[60px] text-xl opacity-80 cursor-wait">
-                       PREPARING...
-                   </GlassButton>
-              ) : (
-                   <GlassButton 
-                        onClick={handleCashOut}
-                        disabled={hasCashedOut}
-                        className={`w-full h-full min-h-[60px] text-2xl text-black shadow-[0_0_20px_rgba(245,158,11,0.4)] transition-all ${
-                            hasCashedOut 
-                            ? '!bg-gray-600 text-gray-400 cursor-not-allowed shadow-none' 
-                            : '!bg-yellow-400 hover:!bg-yellow-300'
-                        }`}
-                   >
-                        {hasCashedOut ? 'CASHED OUT' : `CASH OUT (${(bet * multiplier).toFixed(0)})`}
-                   </GlassButton>
-              )}
+        <div className="crash-auto-column">
+          <label className="crash-switch">
+            <input
+              type="checkbox"
+              checked={autoEnabled}
+              disabled={!controlsOpen || isStarting}
+              onChange={(event) => setAutoEnabled(event.target.checked)}
+            />
+            <span /> AUTO CASH-OUT
+          </label>
+          <div className="crash-auto-input">
+            <input
+              type="number"
+              min="1.01"
+              max="1000"
+              step="0.05"
+              value={autoTarget}
+              disabled={!controlsOpen || !autoEnabled || isStarting}
+              onChange={(event) => setAutoTarget(Math.min(1000, Math.max(1.01, Number(event.target.value) || 1.01)))}
+            />
+            <span>×</span>
           </div>
+        </div>
+
+        <div className="crash-action-column">
+          {gameState === 'FLYING' ? (
+            <button
+              type="button"
+              className="crash-action cashout"
+              disabled={hasCashedOut || isPayoutPending}
+              onClick={() => void cashOut()}
+            >
+              <small>{hasCashedOut ? 'CASHED OUT' : 'CASH OUT NOW'}</small>
+              <strong>{hasCashedOut && cashedOutAt ? `${cashedOutAt.toFixed(2)}×` : `${projectedPayout.toFixed(2)} ${roundRef.current?.currency === 'real' ? 'RC' : 'FC'}`}</strong>
+            </button>
+          ) : (
+            <button
+              type="button"
+              className="crash-action launch"
+              disabled={!controlsOpen || isStarting || isProcessing || !canBet(bet) || currencyMode === 'real'}
+              onClick={() => void startGame()}
+            >
+              <small>{isStarting ? 'CONFIRMING BET' : gameState === 'CRASHED' ? 'NEXT FLIGHT' : 'PLACE BET'}</small>
+              <strong>{isStarting ? '…' : `${bet} ${currencySymbol}`}</strong>
+            </button>
+          )}
+        </div>
       </div>
+
+      <footer className="crash-footer">
+        <span>1.00× minimum</span>
+        <span>1% mathematical edge</span>
+        <span>{currencyMode === 'fun' ? 'Fun Coin mode' : 'Real Coin rounds unavailable'}</span>
+      </footer>
 
       <style>{`
-        @keyframes crash-shake {
-            0% { transform: translate(1px, 1px) rotate(0deg); }
-            10% { transform: translate(-1px, -2px) rotate(-1deg); }
-            20% { transform: translate(-3px, 0px) rotate(1deg); }
-            30% { transform: translate(3px, 2px) rotate(0deg); }
-            40% { transform: translate(1px, -1px) rotate(1deg); }
-            50% { transform: translate(-1px, 2px) rotate(-1deg); }
-            60% { transform: translate(-3px, 1px) rotate(0deg); }
-            70% { transform: translate(3px, 1px) rotate(-1deg); }
-            80% { transform: translate(-1px, -1px) rotate(1deg); }
-            90% { transform: translate(1px, 2px) rotate(0deg); }
-            100% { transform: translate(1px, -2px) rotate(-1deg); }
-        }
-        .animate-crash-shake {
-            animation: crash-shake 0.1s infinite;
-        }
+        .crash-game{width:min(100%,900px);margin:0 auto;padding:18px;color:#e8f2f7;background:linear-gradient(155deg,#091521,#102334);border:1px solid #274158;border-radius:20px;box-shadow:0 24px 70px rgba(0,0,0,.38);user-select:none}.crash-header{display:flex;align-items:center;justify-content:space-between;gap:18px;margin-bottom:13px}.crash-kicker{color:#65c9ed;font-size:9px;font-weight:900;letter-spacing:.22em}.crash-header h2{margin:2px 0 0;font-size:29px;line-height:1;letter-spacing:.04em}.crash-history{display:flex;justify-content:flex-end;gap:6px;max-width:70%;overflow:hidden}.crash-history span{flex:0 0 auto;padding:5px 7px;border:1px solid;border-radius:6px;font-size:10px;font-weight:850}.crash-history .low{color:#ff7c87;border-color:rgba(255,82,99,.3);background:rgba(255,82,99,.1)}.crash-history .high{color:#58e0ac;border-color:rgba(72,221,166,.3);background:rgba(72,221,166,.1)}.crash-history .history-empty{color:#7890a2;border-color:#2a4052;background:#0b1823}.crash-stage{position:relative;width:100%;overflow:hidden;border:1px solid #29485f;border-radius:15px;background:#06121f;box-shadow:inset 0 0 45px rgba(0,0,0,.55)}.crash-stage canvas{display:block;max-width:100%}.crash-readout{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;pointer-events:none;text-shadow:0 3px 20px rgba(0,0,0,.8)}.crash-readout strong{color:#f7fbfd;font-size:clamp(48px,11vw,88px);font-weight:950;line-height:1;letter-spacing:-.06em;font-variant-numeric:tabular-nums}.crash-readout small{margin:5px 0;color:#91a9b9;font-size:10px;font-weight:900;letter-spacing:.2em}.crash-readout .crashed{color:#ff5969}.crash-readout .safe{color:#51dfa9}.crash-readout .unconfirmed{color:#ffbd62}.crash-message{display:flex;align-items:center;gap:9px;min-height:42px;margin:11px 0;padding:9px 12px;border:1px solid #29455a;border-radius:9px;background:#091722;color:#c1d3de;font-size:12px}.crash-message>span{width:7px;height:7px;flex:none;border-radius:50%;background:#58d9aa;box-shadow:0 0 0 4px rgba(88,217,170,.12)}.crash-message.warning{border-color:#725329;color:#ffd58a}.crash-message.warning>span{background:#ffb948;box-shadow:0 0 0 4px rgba(255,185,72,.12)}.crash-panel{display:grid;grid-template-columns:1.25fr .8fr 1fr;gap:12px;padding:13px;border:1px solid #284052;border-radius:13px;background:rgba(5,14,22,.55)}.crash-panel label{color:#8fa5b4;font-size:9px;font-weight:900;letter-spacing:.12em}.crash-panel label span{color:#e7bd55}.crash-bet-column,.crash-auto-column{display:flex;flex-direction:column;gap:7px}.crash-bet-input{display:grid;grid-template-columns:38px 1fr 38px;overflow:hidden;border:1px solid #304b60;border-radius:8px;background:#08141e}.crash-bet-input button,.crash-presets button{border:0;background:#172b3a;color:#c6d5df;font-weight:900;cursor:pointer}.crash-bet-input button:hover,.crash-presets button:hover{background:#22445a}.crash-bet-input input,.crash-auto-input input{min-width:0;border:0;outline:0;background:transparent;color:#f3f8fa;text-align:center;font-size:17px;font-weight:900}.crash-presets{display:grid;grid-template-columns:repeat(4,1fr);gap:4px}.crash-presets button{padding:4px;border-radius:5px;font-size:9px}.crash-switch{display:flex;align-items:center;gap:7px;cursor:pointer}.crash-switch input{position:absolute;opacity:0}.crash-switch>span{position:relative;width:28px;height:15px;border-radius:20px;background:#344a59;transition:.2s}.crash-switch>span:after{content:'';position:absolute;top:3px;left:3px;width:9px;height:9px;border-radius:50%;background:#91a3ae;transition:.2s}.crash-switch input:checked+span{background:#2b9c76}.crash-switch input:checked+span:after{left:16px;background:white}.crash-auto-input{display:grid;grid-template-columns:1fr 28px;flex:1;min-height:39px;border:1px solid #304b60;border-radius:8px;background:#08141e}.crash-auto-input span{display:grid;place-items:center;color:#7f96a5;font-weight:900}.crash-action-column{display:flex}.crash-action{width:100%;min-height:76px;border:0;border-radius:10px;box-shadow:0 5px 0;cursor:pointer;transition:transform .12s,filter .12s}.crash-action:hover:not(:disabled){filter:brightness(1.08)}.crash-action:active:not(:disabled){transform:translateY(4px);box-shadow:0 1px 0}.crash-action small,.crash-action strong{display:block}.crash-action small{font-size:9px;font-weight:950;letter-spacing:.13em}.crash-action strong{margin-top:3px;font-size:19px}.crash-action.launch{background:linear-gradient(#58dfa9,#24a978);box-shadow-color:#126242;color:#062519}.crash-action.cashout{background:linear-gradient(#ffd05f,#e79d24);box-shadow-color:#8b5313;color:#352307}.crash-action:disabled,.crash-panel button:disabled,.crash-panel input:disabled{opacity:.45;cursor:not-allowed}.crash-footer{display:flex;justify-content:center;gap:18px;padding-top:12px;color:#6f8798;font-size:9px;font-weight:800;letter-spacing:.06em}.shaking{animation:crash-shake .09s linear infinite}@keyframes crash-shake{0%,100%{transform:translate(0)}25%{transform:translate(-3px,2px)}50%{transform:translate(3px,-1px)}75%{transform:translate(-1px,-2px)}}@media(max-width:680px){.crash-game{padding:12px;border-radius:14px}.crash-header{align-items:flex-start}.crash-history{max-width:58%}.crash-panel{grid-template-columns:1fr 1fr}.crash-action-column{grid-column:1/-1}.crash-action{min-height:64px}.crash-footer{gap:8px;justify-content:space-between}.crash-footer span:nth-child(2){display:none}}@media(max-width:430px){.crash-history span:nth-last-child(n+5){display:none}.crash-panel{grid-template-columns:1fr}.crash-action-column{grid-column:auto}.crash-footer span:first-child{display:none}}
       `}</style>
-    </div>
+    </section>
   );
 };
 

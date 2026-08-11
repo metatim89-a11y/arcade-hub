@@ -5,20 +5,35 @@ import { useCoinSystem } from '../../context/CoinContext';
 
 const SHELF_WIDTH = 320;
 const SHELF_HEIGHT = 420;
-const COIN_RADIUS = 12;
 const PUSHER_HOME_Y = 64;
 const PUSHER_EXTENDED_Y = 215;
 const LOWER_PUSHER_HOME_Y = 266;
 const LOWER_PUSHER_EXTENDED_Y = 350;
-const PUSH_INTERVAL_MS = 2500;
-const PUSH_MOTION_MS = 1700;
-const FIRST_EDGE_Y = 252;
-const LOWER_SHELF_Y = 290;
+const MIN_PUSH_MS = 1400;
+const MAX_PUSH_MS = 2800;
+const SLOW_ZONE_Y = SHELF_HEIGHT * 0.7;
 const PRIZE_EDGE_Y = 394;
+const GUTTER_WIDTH = 44;
 const BET_AMOUNT = 10;
 const PAYOUT_PER_COIN = 5;
+const POWER_COSTS = { bump: 25, rain: 80, bumpers: 60 } as const;
 
-type CoinTier = 'upper' | 'lower';
+type CoinKind = 'dime' | 'penny' | 'nickel' | 'quarter';
+
+const COIN_SPECS: Record<CoinKind, { label: string; diameterMm: number; mark: string }> = {
+  dime: { label: 'Dime', diameterMm: 17.91, mark: '10¢' },
+  penny: { label: 'Penny', diameterMm: 19.05, mark: '1¢' },
+  nickel: { label: 'Nickel', diameterMm: 21.21, mark: '5¢' },
+  quarter: { label: 'Quarter', diameterMm: 24.26, mark: '25¢' }
+};
+const QUARTER_RADIUS = 12;
+const coinRadius = (kind: CoinKind) =>
+  (COIN_SPECS[kind].diameterMm / COIN_SPECS.quarter.diameterMm) * QUARTER_RADIUS;
+const randomCoinKind = (): CoinKind => {
+  const kinds: CoinKind[] = ['dime', 'penny', 'nickel', 'quarter'];
+  return kinds[Math.floor(Math.random() * kinds.length)];
+};
+const randomPushDuration = () => MIN_PUSH_MS + Math.random() * (MAX_PUSH_MS - MIN_PUSH_MS);
 
 type DisplayCoin = {
   id: number;
@@ -26,7 +41,8 @@ type DisplayCoin = {
   y: number;
   angle: number;
   playerCoin: boolean;
-  tier: CoinTier;
+  kind: CoinKind;
+  radius: number;
 };
 
 type DisplayFrame = {
@@ -34,6 +50,8 @@ type DisplayFrame = {
   pusherY: number;
   lowerPusherY: number;
   cycleProgress: number;
+  strokeDuration: number;
+  activePusher: 'upper' | 'lower';
 };
 
 type PayoutBatch = {
@@ -51,16 +69,22 @@ const CoinPusherGame: React.FC = () => {
     coins: [],
     pusherY: PUSHER_HOME_Y,
     lowerPusherY: LOWER_PUSHER_HOME_Y,
-    cycleProgress: 0
+    cycleProgress: 0,
+    strokeDuration: MIN_PUSH_MS,
+    activePusher: 'upper'
   });
   const [isDropping, setIsDropping] = useState(false);
   const [feedback, setFeedback] = useState('Tap the shelf to drop a coin. The pusher runs automatically.');
   const [lastWin, setLastWin] = useState(0);
+  const [bumpersActive, setBumpersActive] = useState(false);
 
   const engineRef = useRef<Matter.Engine | null>(null);
   const nextCoinIdRef = useRef(1);
   const mountedRef = useRef(true);
   const dropPendingRef = useRef(false);
+  const powerPendingRef = useRef(false);
+  const bumperBodiesRef = useRef<Matter.Body[]>([]);
+  const bumperTimerRef = useRef<number | null>(null);
   const hasPlayedRef = useRef(false);
   const payoutQueueRef = useRef<PayoutBatch[]>([]);
   const payoutBusyRef = useRef(false);
@@ -143,11 +167,12 @@ const CoinPusherGame: React.FC = () => {
     Matter.World.add(world, [leftWall, rightWall, backWall, pusher, lowerPusher]);
 
     const startingCoins: Matter.Body[] = [];
-    const addStartingRow = (row: number, y: number, tier: CoinTier) => {
+    const addStartingRow = (row: number, y: number) => {
       for (let column = 0; column < 7; column += 1) {
         const x = 28 + column * 43 + (row % 2 ? 8 : 0);
         if (x > SHELF_WIDTH - 22) continue;
-        startingCoins.push(Matter.Bodies.circle(x, y, COIN_RADIUS, {
+        const kind = randomCoinKind();
+        startingCoins.push(Matter.Bodies.circle(x, y, coinRadius(kind), {
           restitution: 0.05,
           friction: 0.12,
           frictionAir: 0.1,
@@ -156,62 +181,64 @@ const CoinPusherGame: React.FC = () => {
           plugin: {
             coinId: nextCoinIdRef.current++,
             playerCoin: false,
-            tier
+            kind
           }
         }));
       }
     };
 
-    [158, 188, 218].forEach((y, row) => addStartingRow(row, y, 'upper'));
-    [306, 338, 370].forEach((y, row) => addStartingRow(row + 3, y, 'lower'));
+    [118, 150, 186, 224, 286, 320, 368].forEach((y, row) => addStartingRow(row, y));
     Matter.World.add(world, startingCoins);
 
     let animationFrame = 0;
     let previousTime = performance.now();
     let previousRender = 0;
-    const motorStartedAt = performance.now();
+    let strokeStartedAt = performance.now();
+    let strokeDuration = randomPushDuration();
+    let upperIsAdvancing = true;
 
     const update = (time: number) => {
       const delta = Math.min(32, Math.max(8, time - previousTime));
       previousTime = time;
 
-      const cycleElapsed = (time - motorStartedAt) % PUSH_INTERVAL_MS;
-      const cycleProgress = cycleElapsed / PUSH_INTERVAL_MS;
-      let travel = 0;
-      if (cycleElapsed < PUSH_MOTION_MS) {
-        const motionProgress = cycleElapsed / PUSH_MOTION_MS;
-        travel = motionProgress <= 0.5
-          ? easeInOut(motionProgress * 2)
-          : easeInOut((1 - motionProgress) * 2);
+      if (time - strokeStartedAt >= strokeDuration) {
+        upperIsAdvancing = !upperIsAdvancing;
+        strokeStartedAt = time;
+        strokeDuration = randomPushDuration();
       }
-      const pusherY = PUSHER_HOME_Y + travel * (PUSHER_EXTENDED_Y - PUSHER_HOME_Y);
+      const cycleProgress = Math.min(1, (time - strokeStartedAt) / strokeDuration);
+      const easedProgress = easeInOut(cycleProgress);
+      // The linked drive keeps the plates opposite: as one advances, the other retracts.
+      const upperTravel = upperIsAdvancing ? easedProgress : 1 - easedProgress;
+      const lowerTravel = 1 - upperTravel;
+      const pusherY = PUSHER_HOME_Y + upperTravel * (PUSHER_EXTENDED_Y - PUSHER_HOME_Y);
       const lowerPusherY = LOWER_PUSHER_HOME_Y
-        + travel * (LOWER_PUSHER_EXTENDED_Y - LOWER_PUSHER_HOME_Y);
+        + lowerTravel * (LOWER_PUSHER_EXTENDED_Y - LOWER_PUSHER_HOME_Y);
       Matter.Body.setPosition(pusher, { x: SHELF_WIDTH / 2, y: pusherY }, true);
       Matter.Body.setPosition(lowerPusher, { x: SHELF_WIDTH / 2, y: lowerPusherY }, true);
 
       Matter.Engine.update(engine, delta);
 
       const prizeCoins: Matter.Body[] = [];
+      const gutterCoins: Matter.Body[] = [];
       for (const body of world.bodies) {
         if (body.label !== 'coin') continue;
 
-        if (body.plugin.tier === 'upper' && body.position.y > FIRST_EDGE_Y) {
-          body.plugin.tier = 'lower';
-          Matter.Body.setPosition(body, {
-            x: Math.max(COIN_RADIUS + 3, Math.min(SHELF_WIDTH - COIN_RADIUS - 3, body.position.x)),
-            y: LOWER_SHELF_Y
-          });
-          Matter.Body.setVelocity(body, { x: body.velocity.x * 0.65, y: 1.8 });
-          Matter.Body.setAngularVelocity(body, body.angularVelocity + 0.035);
-        } else if (body.plugin.tier === 'lower' && body.position.y > PRIZE_EDGE_Y) {
-          prizeCoins.push(body);
+        // The playfield is continuous. Extra drag in the final 30% makes the prize approach deliberate.
+        body.frictionAir = body.position.y >= SLOW_ZONE_Y ? 0.22 : 0.09;
+        if (body.position.y >= SLOW_ZONE_Y) {
+          Matter.Body.setVelocity(body, { x: body.velocity.x * 0.985, y: body.velocity.y * 0.975 });
+        }
+        if (body.position.y > PRIZE_EDGE_Y) {
+          if (body.position.x < GUTTER_WIDTH || body.position.x > SHELF_WIDTH - GUTTER_WIDTH) gutterCoins.push(body);
+          else prizeCoins.push(body);
         }
       }
 
-      if (prizeCoins.length > 0) {
-        Matter.World.remove(world, prizeCoins);
+      if (prizeCoins.length > 0 || gutterCoins.length > 0) {
+        Matter.World.remove(world, [...prizeCoins, ...gutterCoins]);
         queuePayout(prizeCoins.length);
+        if (!prizeCoins.length && gutterCoins.length) setFeedback(`${gutterCoins.length} coin${gutterCoins.length === 1 ? '' : 's'} slipped into the gutter.`);
       }
 
       if (time - previousRender >= 33) {
@@ -224,9 +251,17 @@ const CoinPusherGame: React.FC = () => {
             y: body.position.y,
             angle: body.angle * (180 / Math.PI),
             playerCoin: Boolean(body.plugin.playerCoin),
-            tier: body.plugin.tier as CoinTier
+            kind: (body.plugin.kind as CoinKind) || 'quarter',
+            radius: body.circleRadius ?? QUARTER_RADIUS
           }));
-        setFrame({ coins, pusherY, lowerPusherY, cycleProgress });
+        setFrame({
+          coins,
+          pusherY,
+          lowerPusherY,
+          cycleProgress,
+          strokeDuration,
+          activePusher: upperIsAdvancing ? 'upper' : 'lower'
+        });
       }
 
       animationFrame = requestAnimationFrame(update);
@@ -237,6 +272,7 @@ const CoinPusherGame: React.FC = () => {
       mountedRef.current = false;
       cancelAnimationFrame(animationFrame);
       payoutQueueRef.current = [];
+      if (bumperTimerRef.current) window.clearTimeout(bumperTimerRef.current);
       Matter.World.clear(world, false);
       Matter.Engine.clear(engine);
       engineRef.current = null;
@@ -281,7 +317,10 @@ const CoinPusherGame: React.FC = () => {
     }
 
     const x = 26 + (dropPercent / 100) * (SHELF_WIDTH - 52);
-    const coin = Matter.Bodies.circle(x, 108, COIN_RADIUS, {
+    const kind = randomCoinKind();
+    // Drop in front of the upper plate so a coin can never disappear behind it.
+    const safeDropY = Math.max(108, frame.pusherY + 34);
+    const coin = Matter.Bodies.circle(x, safeDropY, coinRadius(kind), {
       restitution: 0.05,
       friction: 0.12,
       frictionAir: 0.1,
@@ -290,15 +329,72 @@ const CoinPusherGame: React.FC = () => {
       plugin: {
         coinId: nextCoinIdRef.current++,
         playerCoin: true,
-        tier: 'upper' as CoinTier
+        kind
       }
     });
     Matter.World.add(engine.world, coin);
     hasPlayedRef.current = true;
-    setFeedback(`Coin dropped at ${Math.round(dropPercent)}%. The next automatic push is coming.`);
+    setFeedback(`${COIN_SPECS[kind].label} dropped at ${Math.round(dropPercent)}%, safely in front of the pusher.`);
     setIsDropping(false);
     dropPendingRef.current = false;
-  }, [canBet, currencyMode, isProcessing, subtractCoins]);
+  }, [canBet, currencyMode, frame.pusherY, isProcessing, subtractCoins]);
+
+  const activatePower = useCallback(async (power: keyof typeof POWER_COSTS) => {
+    if (powerPendingRef.current || isProcessing) return;
+    const cost = POWER_COSTS[power];
+    if (!canBet(cost)) {
+      setFeedback(`You need ${cost} ${currencyMode === 'fun' ? 'FC' : 'RC'} for that power.`);
+      return;
+    }
+    powerPendingRef.current = true;
+    setFeedback('Charging super power…');
+    const powerCurrency = currencyMode;
+    const charged = await subtractCoins(cost, `Coin Pusher · ${power}`, powerCurrency);
+    const engine = engineRef.current;
+    if (!charged || !engine || !mountedRef.current) {
+      if (charged && !engine) await addCoinsRef.current(cost, 'Coin Pusher Power Refund', powerCurrency);
+      if (mountedRef.current) setFeedback(charged ? 'The table was unavailable, so the power was refunded.' : 'The power was not charged.');
+      powerPendingRef.current = false;
+      return;
+    }
+    hasPlayedRef.current = true;
+    const coins = engine.world.bodies.filter((body) => body.label === 'coin');
+
+    if (power === 'bump') {
+      coins.forEach((body) => Matter.Body.setVelocity(body, {
+        x: body.velocity.x + (SHELF_WIDTH / 2 - body.position.x) * 0.012,
+        y: Math.max(body.velocity.y, 5.4)
+      }));
+      setFeedback('BUMP! Every coin surged toward the prize tray.');
+    } else if (power === 'rain') {
+      const rainCoins = Array.from({ length: 14 }, (_, index) => {
+        const kind = randomCoinKind();
+        return Matter.Bodies.circle(28 + Math.random() * (SHELF_WIDTH - 56), Math.min(246, Math.max(105, frame.pusherY + 34)) - (index % 3) * 3, coinRadius(kind), {
+          restitution: 0.06, friction: 0.12, frictionAir: 0.09, density: 0.012, label: 'coin',
+          plugin: { coinId: nextCoinIdRef.current++, playerCoin: true, kind }
+        });
+      });
+      Matter.World.add(engine.world, rainCoins);
+      setFeedback('COIN RAIN! Fourteen mixed U.S. coins hit the table.');
+    } else {
+      if (bumperBodiesRef.current.length) Matter.World.remove(engine.world, bumperBodiesRef.current);
+      const positions = [{ x: 82, y: 318 }, { x: 160, y: 346 }, { x: 238, y: 318 }, { x: 112, y: 376 }, { x: 208, y: 376 }];
+      bumperBodiesRef.current = positions.map(({ x, y }) => Matter.Bodies.circle(x, y, 13, {
+        isStatic: true, restitution: 1.15, friction: 0, label: 'power-bumper'
+      }));
+      Matter.World.add(engine.world, bumperBodiesRef.current);
+      setBumpersActive(true);
+      if (bumperTimerRef.current) window.clearTimeout(bumperTimerRef.current);
+      bumperTimerRef.current = window.setTimeout(() => {
+        const liveEngine = engineRef.current;
+        if (liveEngine && bumperBodiesRef.current.length) Matter.World.remove(liveEngine.world, bumperBodiesRef.current);
+        bumperBodiesRef.current = [];
+        if (mountedRef.current) setBumpersActive(false);
+      }, 12000);
+      setFeedback('BOUNCE FIELD active for 12 seconds.');
+    }
+    powerPendingRef.current = false;
+  }, [canBet, currencyMode, frame.pusherY, isProcessing, subtractCoins]);
 
   const handleShelfPointer = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
     const bounds = event.currentTarget.getBoundingClientRect();
@@ -309,13 +405,13 @@ const CoinPusherGame: React.FC = () => {
 
   const currencySymbol = currencyMode === 'fun' ? 'FC' : 'RC';
   const aimX = 26 + (aimPercent / 100) * (SHELF_WIDTH - 52);
-  const secondsToPush = Math.max(0, ((1 - frame.cycleProgress) * PUSH_INTERVAL_MS) / 1000);
+  const secondsToSwitch = Math.max(0, ((1 - frame.cycleProgress) * frame.strokeDuration) / 1000);
 
   return (
     <section className="coin-pusher-game" aria-label="Coin Pusher game">
       <header className="coin-pusher-header">
         <div>
-          <div className="coin-pusher-kicker">Two-level skill game</div>
+          <div className="coin-pusher-kicker">Continuous skill table</div>
           <h2>Coin Pusher</h2>
         </div>
         <div className="coin-pusher-rules">
@@ -331,8 +427,8 @@ const CoinPusherGame: React.FC = () => {
 
       <div className="coin-pusher-machine">
         <div className="coin-pusher-topbar">
-          <span>AUTO PUSH · 2.5 SEC</span>
-          <span>NEXT {secondsToPush.toFixed(1)}S</span>
+          <span>OPPOSED PUSHERS · RANDOM 1.4–2.8S</span>
+          <span>{frame.activePusher.toUpperCase()} · {secondsToSwitch.toFixed(1)}S</span>
         </div>
         <div
           className={`coin-pusher-shelf${isDropping ? ' dropping' : ''}`}
@@ -348,6 +444,9 @@ const CoinPusherGame: React.FC = () => {
           }}
         >
           <div className="coin-pusher-grid" />
+          <div className="coin-pusher-slow-zone"><span>SLOW ZONE</span></div>
+          <div className="coin-pusher-gutter left">GUTTER</div>
+          <div className="coin-pusher-gutter right">GUTTER</div>
           <div className="coin-pusher-aim" style={{ left: `${(aimX / SHELF_WIDTH) * 100}%` }}>
             <span />
           </div>
@@ -358,29 +457,25 @@ const CoinPusherGame: React.FC = () => {
             className="coin-pusher-lower-plate"
             style={{ top: `${((frame.lowerPusherY - 10) / SHELF_HEIGHT) * 100}%` }}
           >
-            <span>STAGE 2</span>
+            <span>OPPOSED PUSH</span>
           </div>
-
-          <div className="coin-pusher-step first">
-            <span>STEP 1</span>
-            <strong>LOWER SHELF</strong>
-          </div>
-          <div className="coin-pusher-step second">
-            <span>STEP 2</span>
-            <strong>PRIZE TRAY</strong>
-          </div>
+          {bumpersActive && [
+            { x: 82, y: 318 }, { x: 160, y: 346 }, { x: 238, y: 318 }, { x: 112, y: 376 }, { x: 208, y: 376 }
+          ].map((bumper, index) => <div key={index} className="coin-power-bumper" style={{ left: `${bumper.x / SHELF_WIDTH * 100}%`, top: `${bumper.y / SHELF_HEIGHT * 100}%` }} />)}
 
           {frame.coins.map((coin) => (
             <div
               key={coin.id}
-              className={`coin-pusher-coin ${coin.tier}${coin.playerCoin ? ' player' : ''}`}
+              className={`coin-pusher-coin ${coin.kind}${coin.playerCoin ? ' player' : ''}`}
               style={{
                 left: `${(coin.x / SHELF_WIDTH) * 100}%`,
                 top: `${(coin.y / SHELF_HEIGHT) * 100}%`,
+                width: `${(coin.radius * 2 / SHELF_WIDTH) * 100}%`,
                 transform: `translate(-50%, -50%) rotate(${coin.angle}deg)`
               }}
+              title={COIN_SPECS[coin.kind].label}
             >
-              <span>{coin.playerCoin ? '★' : '$'}</span>
+              <span>{COIN_SPECS[coin.kind].mark}</span>
             </div>
           ))}
         </div>
@@ -391,6 +486,11 @@ const CoinPusherGame: React.FC = () => {
       </div>
 
       <div className="coin-pusher-controls">
+        <div className="coin-pusher-powers">
+          <button type="button" disabled={isProcessing} onClick={() => void activatePower('bump')}><span>💥</span><strong>BUMP</strong><small>{POWER_COSTS.bump} {currencySymbol}</small></button>
+          <button type="button" disabled={isProcessing} onClick={() => void activatePower('rain')}><span>🪙</span><strong>COIN RAIN</strong><small>{POWER_COSTS.rain} {currencySymbol}</small></button>
+          <button type="button" disabled={isProcessing || bumpersActive} onClick={() => void activatePower('bumpers')}><span>🔵</span><strong>{bumpersActive ? 'ACTIVE' : 'BUMPERS'}</strong><small>{bumpersActive ? '12 SEC' : `${POWER_COSTS.bumpers} ${currencySymbol}`}</small></button>
+        </div>
         <label htmlFor="coin-pusher-aim">Drop position: {Math.round(aimPercent)}%</label>
         <input
           id="coin-pusher-aim"
@@ -408,20 +508,20 @@ const CoinPusherGame: React.FC = () => {
         >
           {isDropping ? 'DROPPING…' : `DROP AT ${Math.round(aimPercent)}% · ${BET_AMOUNT} ${currencySymbol}`}
         </button>
-        <p>Tap directly on the shelf for instant placement. Coins fall to the lower shelf, then into the prize tray.</p>
+        <p>One continuous table—no ledges. The final 30% slows every coin; center drops pay and both edge gutters do not.</p>
       </div>
 
       <style>{`
         .coin-pusher-game{width:min(100%,760px);margin:0 auto;padding:18px;color:#eef5fa;background:linear-gradient(160deg,#0a1420,#101d2b);border:1px solid #294058;border-radius:18px;box-shadow:0 22px 60px rgba(0,0,0,.38);user-select:none}
         .coin-pusher-header{display:flex;justify-content:space-between;align-items:flex-start;gap:20px;padding:4px 4px 16px}.coin-pusher-kicker{color:#6dc7ee;font-size:10px;font-weight:900;letter-spacing:.18em;text-transform:uppercase}.coin-pusher-header h2{margin:3px 0 0;font-size:26px;line-height:1}.coin-pusher-rules{display:grid;gap:3px;text-align:right;color:#9fb0c1;font-size:12px}
         .coin-pusher-status{display:flex;align-items:center;gap:9px;min-height:42px;padding:10px 13px;margin-bottom:12px;border:1px solid #263d53;border-radius:9px;background:#0a111a;color:#d6e1e9;font-size:13px}.status-light{width:8px;height:8px;border-radius:50%;background:#5b6c7d;box-shadow:0 0 0 4px rgba(91,108,125,.12)}.status-light.active{background:#52d6a3;box-shadow:0 0 0 4px rgba(82,214,163,.14);animation:pusher-pulse 2.5s infinite}
-        .coin-pusher-machine{width:min(100%,380px);margin:0 auto;padding:12px 12px 0;border:1px solid #40556b;border-radius:14px;background:linear-gradient(145deg,#26384a,#111b26 58%);box-shadow:inset 0 1px rgba(255,255,255,.08),0 18px 30px rgba(0,0,0,.3)}.coin-pusher-topbar{display:flex;justify-content:space-between;padding:0 5px 9px;color:#95aabc;font-size:10px;font-weight:800;letter-spacing:.12em}.coin-pusher-shelf{position:relative;width:320px;max-width:100%;height:auto;aspect-ratio:320/420;margin:auto;overflow:hidden;touch-action:manipulation;cursor:crosshair;border:8px solid #172330;border-bottom:0;border-radius:7px 7px 0 0;background:linear-gradient(#1a2a3a 0 59%,#132331 59% 93%,#0b171f 93%);box-shadow:inset 0 0 35px rgba(0,0,0,.65);outline:none}.coin-pusher-shelf:focus-visible{box-shadow:inset 0 0 35px rgba(0,0,0,.65),0 0 0 3px #65ccef}.coin-pusher-shelf.dropping{cursor:wait}.coin-pusher-grid{position:absolute;inset:0;background-image:linear-gradient(rgba(120,167,196,.08) 1px,transparent 1px),linear-gradient(90deg,rgba(120,167,196,.08) 1px,transparent 1px);background-size:10% 7.62%}.coin-pusher-aim{position:absolute;top:2.14%;z-index:9;width:2px;height:17.62%;pointer-events:none;background:linear-gradient(#70d4ff,transparent);transform:translateX(-1px);filter:drop-shadow(0 0 5px #67cfff)}.coin-pusher-aim span{position:absolute;top:0;left:50%;width:9px;height:9px;border-top:2px solid #83dcff;border-left:2px solid #83dcff;transform:translate(-50%,-1px) rotate(45deg)}
+        .coin-pusher-machine{width:min(100%,380px);margin:0 auto;padding:12px 12px 0;border:1px solid #40556b;border-radius:14px;background:linear-gradient(145deg,#26384a,#111b26 58%);box-shadow:inset 0 1px rgba(255,255,255,.08),0 18px 30px rgba(0,0,0,.3)}.coin-pusher-topbar{display:flex;justify-content:space-between;padding:0 5px 9px;color:#95aabc;font-size:10px;font-weight:800;letter-spacing:.12em}.coin-pusher-shelf{position:relative;width:320px;max-width:100%;height:auto;aspect-ratio:320/420;margin:auto;overflow:hidden;touch-action:manipulation;cursor:crosshair;border:8px solid #172330;border-bottom:0;border-radius:7px 7px 0 0;background:linear-gradient(#1a2a3a,#132331 70%,#10212c);box-shadow:inset 0 0 35px rgba(0,0,0,.65);outline:none}.coin-pusher-shelf:focus-visible{box-shadow:inset 0 0 35px rgba(0,0,0,.65),0 0 0 3px #65ccef}.coin-pusher-shelf.dropping{cursor:wait}.coin-pusher-grid{position:absolute;inset:0;background-image:linear-gradient(rgba(120,167,196,.08) 1px,transparent 1px),linear-gradient(90deg,rgba(120,167,196,.08) 1px,transparent 1px);background-size:10% 7.62%}.coin-pusher-slow-zone{position:absolute;left:0;right:0;top:70%;bottom:0;border-top:1px dashed rgba(106,213,238,.4);background:linear-gradient(rgba(32,115,139,.06),rgba(25,95,116,.24));pointer-events:none}.coin-pusher-slow-zone span{position:absolute;top:4px;left:50%;transform:translateX(-50%);color:rgba(145,218,235,.5);font-size:7px;font-weight:900;letter-spacing:.18em}.coin-pusher-gutter{position:absolute;z-index:6;bottom:0;width:${GUTTER_WIDTH / SHELF_WIDTH * 100}%;height:${(SHELF_HEIGHT - PRIZE_EDGE_Y) / SHELF_HEIGHT * 100}%;display:grid;place-items:center;background:repeating-linear-gradient(45deg,#121b22 0 5px,#26313a 5px 10px);border-top:2px solid #61717b;color:#778791;font-size:6px;font-weight:900;letter-spacing:.08em;writing-mode:vertical-rl;pointer-events:none}.coin-pusher-gutter.left{left:0;border-right:2px solid #0a1116}.coin-pusher-gutter.right{right:0;border-left:2px solid #0a1116}.coin-pusher-aim{position:absolute;top:2.14%;z-index:9;width:2px;height:17.62%;pointer-events:none;background:linear-gradient(#70d4ff,transparent);transform:translateX(-1px);filter:drop-shadow(0 0 5px #67cfff)}.coin-pusher-aim span{position:absolute;top:0;left:50%;width:9px;height:9px;border-top:2px solid #83dcff;border-left:2px solid #83dcff;transform:translate(-50%,-1px) rotate(45deg)}
         .coin-pusher-plate{position:absolute;left:1.56%;z-index:5;width:96.88%;height:10%;pointer-events:none;border:1px solid #6a7c8d;border-radius:5px;background:linear-gradient(#718395,#3b4a58);box-shadow:0 9px 14px rgba(0,0,0,.45);will-change:top}.coin-pusher-plate-face{position:absolute;inset:auto 0 0;padding:3px;text-align:center;border-top:1px solid rgba(255,255,255,.17);color:#d8e1e8;font-size:9px;font-weight:900;letter-spacing:.22em}
         .coin-pusher-lower-plate{position:absolute;left:1.56%;z-index:2;width:96.88%;height:4.76%;pointer-events:none;border:1px solid #426d80;border-radius:4px;background:linear-gradient(#416f82,#203c4a);box-shadow:0 7px 12px rgba(0,0,0,.48);text-align:center;will-change:top}.coin-pusher-lower-plate span{position:relative;top:2px;color:#a8dded;font-size:7px;font-weight:900;letter-spacing:.17em}
-        .coin-pusher-step{position:absolute;left:0;right:0;z-index:6;height:7%;pointer-events:none;border-top:2px solid;box-shadow:0 -6px 16px rgba(0,0,0,.26);text-align:center}.coin-pusher-step span,.coin-pusher-step strong{position:relative;top:4px;display:inline-block;font-size:8px;font-weight:900;letter-spacing:.13em}.coin-pusher-step span{margin-right:5px;opacity:.75}.coin-pusher-step.first{top:${(FIRST_EDGE_Y / SHELF_HEIGHT) * 100}%;border-color:#55b9de;background:linear-gradient(rgba(54,156,198,.22),rgba(23,69,89,.44));color:#9adef6}.coin-pusher-step.second{top:${((PRIZE_EDGE_Y - 7) / SHELF_HEIGHT) * 100}%;border-color:#54d7a2;background:linear-gradient(rgba(62,211,153,.14),rgba(62,211,153,.34));color:#83e9c0}
-        .coin-pusher-coin{position:absolute;z-index:3;display:grid;place-items:center;width:7.5%;height:auto;aspect-ratio:1;pointer-events:none;border:2px solid #8a570d;border-radius:50%;background:radial-gradient(circle at 32% 27%,#fff7b2 0,#f2c84b 22%,#c98712 68%,#794307 100%);box-shadow:0 3px 5px rgba(0,0,0,.45),inset 0 0 0 2px rgba(255,255,255,.18);color:#6f4208;font:bold clamp(8px,3vw,12px)/1 sans-serif;will-change:left,top,transform}.coin-pusher-coin.lower{filter:saturate(.92) brightness(.92)}.coin-pusher-coin.player{z-index:4;border-color:#4dbce9;background:radial-gradient(circle at 32% 27%,#e8fbff 0,#74d5f4 25%,#2584b0 70%,#15506c 100%);color:#e9fbff;box-shadow:0 0 12px rgba(87,199,240,.58)}
+        .coin-power-bumper{position:absolute;z-index:5;width:8.125%;aspect-ratio:1;transform:translate(-50%,-50%);border:3px solid #8be7ff;border-radius:50%;background:radial-gradient(circle,#f4fdff 0,#58cce9 28%,#16718d 68%,#0a3443);box-shadow:0 0 16px #58dfff,inset 0 0 0 3px rgba(255,255,255,.22);pointer-events:none}
+        .coin-pusher-coin{position:absolute;z-index:3;display:grid;place-items:center;height:auto;aspect-ratio:1;pointer-events:none;border:2px solid #777;border-radius:50%;background:radial-gradient(circle at 32% 27%,#fff 0,#cdd2d5 25%,#8c9499 72%,#555d62 100%);box-shadow:0 3px 5px rgba(0,0,0,.45),inset 0 0 0 2px rgba(255,255,255,.2);color:#42494d;font:bold clamp(5px,2.2vw,9px)/1 sans-serif;will-change:left,top,transform}.coin-pusher-coin.penny{border-color:#814626;background:radial-gradient(circle at 32% 27%,#ffd09d 0,#bd713f 30%,#854525 72%,#542916 100%);color:#5f2d17}.coin-pusher-coin.dime{border-style:double}.coin-pusher-coin.quarter{box-shadow:0 3px 5px rgba(0,0,0,.45),inset 0 0 0 2px rgba(255,255,255,.25),inset 0 0 0 4px rgba(60,66,70,.18)}.coin-pusher-coin.lower{filter:saturate(.92) brightness(.92)}.coin-pusher-coin.player{z-index:4;box-shadow:0 0 0 2px #55c8f3,0 0 13px rgba(87,199,240,.72),inset 0 0 0 2px rgba(255,255,255,.25)}
         .coin-pusher-tray{display:flex;justify-content:space-between;align-items:center;padding:13px 8px;color:#91a3b5;font-size:10px;font-weight:800;letter-spacing:.12em}.coin-pusher-tray strong{color:#f4cd58;font-size:15px;letter-spacing:.02em}
-        .coin-pusher-controls{display:grid;gap:10px;width:min(100%,460px);margin:18px auto 2px}.coin-pusher-controls label{color:#aab9c6;font-size:12px;font-weight:750}.coin-pusher-controls input{width:100%;accent-color:#62c8ef}.coin-pusher-controls button{width:100%;padding:15px;border:1px solid #d99d24;border-radius:10px;background:linear-gradient(#f5c94e,#d88718);box-shadow:0 5px 0 #84500e;color:#2e2108;font-size:16px;font-weight:950;letter-spacing:.04em;cursor:pointer}.coin-pusher-controls button:active:not(:disabled){transform:translateY(4px);box-shadow:0 1px 0 #84500e}.coin-pusher-controls button:disabled{filter:saturate(.25);opacity:.62;cursor:not-allowed}.coin-pusher-controls p{margin:3px 0 0;text-align:center;color:#8496a8;font-size:11px}
+        .coin-pusher-controls{display:grid;gap:10px;width:min(100%,520px);margin:18px auto 2px}.coin-pusher-controls label{color:#aab9c6;font-size:12px;font-weight:750}.coin-pusher-controls input{width:100%;accent-color:#62c8ef}.coin-pusher-controls>button{width:100%;padding:15px;border:1px solid #d99d24;border-radius:10px;background:linear-gradient(#f5c94e,#d88718);box-shadow:0 5px 0 #84500e;color:#2e2108;font-size:16px;font-weight:950;letter-spacing:.04em;cursor:pointer}.coin-pusher-controls>button:active:not(:disabled){transform:translateY(4px);box-shadow:0 1px 0 #84500e}.coin-pusher-controls button:disabled{filter:saturate(.25);opacity:.62;cursor:not-allowed}.coin-pusher-powers{display:grid;grid-template-columns:repeat(3,1fr);gap:7px}.coin-pusher-powers button{display:grid;place-items:center;gap:2px;min-width:0;padding:9px 4px;border:1px solid #365b70;border-radius:8px;background:linear-gradient(#17384b,#0b2331);color:#dff6ff;cursor:pointer}.coin-pusher-powers span{font-size:20px}.coin-pusher-powers strong{font-size:9px;letter-spacing:.08em}.coin-pusher-powers small{color:#78a4b7;font-size:7px}.coin-pusher-controls p{margin:3px 0 0;text-align:center;color:#8496a8;font-size:11px}
         @keyframes pusher-pulse{0%,68%,100%{transform:scale(1);filter:brightness(1)}34%{transform:scale(1.2);filter:brightness(1.35)}}
         @media(max-width:520px){.coin-pusher-game{padding:12px;border-radius:12px}.coin-pusher-header{align-items:flex-end}.coin-pusher-header h2{font-size:22px}.coin-pusher-rules{font-size:10px}.coin-pusher-machine{padding:8px 8px 0}.coin-pusher-controls{margin-top:13px}}
       `}</style>

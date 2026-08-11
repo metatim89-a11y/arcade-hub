@@ -2,35 +2,19 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { CurrencyMode } from '../../types';
 import { useCoinSystem } from '../../context/CoinContext';
 
-const CANVAS_WIDTH = 1200;
-const CANVAS_HEIGHT = 675;
-const CANNON_X = CANVAS_WIDTH / 2;
-const CANNON_Y = CANVAS_HEIGHT - 38;
-const BULLET_SPEED = 920;
-const MAX_FISH = 18;
+const CANVAS_WIDTH = 1500;
+const CANVAS_HEIGHT = 850;
+const BULLET_SPEED = 1050;
+const MAX_FISH = 28;
 const DEFAULT_BET = 10;
 
-type FishDefinition = {
-  emoji: string;
-  hp: number;
-  multiplier: number;
-  speed: number;
-  radius: number;
-  weight: number;
-  color: string;
-};
-
-type Fish = FishDefinition & {
-  id: number;
-  x: number;
-  y: number;
-  vx: number;
-  phase: number;
-  currentHp: number;
-};
-
+type ArenaSide = 'bottom' | 'left' | 'top' | 'right';
+type FishDefinition = { emoji: string; hp: number; multiplier: number; speed: number; radius: number; weight: number; color: string };
+type Fish = FishDefinition & { id: number; x: number; y: number; vx: number; phase: number; currentHp: number };
+type Hunter = { id: number; name: string; isHuman: boolean; side: ArenaSide; color: string; score: number; catches: number; shots: number };
 type Bullet = {
   id: number;
+  ownerId: number;
   x: number;
   y: number;
   previousX: number;
@@ -41,33 +25,48 @@ type Bullet = {
   cost: number;
   currency: CurrencyMode;
   targetId: number | null;
+  color: string;
 };
+type WinEffect = { id: number; x: number; y: number; text: string; color: string; age: number };
+type Payout = { amount: number; currency: CurrencyMode; hunterId: number; emoji: string };
 
-type WinEffect = { id: number; x: number; y: number; text: string; age: number };
-
-const FISH_DEFINITIONS: Record<string, FishDefinition> = {
-  jelly:  { emoji: '🪼', hp: 1,  multiplier: 0.8, speed: 82,  radius: 24,  weight: 15, color: '#c98cff' },
-  shrimp: { emoji: '🦐', hp: 1,  multiplier: 1.0, speed: 142, radius: 20,  weight: 14, color: '#ff8f86' },
-  crab:   { emoji: '🦀', hp: 2,  multiplier: 1.4, speed: 64,  radius: 28,  weight: 13, color: '#ff5c56' },
-  guppy:  { emoji: '🐠', hp: 2,  multiplier: 1.8, speed: 126, radius: 32,  weight: 14, color: '#4ed4ff' },
-  fish:   { emoji: '🐟', hp: 3,  multiplier: 2.4, speed: 112, radius: 34,  weight: 13, color: '#78a8d2' },
-  puffer: { emoji: '🐡', hp: 4,  multiplier: 3.2, speed: 86,  radius: 39,  weight: 10, color: '#ffc247' },
-  squid:  { emoji: '🦑', hp: 6,  multiplier: 5.0, speed: 118, radius: 45,  weight: 8,  color: '#ffb3d0' },
-  turtle: { emoji: '🐢', hp: 10, multiplier: 8.0, speed: 58,  radius: 56,  weight: 6,  color: '#75e59b' },
-  shark:  { emoji: '🦈', hp: 18, multiplier: 15,  speed: 104, radius: 82,  weight: 4,  color: '#b7c4d0' },
-  whale:  { emoji: '🐋', hp: 28, multiplier: 28,  speed: 42,  radius: 108, weight: 2,  color: '#7588df' },
-  gold:   { emoji: '🌟', hp: 12, multiplier: 22,  speed: 168, radius: 45,  weight: 2,  color: '#ffd84d' }
-};
+const FISH_DEFINITIONS: FishDefinition[] = [
+  { emoji: '🪼', hp: 1, multiplier: 0.8, speed: 82, radius: 24, weight: 15, color: '#c98cff' },
+  { emoji: '🦐', hp: 1, multiplier: 1, speed: 142, radius: 20, weight: 14, color: '#ff8f86' },
+  { emoji: '🦀', hp: 2, multiplier: 1.4, speed: 64, radius: 28, weight: 13, color: '#ff5c56' },
+  { emoji: '🐠', hp: 2, multiplier: 1.8, speed: 126, radius: 32, weight: 14, color: '#4ed4ff' },
+  { emoji: '🐟', hp: 3, multiplier: 2.4, speed: 112, radius: 34, weight: 13, color: '#78a8d2' },
+  { emoji: '🐡', hp: 4, multiplier: 3.2, speed: 86, radius: 39, weight: 10, color: '#ffc247' },
+  { emoji: '🦑', hp: 6, multiplier: 5, speed: 118, radius: 45, weight: 8, color: '#ffb3d0' },
+  { emoji: '🐢', hp: 10, multiplier: 8, speed: 58, radius: 56, weight: 6, color: '#75e59b' },
+  { emoji: '🦈', hp: 18, multiplier: 15, speed: 104, radius: 82, weight: 4, color: '#b7c4d0' },
+  { emoji: '🐋', hp: 28, multiplier: 28, speed: 42, radius: 108, weight: 2, color: '#7588df' },
+  { emoji: '🌟', hp: 12, multiplier: 22, speed: 168, radius: 45, weight: 2, color: '#ffd84d' }
+];
+const HUNTER_COLORS = ['#ffd34f', '#55d6ff', '#ff6e82', '#8ee66b'];
 
 const chooseFishDefinition = () => {
-  const entries = Object.values(FISH_DEFINITIONS);
-  const totalWeight = entries.reduce((total, fish) => total + fish.weight, 0);
-  let roll = Math.random() * totalWeight;
-  for (const fish of entries) {
+  const total = FISH_DEFINITIONS.reduce((sum, fish) => sum + fish.weight, 0);
+  let roll = Math.random() * total;
+  for (const fish of FISH_DEFINITIONS) {
     roll -= fish.weight;
     if (roll <= 0) return fish;
   }
-  return entries[0];
+  return FISH_DEFINITIONS[0];
+};
+
+const sidesForCount = (count: number): ArenaSide[] => {
+  if (count === 1) return ['bottom'];
+  if (count === 2) return ['bottom', 'top'];
+  if (count === 3) return ['bottom', 'left', 'right'];
+  return ['bottom', 'left', 'top', 'right'];
+};
+
+const cannonPosition = (side: ArenaSide) => {
+  if (side === 'top') return { x: CANVAS_WIDTH / 2, y: 25 };
+  if (side === 'left') return { x: 25, y: CANVAS_HEIGHT / 2 };
+  if (side === 'right') return { x: CANVAS_WIDTH - 25, y: CANVAS_HEIGHT / 2 };
+  return { x: CANVAS_WIDTH / 2, y: CANVAS_HEIGHT - 25 };
 };
 
 const distanceToSegment = (px: number, py: number, x1: number, y1: number, x2: number, y2: number) => {
@@ -85,444 +84,393 @@ const OceanHunterGame: React.FC = () => {
   const fishRef = useRef<Fish[]>([]);
   const bulletsRef = useRef<Bullet[]>([]);
   const effectsRef = useRef<WinEffect[]>([]);
+  const huntersRef = useRef<Hunter[]>([]);
   const bubblesRef = useRef<{ x: number; y: number; radius: number; speed: number }[]>([]);
-  const aimRef = useRef({ x: CANNON_X, y: 120 });
-  const autoRef = useRef(false);
-  const lockRef = useRef(false);
-  const targetRef = useRef<number | null>(null);
+  const aimsRef = useRef(new Map<number, { x: number; y: number }>());
+  const targetsRef = useRef(new Map<number, number | null>());
+  const autoIdsRef = useRef(new Set<number>());
+  const lastShotRef = useRef(new Map<number, number>());
+  const botNextShotRef = useRef(new Map<number, number>());
+  const pendingHumanShotsRef = useRef(new Set<number>());
+  const humanShotQueueRef = useRef<Promise<void>>(Promise.resolve());
+  const payoutQueueRef = useRef<Payout[]>([]);
+  const payoutBusyRef = useRef(false);
   const mountedRef = useRef(true);
-  const shotPendingRef = useRef(false);
-  const lastShotRef = useRef(0);
   const nextIdRef = useRef(1);
   const betRef = useRef(DEFAULT_BET);
   const currencyRef = useRef(currencyMode);
   const canBetRef = useRef(canBet);
   const subtractCoinsRef = useRef(subtractCoins);
   const addCoinsRef = useRef(addCoins);
-  const requestShotRef = useRef<(targetId?: number | null) => Promise<void>>(async () => {});
+  const activeHunterIdRef = useRef(0);
+  const launchShotRef = useRef<(ownerId: number, targetId?: number | null) => void>(() => undefined);
 
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [humanCount, setHumanCount] = useState(1);
+  const [botCount, setBotCount] = useState(0);
+  const [names, setNames] = useState(['Player 1', 'Player 2', 'Player 3', 'Player 4']);
+  const [hunters, setHunters] = useState<Hunter[]>([]);
+  const [activeHunterId, setActiveHunterId] = useState(0);
   const [betAmount, setBetAmount] = useState(DEFAULT_BET);
-  const [isAuto, setIsAuto] = useState(false);
-  const [isLockEnabled, setIsLockEnabled] = useState(false);
+  const [autoIds, setAutoIds] = useState<number[]>([]);
+  const [lockEnabled, setLockEnabled] = useState(false);
   const [lockedTargetId, setLockedTargetId] = useState<number | null>(null);
   const [fishCount, setFishCount] = useState(0);
-  const [status, setStatus] = useState('Aim at the ocean and tap to fire.');
+  const [status, setStatus] = useState('Configure the arena to begin.');
   const [lastWin, setLastWin] = useState(0);
 
   const currencySymbol = currencyMode === 'fun' ? 'FC' : 'RC';
   const balance = currencyMode === 'fun' ? funCoins : realCoins;
+  const activeHunter = hunters.find((hunter) => hunter.id === activeHunterId);
+  const totalPlayers = humanCount + botCount;
 
   useEffect(() => { betRef.current = betAmount; }, [betAmount]);
   useEffect(() => { currencyRef.current = currencyMode; }, [currencyMode]);
   useEffect(() => { canBetRef.current = canBet; }, [canBet]);
   useEffect(() => { subtractCoinsRef.current = subtractCoins; }, [subtractCoins]);
   useEffect(() => { addCoinsRef.current = addCoins; }, [addCoins]);
-  useEffect(() => { autoRef.current = isAuto; }, [isAuto]);
-  useEffect(() => { lockRef.current = isLockEnabled; }, [isLockEnabled]);
-  useEffect(() => { targetRef.current = lockedTargetId; }, [lockedTargetId]);
+  useEffect(() => { autoIdsRef.current = new Set(autoIds); }, [autoIds]);
+  useEffect(() => { activeHunterIdRef.current = activeHunterId; }, [activeHunterId]);
+
+  const commitHunters = useCallback((update: (current: Hunter[]) => Hunter[]) => {
+    const next = update(huntersRef.current);
+    huntersRef.current = next;
+    setHunters(next);
+  }, []);
 
   const spawnFish = useCallback((initial = false) => {
     const definition = chooseFishDefinition();
     const fromLeft = Math.random() > 0.5;
-    const radius = definition.radius;
-    const fish: Fish = {
+    fishRef.current.push({
       ...definition,
       id: nextIdRef.current++,
-      x: initial ? 80 + Math.random() * (CANVAS_WIDTH - 160) : fromLeft ? -radius - 10 : CANVAS_WIDTH + radius + 10,
-      y: 75 + Math.random() * (CANVAS_HEIGHT - 235),
+      x: initial ? 100 + Math.random() * (CANVAS_WIDTH - 200) : fromLeft ? -definition.radius - 10 : CANVAS_WIDTH + definition.radius + 10,
+      y: 90 + Math.random() * (CANVAS_HEIGHT - 180),
       vx: (fromLeft ? 1 : -1) * definition.speed,
       phase: Math.random() * Math.PI * 2,
       currentHp: definition.hp
-    };
-    fishRef.current.push(fish);
+    });
   }, []);
+
+  const flushPayouts = useCallback(async () => {
+    if (payoutBusyRef.current) return;
+    payoutBusyRef.current = true;
+    while (mountedRef.current && payoutQueueRef.current.length) {
+      const payout = payoutQueueRef.current.shift()!;
+      const credited = await addCoinsRef.current(payout.amount, 'Ocean Hunter Catch', payout.currency);
+      if (!mountedRef.current) break;
+      if (credited) {
+        commitHunters((current) => current.map((hunter) => hunter.id === payout.hunterId
+          ? { ...hunter, score: hunter.score + payout.amount, catches: hunter.catches + 1 }
+          : hunter));
+        setLastWin(payout.amount);
+        setStatus(`${huntersRef.current.find((hunter) => hunter.id === payout.hunterId)?.name ?? 'Player'} caught ${payout.emoji} — ${payout.amount} ${payout.currency === 'fun' ? 'FC' : 'RC'}!`);
+      } else {
+        setStatus('A catch was made, but its payout was not confirmed.');
+        setAutoIds((current) => current.filter((id) => id !== payout.hunterId));
+      }
+    }
+    payoutBusyRef.current = false;
+  }, [commitHunters]);
+
+  const awardFish = useCallback((fish: Fish, bullet: Bullet) => {
+    const owner = huntersRef.current.find((hunter) => hunter.id === bullet.ownerId);
+    if (!owner) return;
+    const reward = Math.max(1, Math.round(fish.multiplier * bullet.cost));
+    effectsRef.current.push({ id: nextIdRef.current++, x: fish.x, y: fish.y, text: `+${reward}`, color: owner.color, age: 0 });
+    if (owner.isHuman) {
+      payoutQueueRef.current.push({ amount: reward, currency: bullet.currency, hunterId: owner.id, emoji: fish.emoji });
+      void flushPayouts();
+    } else {
+      commitHunters((current) => current.map((hunter) => hunter.id === owner.id
+        ? { ...hunter, score: hunter.score + reward, catches: hunter.catches + 1 }
+        : hunter));
+      setStatus(`${owner.name} caught ${fish.emoji} for ${reward} points.`);
+    }
+  }, [commitHunters, flushPayouts]);
+
+  const createBullet = useCallback((owner: Hunter, targetId?: number | null) => {
+    const origin = cannonPosition(owner.side);
+    const target = targetId ? fishRef.current.find((fish) => fish.id === targetId) : null;
+    const destination = target || aimsRef.current.get(owner.id) || { x: CANVAS_WIDTH / 2, y: CANVAS_HEIGHT / 2 };
+    const angle = Math.atan2(destination.y - origin.y, destination.x - origin.x);
+    const cost = owner.isHuman ? betRef.current : DEFAULT_BET;
+    const muzzleX = origin.x + Math.cos(angle) * 58;
+    const muzzleY = origin.y + Math.sin(angle) * 58;
+    bulletsRef.current.push({
+      id: nextIdRef.current++, ownerId: owner.id, x: muzzleX, y: muzzleY, previousX: muzzleX, previousY: muzzleY,
+      vx: Math.cos(angle) * BULLET_SPEED, vy: Math.sin(angle) * BULLET_SPEED,
+      damage: Math.max(1, Math.round(cost / DEFAULT_BET)), cost, currency: currencyRef.current,
+      targetId: target?.id ?? null, color: owner.color
+    });
+    lastShotRef.current.set(owner.id, performance.now());
+    commitHunters((current) => current.map((hunter) => hunter.id === owner.id ? { ...hunter, shots: hunter.shots + 1 } : hunter));
+  }, [commitHunters]);
+
+  const launchShot = useCallback((ownerId: number, targetId?: number | null) => {
+    const owner = huntersRef.current.find((hunter) => hunter.id === ownerId);
+    if (!owner) return;
+    const now = performance.now();
+    if (now - (lastShotRef.current.get(ownerId) ?? 0) < (owner.isHuman ? 190 : 480)) return;
+
+    if (!owner.isHuman) {
+      createBullet(owner, targetId);
+      return;
+    }
+    if (pendingHumanShotsRef.current.has(ownerId)) return;
+    pendingHumanShotsRef.current.add(ownerId);
+    humanShotQueueRef.current = humanShotQueueRef.current.then(async () => {
+      const cost = betRef.current;
+      if (!canBetRef.current(cost)) {
+        setStatus(`${owner.name} needs ${cost} ${currencyRef.current === 'fun' ? 'FC' : 'RC'} to fire.`);
+        setAutoIds((current) => current.filter((id) => id !== ownerId));
+        pendingHumanShotsRef.current.delete(ownerId);
+        return;
+      }
+      const shotCurrency = currencyRef.current;
+      const charged = await subtractCoinsRef.current(cost, `Ocean Hunter Shot · ${owner.name}`, shotCurrency);
+      if (mountedRef.current && charged) createBullet(owner, targetId);
+      else if (mountedRef.current) setStatus('The shot was not charged, so no torpedo was fired.');
+      pendingHumanShotsRef.current.delete(ownerId);
+    });
+  }, [createBullet]);
+  launchShotRef.current = launchShot;
 
   const resetOcean = useCallback(() => {
     fishRef.current = [];
     bulletsRef.current = [];
     effectsRef.current = [];
-    for (let index = 0; index < 10; index += 1) spawnFish(true);
-    targetRef.current = null;
+    targetsRef.current.clear();
+    for (let index = 0; index < 16; index += 1) spawnFish(true);
     setLockedTargetId(null);
     setFishCount(fishRef.current.length);
     setLastWin(0);
-    setStatus('Ocean reset. Aim and tap to fire.');
+    setStatus('Fresh targets entered the arena.');
   }, [spawnFish]);
 
-  const requestShot = useCallback(async (targetId?: number | null) => {
-    const now = performance.now();
-    if (shotPendingRef.current || now - lastShotRef.current < 190) return;
-    const cost = betRef.current;
-    if (!canBetRef.current(cost)) {
-      setStatus(`You need ${cost} ${currencyRef.current === 'fun' ? 'FC' : 'RC'} to fire.`);
-      autoRef.current = false;
-      setIsAuto(false);
-      return;
-    }
-
-    shotPendingRef.current = true;
-    const shotCurrency = currencyRef.current;
-    const charged = await subtractCoinsRef.current(cost, 'Ocean Hunter Shot', shotCurrency);
-    shotPendingRef.current = false;
-    if (!mountedRef.current) return;
-    if (!charged) {
-      setStatus(shotCurrency === 'real' ? 'Real Coin service is unavailable.' : 'Shot was not charged.');
-      setIsAuto(false);
-      return;
-    }
-
-    const selectedTarget = targetId ?? targetRef.current;
-    const target = selectedTarget ? fishRef.current.find((fish) => fish.id === selectedTarget) : null;
-    const destination = target || aimRef.current;
-    const angle = Math.atan2(destination.y - CANNON_Y, destination.x - CANNON_X);
-    const muzzleX = CANNON_X + Math.cos(angle) * 62;
-    const muzzleY = CANNON_Y + Math.sin(angle) * 62;
-    bulletsRef.current.push({
-      id: nextIdRef.current++,
-      x: muzzleX,
-      y: muzzleY,
-      previousX: muzzleX,
-      previousY: muzzleY,
-      vx: Math.cos(angle) * BULLET_SPEED,
-      vy: Math.sin(angle) * BULLET_SPEED,
-      damage: Math.max(1, Math.round(cost / DEFAULT_BET)),
-      cost,
-      currency: shotCurrency,
-      targetId: target?.id || null
+  const startArena = () => {
+    const sides = sidesForCount(totalPlayers);
+    let humanIndex = 0;
+    const nextHunters: Hunter[] = Array.from({ length: totalPlayers }, (_, index) => {
+      const isHuman = index < humanCount;
+      const hunter: Hunter = {
+        id: index,
+        name: isHuman ? names[humanIndex].trim() || `Player ${humanIndex + 1}` : `BOT ${index - humanCount + 1}`,
+        isHuman,
+        side: sides[index],
+        color: HUNTER_COLORS[index],
+        score: 0,
+        catches: 0,
+        shots: 0
+      };
+      if (isHuman) humanIndex += 1;
+      return hunter;
     });
-    lastShotRef.current = performance.now();
-    setStatus(target ? `Tracking ${target.emoji}` : 'Torpedo fired.');
-  }, []);
-
-  useEffect(() => { requestShotRef.current = requestShot; }, [requestShot]);
+    huntersRef.current = nextHunters;
+    setHunters(nextHunters);
+    const firstHuman = nextHunters.find((hunter) => hunter.isHuman)!;
+    setActiveHunterId(firstHuman.id);
+    aimsRef.current.clear();
+    targetsRef.current.clear();
+    nextHunters.forEach((hunter) => aimsRef.current.set(hunter.id, { x: CANVAS_WIDTH / 2, y: CANVAS_HEIGHT / 2 }));
+    setAutoIds([]);
+    setLockEnabled(false);
+    setLockedTargetId(null);
+    setStatus(`${firstHuman.name} has control. Tap the ocean to fire.`);
+    setIsPlaying(true);
+  };
 
   useEffect(() => {
+    if (!isPlaying) return;
     mountedRef.current = true;
     const canvas = canvasRef.current;
-    if (!canvas) return;
-    const context = canvas.getContext('2d');
-    if (!context) return;
-
-    bubblesRef.current = Array.from({ length: 36 }, () => ({
-      x: Math.random() * CANVAS_WIDTH,
-      y: Math.random() * CANVAS_HEIGHT,
-      radius: 2 + Math.random() * 5,
-      speed: 14 + Math.random() * 30
+    const context = canvas?.getContext('2d');
+    if (!canvas || !context) return;
+    bubblesRef.current = Array.from({ length: 48 }, () => ({
+      x: Math.random() * CANVAS_WIDTH, y: Math.random() * CANVAS_HEIGHT,
+      radius: 2 + Math.random() * 5, speed: 14 + Math.random() * 30
     }));
-    for (let index = 0; index < 10; index += 1) spawnFish(true);
-    setFishCount(fishRef.current.length);
+    resetOcean();
+    huntersRef.current.filter((hunter) => !hunter.isHuman).forEach((hunter) => botNextShotRef.current.set(hunter.id, performance.now() + 500 + Math.random() * 900));
 
     let animationFrame = 0;
     let previousTime = performance.now();
     let lastSpawn = previousTime;
-    let lastAutoShot = previousTime;
     let lastCountUpdate = previousTime;
 
-    const awardFish = async (fish: Fish, bullet: Bullet) => {
-      const reward = Math.max(1, Math.round(fish.multiplier * bullet.cost));
-      const credited = await addCoinsRef.current(reward, 'Ocean Hunter Catch', bullet.currency);
-      if (!mountedRef.current) return;
-      if (credited) {
-        setLastWin(reward);
-        setStatus(`Caught ${fish.emoji} — won ${reward} ${bullet.currency === 'fun' ? 'FC' : 'RC'}!`);
-        effectsRef.current.push({ id: nextIdRef.current++, x: fish.x, y: fish.y, text: `+${reward}`, age: 0 });
-      } else {
-        setStatus('Target caught, but the payout was not confirmed.');
-        setIsAuto(false);
-      }
-    };
-
-    const drawOcean = (time: number) => {
+    const draw = (time: number) => {
       const gradient = context.createLinearGradient(0, 0, 0, CANVAS_HEIGHT);
-      gradient.addColorStop(0, '#087aa0');
-      gradient.addColorStop(0.48, '#035071');
-      gradient.addColorStop(1, '#061b35');
-      context.fillStyle = gradient;
-      context.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
-
-      context.fillStyle = 'rgba(117, 231, 255, .08)';
-      for (let ray = 0; ray < 6; ray += 1) {
-        context.beginPath();
-        context.moveTo(90 + ray * 210, 0);
-        context.lineTo(210 + ray * 210, CANVAS_HEIGHT);
-        context.lineTo(360 + ray * 210, CANVAS_HEIGHT);
-        context.lineTo(180 + ray * 210, 0);
-        context.fill();
+      gradient.addColorStop(0, '#087da4'); gradient.addColorStop(.48, '#035273'); gradient.addColorStop(1, '#06192e');
+      context.fillStyle = gradient; context.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+      context.fillStyle = 'rgba(117,231,255,.07)';
+      for (let ray = 0; ray < 8; ray += 1) {
+        context.beginPath(); context.moveTo(60 + ray * 210, 0); context.lineTo(180 + ray * 210, CANVAS_HEIGHT);
+        context.lineTo(350 + ray * 210, CANVAS_HEIGHT); context.lineTo(160 + ray * 210, 0); context.fill();
       }
-
-      context.fillStyle = '#092d35';
-      context.beginPath();
-      context.moveTo(0, CANVAS_HEIGHT - 34);
-      for (let x = 0; x <= CANVAS_WIDTH; x += 60) context.lineTo(x, CANVAS_HEIGHT - 40 - Math.sin(x * 0.025) * 16);
-      context.lineTo(CANVAS_WIDTH, CANVAS_HEIGHT);
-      context.lineTo(0, CANVAS_HEIGHT);
-      context.fill();
-
-      context.strokeStyle = 'rgba(220, 250, 255, .25)';
-      context.lineWidth = 1.5;
-      for (const bubble of bubblesRef.current) {
-        context.beginPath();
-        context.arc(bubble.x, bubble.y, bubble.radius, 0, Math.PI * 2);
-        context.stroke();
-      }
+      context.fillStyle = '#082c34'; context.beginPath(); context.moveTo(0, CANVAS_HEIGHT - 30);
+      for (let x = 0; x <= CANVAS_WIDTH; x += 55) context.lineTo(x, CANVAS_HEIGHT - 38 - Math.sin(x * .023) * 17);
+      context.lineTo(CANVAS_WIDTH, CANVAS_HEIGHT); context.lineTo(0, CANVAS_HEIGHT); context.fill();
+      context.strokeStyle = 'rgba(220,250,255,.22)'; context.lineWidth = 1.5;
+      bubblesRef.current.forEach((bubble) => { context.beginPath(); context.arc(bubble.x, bubble.y, bubble.radius, 0, Math.PI * 2); context.stroke(); });
 
       for (const fish of fishRef.current) {
-        const bob = Math.sin(time * 0.003 + fish.phase) * 4;
-        context.save();
-        context.translate(fish.x, fish.y + bob);
-        if (fish.vx < 0) context.scale(-1, 1);
-        context.font = `${fish.radius * 1.7}px serif`;
-        context.textAlign = 'center';
-        context.textBaseline = 'middle';
-        context.shadowColor = fish.color;
-        context.shadowBlur = fish === fishRef.current.find((entry) => entry.id === targetRef.current) ? 22 : 7;
-        context.fillText(fish.emoji, 0, 0);
-        context.shadowBlur = 0;
+        const bob = Math.sin(time * .003 + fish.phase) * 4;
+        context.save(); context.translate(fish.x, fish.y + bob); if (fish.vx < 0) context.scale(-1, 1);
+        context.font = `${fish.radius * 1.7}px serif`; context.textAlign = 'center'; context.textBaseline = 'middle';
+        context.shadowColor = fish.color; context.shadowBlur = [...targetsRef.current.values()].includes(fish.id) ? 22 : 7;
+        context.fillText(fish.emoji, 0, 0); context.shadowBlur = 0;
         if (fish.currentHp < fish.hp) {
-          const width = fish.radius * 1.5;
-          context.fillStyle = 'rgba(0,0,0,.65)';
-          context.fillRect(-width / 2, -fish.radius - 14, width, 6);
-          context.fillStyle = '#65e6a9';
-          context.fillRect(-width / 2, -fish.radius - 14, width * (fish.currentHp / fish.hp), 6);
+          const width = fish.radius * 1.5; context.fillStyle = 'rgba(0,0,0,.65)'; context.fillRect(-width / 2, -fish.radius - 14, width, 6);
+          context.fillStyle = '#65e6a9'; context.fillRect(-width / 2, -fish.radius - 14, width * (fish.currentHp / fish.hp), 6);
         }
-        if (fish.id === targetRef.current) {
-          context.strokeStyle = '#ffcf4d';
-          context.lineWidth = 3;
-          context.setLineDash([9, 7]);
-          context.beginPath();
-          context.arc(0, 0, fish.radius + 12, 0, Math.PI * 2);
-          context.stroke();
-          context.setLineDash([]);
-        }
+        huntersRef.current.forEach((hunter) => {
+          if (targetsRef.current.get(hunter.id) !== fish.id) return;
+          context.strokeStyle = hunter.color; context.lineWidth = 3; context.setLineDash([9, 7]);
+          context.beginPath(); context.arc(0, 0, fish.radius + 12, 0, Math.PI * 2); context.stroke(); context.setLineDash([]);
+        });
         context.restore();
       }
 
-      for (const bullet of bulletsRef.current) {
-        context.strokeStyle = 'rgba(106, 227, 255, .45)';
-        context.lineWidth = 5;
-        context.beginPath();
-        context.moveTo(bullet.previousX, bullet.previousY);
-        context.lineTo(bullet.x, bullet.y);
-        context.stroke();
-        context.fillStyle = '#f4fdff';
-        context.shadowColor = '#53dcff';
-        context.shadowBlur = 18;
-        context.beginPath();
-        context.arc(bullet.x, bullet.y, 7, 0, Math.PI * 2);
-        context.fill();
-        context.shadowBlur = 0;
-      }
-
-      for (const effect of effectsRef.current) {
-        context.globalAlpha = Math.max(0, 1 - effect.age / 1.2);
-        context.fillStyle = '#ffe36b';
-        context.font = '900 28px ui-sans-serif, system-ui';
-        context.textAlign = 'center';
+      bulletsRef.current.forEach((bullet) => {
+        context.strokeStyle = `${bullet.color}88`; context.lineWidth = 5; context.beginPath();
+        context.moveTo(bullet.previousX, bullet.previousY); context.lineTo(bullet.x, bullet.y); context.stroke();
+        context.fillStyle = '#f7feff'; context.shadowColor = bullet.color; context.shadowBlur = 18;
+        context.beginPath(); context.arc(bullet.x, bullet.y, 7, 0, Math.PI * 2); context.fill(); context.shadowBlur = 0;
+      });
+      effectsRef.current.forEach((effect) => {
+        context.globalAlpha = Math.max(0, 1 - effect.age / 1.2); context.fillStyle = effect.color;
+        context.font = '900 28px ui-sans-serif,system-ui'; context.textAlign = 'center';
         context.fillText(effect.text, effect.x, effect.y - effect.age * 42);
-      }
+      });
       context.globalAlpha = 1;
 
-      const target = targetRef.current ? fishRef.current.find((fish) => fish.id === targetRef.current) : null;
-      const aim = target || aimRef.current;
-      const angle = Math.atan2(aim.y - CANNON_Y, aim.x - CANNON_X);
-      context.save();
-      context.translate(CANNON_X, CANNON_Y);
-      context.rotate(angle);
-      context.fillStyle = '#f2bd37';
-      context.fillRect(0, -12, 74, 24);
-      context.fillStyle = '#273746';
-      context.beginPath();
-      context.arc(0, 0, 34, 0, Math.PI * 2);
-      context.fill();
-      context.restore();
+      huntersRef.current.forEach((hunter) => {
+        const origin = cannonPosition(hunter.side);
+        const targetId = targetsRef.current.get(hunter.id);
+        const target = targetId ? fishRef.current.find((fish) => fish.id === targetId) : null;
+        const aim = target || aimsRef.current.get(hunter.id) || { x: CANVAS_WIDTH / 2, y: CANVAS_HEIGHT / 2 };
+        const angle = Math.atan2(aim.y - origin.y, aim.x - origin.x);
+        context.save(); context.translate(origin.x, origin.y); context.rotate(angle);
+        context.fillStyle = hunter.color; context.fillRect(0, -10, 66, 20);
+        context.fillStyle = '#203544'; context.beginPath(); context.arc(0, 0, 29, 0, Math.PI * 2); context.fill();
+        context.strokeStyle = hunter.color; context.lineWidth = 4; context.stroke(); context.restore();
+        context.fillStyle = hunter.color; context.font = '900 13px ui-sans-serif,system-ui'; context.textAlign = 'center';
+        context.fillText(hunter.name, origin.x, origin.y + (hunter.side === 'top' ? 52 : -40));
+      });
     };
 
     const update = (time: number) => {
-      const delta = Math.min(0.033, Math.max(0.008, (time - previousTime) / 1000));
-      previousTime = time;
-
-      if (time - lastSpawn > 850 && fishRef.current.length < MAX_FISH) {
-        spawnFish(false);
-        lastSpawn = time;
-      }
-
-      for (const bubble of bubblesRef.current) {
-        bubble.y -= bubble.speed * delta;
-        bubble.x += Math.sin(time * 0.001 + bubble.radius) * 8 * delta;
-        if (bubble.y < -12) {
-          bubble.y = CANVAS_HEIGHT + 12;
-          bubble.x = Math.random() * CANVAS_WIDTH;
-        }
-      }
-
-      for (const fish of fishRef.current) fish.x += fish.vx * delta;
+      const delta = Math.min(.033, Math.max(.008, (time - previousTime) / 1000)); previousTime = time;
+      if (time - lastSpawn > 620 && fishRef.current.length < MAX_FISH) { spawnFish(false); lastSpawn = time; }
+      bubblesRef.current.forEach((bubble) => { bubble.y -= bubble.speed * delta; if (bubble.y < -12) { bubble.y = CANVAS_HEIGHT + 12; bubble.x = Math.random() * CANVAS_WIDTH; } });
+      fishRef.current.forEach((fish) => { fish.x += fish.vx * delta; });
       fishRef.current = fishRef.current.filter((fish) => fish.x > -fish.radius - 80 && fish.x < CANVAS_WIDTH + fish.radius + 80);
-      if (targetRef.current && !fishRef.current.some((fish) => fish.id === targetRef.current)) {
-        targetRef.current = null;
-        setLockedTargetId(null);
-      }
+      targetsRef.current.forEach((targetId, hunterId) => {
+        if (targetId && !fishRef.current.some((fish) => fish.id === targetId)) targetsRef.current.set(hunterId, null);
+      });
 
-      for (const bullet of bulletsRef.current) {
-        bullet.previousX = bullet.x;
-        bullet.previousY = bullet.y;
-        if (bullet.targetId) {
-          const target = fishRef.current.find((fish) => fish.id === bullet.targetId);
-          if (target) {
-            const angle = Math.atan2(target.y - bullet.y, target.x - bullet.x);
-            bullet.vx = Math.cos(angle) * BULLET_SPEED;
-            bullet.vy = Math.sin(angle) * BULLET_SPEED;
-          }
-        }
-        bullet.x += bullet.vx * delta;
-        bullet.y += bullet.vy * delta;
-      }
-
-      const hitBullets = new Set<number>();
-      const caughtFish = new Set<number>();
+      bulletsRef.current.forEach((bullet) => {
+        bullet.previousX = bullet.x; bullet.previousY = bullet.y;
+        const target = bullet.targetId ? fishRef.current.find((fish) => fish.id === bullet.targetId) : null;
+        if (target) { const angle = Math.atan2(target.y - bullet.y, target.x - bullet.x); bullet.vx = Math.cos(angle) * BULLET_SPEED; bullet.vy = Math.sin(angle) * BULLET_SPEED; }
+        bullet.x += bullet.vx * delta; bullet.y += bullet.vy * delta;
+      });
+      const hitBullets = new Set<number>(); const caughtFish = new Set<number>();
       for (const bullet of bulletsRef.current) {
         for (const fish of fishRef.current) {
           if (caughtFish.has(fish.id)) continue;
           if (distanceToSegment(fish.x, fish.y, bullet.previousX, bullet.previousY, bullet.x, bullet.y) <= fish.radius + 7) {
-            hitBullets.add(bullet.id);
-            fish.currentHp -= bullet.damage;
-            if (fish.currentHp <= 0) {
-              caughtFish.add(fish.id);
-              void awardFish(fish, bullet);
-              if (targetRef.current === fish.id) {
-                targetRef.current = null;
-                setLockedTargetId(null);
-              }
-            }
+            hitBullets.add(bullet.id); fish.currentHp -= bullet.damage;
+            if (fish.currentHp <= 0) { caughtFish.add(fish.id); awardFish(fish, bullet); }
             break;
           }
         }
       }
-      bulletsRef.current = bulletsRef.current.filter((bullet) => !hitBullets.has(bullet.id)
-        && bullet.x > -60 && bullet.x < CANVAS_WIDTH + 60 && bullet.y > -60 && bullet.y < CANVAS_HEIGHT + 60);
+      bulletsRef.current = bulletsRef.current.filter((bullet) => !hitBullets.has(bullet.id) && bullet.x > -70 && bullet.x < CANVAS_WIDTH + 70 && bullet.y > -70 && bullet.y < CANVAS_HEIGHT + 70);
       fishRef.current = fishRef.current.filter((fish) => !caughtFish.has(fish.id));
+      effectsRef.current.forEach((effect) => { effect.age += delta; }); effectsRef.current = effectsRef.current.filter((effect) => effect.age < 1.2);
 
-      for (const effect of effectsRef.current) effect.age += delta;
-      effectsRef.current = effectsRef.current.filter((effect) => effect.age < 1.2);
-
-      if (autoRef.current && time - lastAutoShot > 360) {
-        let target = targetRef.current ? fishRef.current.find((fish) => fish.id === targetRef.current) : null;
-        if (!target) target = [...fishRef.current].sort((left, right) => right.multiplier - left.multiplier)[0];
-        if (target) {
-          aimRef.current = { x: target.x, y: target.y };
-          void requestShotRef.current(target.id);
+      huntersRef.current.forEach((hunter) => {
+        const shouldAutoFire = !hunter.isHuman || autoIdsRef.current.has(hunter.id);
+        const due = hunter.isHuman ? (lastShotRef.current.get(hunter.id) ?? 0) + 430 : (botNextShotRef.current.get(hunter.id) ?? 0);
+        if (!shouldAutoFire || time < due) return;
+        let target = targetsRef.current.get(hunter.id) ? fishRef.current.find((fish) => fish.id === targetsRef.current.get(hunter.id)) : null;
+        if (!target) {
+          const candidates = [...fishRef.current].sort((left, right) => (right.multiplier / right.hp) - (left.multiplier / left.hp));
+          target = candidates[Math.min(candidates.length - 1, Math.floor(Math.random() * Math.min(5, candidates.length)))];
         }
-        lastAutoShot = time;
-      }
-
-      if (time - lastCountUpdate > 500) {
-        setFishCount(fishRef.current.length);
-        lastCountUpdate = time;
-      }
-      drawOcean(time);
-      animationFrame = requestAnimationFrame(update);
+        if (target) { aimsRef.current.set(hunter.id, { x: target.x, y: target.y }); launchShotRef.current(hunter.id, target.id); }
+        if (!hunter.isHuman) botNextShotRef.current.set(hunter.id, time + 650 + Math.random() * 900);
+      });
+      if (time - lastCountUpdate > 450) { setFishCount(fishRef.current.length); setLockedTargetId(targetsRef.current.get(activeHunterIdRef.current) ?? null); lastCountUpdate = time; }
+      draw(time); animationFrame = requestAnimationFrame(update);
     };
-
     animationFrame = requestAnimationFrame(update);
     return () => {
-      mountedRef.current = false;
-      cancelAnimationFrame(animationFrame);
-      fishRef.current = [];
-      bulletsRef.current = [];
-      effectsRef.current = [];
+      mountedRef.current = false; cancelAnimationFrame(animationFrame);
+      fishRef.current = []; bulletsRef.current = []; effectsRef.current = []; payoutQueueRef.current = [];
     };
-  }, [spawnFish]);
+  }, [awardFish, isPlaying, resetOcean, spawnFish]);
 
   const canvasPoint = (event: React.PointerEvent<HTMLCanvasElement>) => {
-    const canvas = canvasRef.current;
-    if (!canvas) return null;
-    const bounds = canvas.getBoundingClientRect();
-    return {
-      x: (event.clientX - bounds.left) * (CANVAS_WIDTH / bounds.width),
-      y: (event.clientY - bounds.top) * (CANVAS_HEIGHT / bounds.height)
-    };
+    const bounds = canvasRef.current?.getBoundingClientRect();
+    if (!bounds) return null;
+    return { x: (event.clientX - bounds.left) * (CANVAS_WIDTH / bounds.width), y: (event.clientY - bounds.top) * (CANVAS_HEIGHT / bounds.height) };
   };
 
-  const handlePointerMove = (event: React.PointerEvent<HTMLCanvasElement>) => {
-    if (targetRef.current) return;
-    const point = canvasPoint(event);
-    if (point) aimRef.current = point;
-  };
-
-  const handlePointerDown = (event: React.PointerEvent<HTMLCanvasElement>) => {
-    const point = canvasPoint(event);
-    if (!point) return;
-    aimRef.current = point;
+  const handlePointer = (event: React.PointerEvent<HTMLCanvasElement>, fire: boolean) => {
+    if (!activeHunter?.isHuman) return;
+    const point = canvasPoint(event); if (!point) return;
+    aimsRef.current.set(activeHunter.id, point);
+    if (!fire) return;
     let targetId: number | null = null;
-    if (lockRef.current) {
+    if (lockEnabled) {
       const target = [...fishRef.current]
         .sort((left, right) => Math.hypot(point.x - left.x, point.y - left.y) - Math.hypot(point.x - right.x, point.y - right.y))
-        .find((fish) => Math.hypot(point.x - fish.x, point.y - fish.y) <= fish.radius * 1.4);
-      targetId = target?.id || null;
-      targetRef.current = targetId;
-      setLockedTargetId(targetId);
-      if (!target) setStatus('No fish selected. Tap directly on a target.');
+        .find((fish) => Math.hypot(point.x - fish.x, point.y - fish.y) <= fish.radius * 1.45);
+      targetId = target?.id ?? null; targetsRef.current.set(activeHunter.id, targetId); setLockedTargetId(targetId);
+      if (!target) setStatus('Tap directly on a target to lock it.');
     }
-    void requestShot(targetId);
+    launchShot(activeHunter.id, targetId);
+  };
+
+  const setCounts = (nextHumans: number, nextBots: number) => {
+    const humans = Math.max(1, Math.min(4, nextHumans));
+    const bots = Math.max(0, Math.min(4 - humans, nextBots));
+    setHumanCount(humans); setBotCount(bots);
   };
 
   return (
     <section className="ocean-hunter">
-      <header className="ocean-hunter-header">
-        <div>
-          <div className="ocean-hunter-kicker">Deep-sea skill arcade</div>
-          <h2>Ocean Hunter</h2>
+      {!isPlaying ? (
+        <div className="ocean-setup">
+          <div className="ocean-kicker">MULTIPLAYER ARENA</div><h2>Ocean Hunter</h2>
+          <p>Play alone or open up to four cannon stations. Computer hunters fill only the seats you choose.</p>
+          <div className="ocean-counts">
+            <label>LOCAL PLAYERS<strong>{humanCount}</strong><input type="range" min="1" max="4" value={humanCount} onChange={(event) => setCounts(Number(event.target.value), botCount)} /></label>
+            <label>COMPUTER BOTS<strong>{botCount}</strong><input type="range" min="0" max={4 - humanCount} value={botCount} onChange={(event) => setCounts(humanCount, Number(event.target.value))} /></label>
+          </div>
+          <div className="ocean-names">{Array.from({ length: humanCount }, (_, index) => <input key={index} value={names[index]} aria-label={`Player ${index + 1} name`} onChange={(event) => setNames((current) => current.map((name, nameIndex) => nameIndex === index ? event.target.value : name))} />)}</div>
+          <div className="arena-preview">{sidesForCount(totalPlayers).map((side, index) => <span key={side} style={{ color: HUNTER_COLORS[index] }}>{index < humanCount ? names[index] || `Player ${index + 1}` : `BOT ${index - humanCount + 1}`} · {side}</span>)}</div>
+          <button type="button" onClick={startArena}>OPEN {totalPlayers}-PLAYER ARENA</button>
+          <small>Local players share the selected Arcade Hub balance. Bot shots use bot points and never charge your balance.</small>
         </div>
-        <div className="ocean-hunter-metrics">
-          <span><small>Balance</small>{Math.floor(balance)} {currencySymbol}</span>
-          <span><small>Last catch</small>{lastWin} {currencySymbol}</span>
-          <span><small>Targets</small>{fishCount}</span>
-        </div>
-      </header>
-
-      <div className="ocean-hunter-screen">
-        <canvas
-          ref={canvasRef}
-          width={CANVAS_WIDTH}
-          height={CANVAS_HEIGHT}
-          onPointerMove={handlePointerMove}
-          onPointerDown={handlePointerDown}
-          aria-label="Ocean Hunter play field. Aim and tap to fire."
-        />
-        <div className="ocean-hunter-hud">
-          <span className={isAuto ? 'active' : ''}>{isAuto ? 'AUTO FIRE' : 'MANUAL'}</span>
-          <span className={lockedTargetId ? 'locked' : ''}>{lockedTargetId ? 'TARGET LOCKED' : 'FREE AIM'}</span>
-        </div>
-      </div>
-
-      <div className="ocean-hunter-status" role="status" aria-live="polite">{status}</div>
-
-      <div className="ocean-hunter-controls">
-        <div className="ocean-hunter-bet">
-          <span>SHOT POWER</span>
-          <button type="button" disabled={isProcessing} onClick={() => setBetAmount(Math.max(10, betAmount - 10))}>−</button>
-          <strong>{betAmount} {currencySymbol}</strong>
-          <button type="button" disabled={isProcessing} onClick={() => setBetAmount(Math.min(100, betAmount + 10))}>+</button>
-        </div>
-        <div className="ocean-hunter-actions">
-          <button type="button" className={isAuto ? 'selected' : ''} onClick={() => setIsAuto(current => !current)}>{isAuto ? 'Stop Auto' : 'Auto Fire'}</button>
-          <button type="button" className={isLockEnabled ? 'selected lock' : ''} onClick={() => {
-            setIsLockEnabled(current => !current);
-            if (isLockEnabled) {
-              targetRef.current = null;
-              setLockedTargetId(null);
-            }
-          }}>{isLockEnabled ? 'Lock On' : 'Free Aim'}</button>
-          <button type="button" onClick={resetOcean}>Reset Ocean</button>
-        </div>
-      </div>
-
-      <p className="ocean-hunter-help">Move or tap to aim. Every shot is charged once. Higher shot power deals more damage and scales the catch reward.</p>
+      ) : (
+        <>
+          <header className="ocean-header"><div><div className="ocean-kicker">FOUR-STATION DEEP SEA ARENA</div><h2>Ocean Hunter</h2></div><div className="ocean-metrics"><span><small>Balance</small>{Math.floor(balance)} {currencySymbol}</span><span><small>Last win</small>{lastWin} {currencySymbol}</span><span><small>Targets</small>{fishCount}</span></div></header>
+          <div className="hunter-scoreboard">{hunters.map((hunter) => <button key={hunter.id} type="button" disabled={!hunter.isHuman} className={hunter.id === activeHunterId ? 'active' : ''} style={{ '--hunter': hunter.color } as React.CSSProperties} onClick={() => { setActiveHunterId(hunter.id); setLockedTargetId(targetsRef.current.get(hunter.id) ?? null); setStatus(`${hunter.name} has control.`); }}><span>{hunter.name}<small>{hunter.isHuman ? 'PLAYER' : 'BOT'}</small></span><strong>{hunter.score}</strong><em>{hunter.catches} catches</em></button>)}</div>
+          <div className="ocean-screen"><canvas ref={canvasRef} width={CANVAS_WIDTH} height={CANVAS_HEIGHT} onPointerMove={(event) => handlePointer(event, false)} onPointerDown={(event) => handlePointer(event, true)} aria-label="Ocean Hunter multiplayer arena" /><div className="ocean-hud"><span style={{ color: activeHunter?.color }}>{activeHunter?.name} CONTROL</span><span>{autoIds.includes(activeHunterId) ? 'AUTO FIRE' : 'MANUAL'}</span><span>{lockedTargetId ? 'TARGET LOCKED' : 'FREE AIM'}</span></div></div>
+          <div className="ocean-status" role="status">{status}</div>
+          <div className="ocean-controls">
+            <div className="shot-power"><span>SHOT POWER</span><button type="button" disabled={isProcessing} onClick={() => setBetAmount(Math.max(10, betAmount - 10))}>−</button><strong>{betAmount} {currencySymbol}</strong><button type="button" disabled={isProcessing} onClick={() => setBetAmount(Math.min(100, betAmount + 10))}>+</button></div>
+            <div className="ocean-actions"><button type="button" className={autoIds.includes(activeHunterId) ? 'selected' : ''} onClick={() => setAutoIds((current) => current.includes(activeHunterId) ? current.filter((id) => id !== activeHunterId) : [...current, activeHunterId])}>{autoIds.includes(activeHunterId) ? 'STOP AUTO' : 'AUTO FIRE'}</button><button type="button" className={lockEnabled ? 'selected lock' : ''} onClick={() => { setLockEnabled((current) => !current); if (lockEnabled) { targetsRef.current.set(activeHunterId, null); setLockedTargetId(null); } }}>{lockEnabled ? 'LOCK ON' : 'FREE AIM'}</button><button type="button" onClick={resetOcean}>RESET OCEAN</button><button type="button" onClick={() => setIsPlaying(false)}>CHANGE PLAYERS</button></div>
+          </div>
+          <p className="ocean-help">Select a local player above, then aim and tap. Each human shot uses the shared balance; bots compete using score only.</p>
+        </>
+      )}
 
       <style>{`
-        .ocean-hunter{width:100%;padding:18px;border:1px solid #25516a;border-radius:18px;background:linear-gradient(155deg,#071927,#0b2434);color:#eefaff;box-shadow:0 24px 65px rgba(0,0,0,.38)}.ocean-hunter-header{display:flex;justify-content:space-between;gap:18px;align-items:flex-end;margin-bottom:13px}.ocean-hunter-kicker{color:#63d4ee;font-size:10px;font-weight:900;letter-spacing:.16em;text-transform:uppercase}.ocean-hunter h2{margin:2px 0 0;font-size:28px;line-height:1}.ocean-hunter-metrics{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}.ocean-hunter-metrics span{min-width:88px;padding:7px 10px;border:1px solid #28536a;border-radius:8px;background:#081723;color:#d8f5ff;font-size:13px;font-weight:850;text-align:right}.ocean-hunter-metrics small{display:block;color:#7f9cab;font-size:8px;font-weight:800;letter-spacing:.09em;text-transform:uppercase}
-        .ocean-hunter-screen{position:relative;overflow:hidden;width:100%;aspect-ratio:16/9;border:8px solid #102d42;border-radius:14px;background:#032e47;box-shadow:inset 0 0 40px rgba(0,0,0,.8),0 15px 30px rgba(0,0,0,.3)}.ocean-hunter-screen canvas{display:block;width:100%;height:100%;touch-action:none;cursor:crosshair}.ocean-hunter-hud{position:absolute;top:10px;left:10px;right:10px;display:flex;justify-content:space-between;pointer-events:none}.ocean-hunter-hud span{padding:5px 8px;border:1px solid rgba(118,206,235,.3);border-radius:6px;background:rgba(3,20,31,.68);color:#9db5c0;font-size:9px;font-weight:900;letter-spacing:.1em}.ocean-hunter-hud span.active{color:#7ff2bd;border-color:#4ab988}.ocean-hunter-hud span.locked{color:#ffd86b;border-color:#d3a52d}.ocean-hunter-status{min-height:40px;margin:12px 0;padding:10px 12px;border:1px solid #23485c;border-radius:8px;background:#071620;color:#c9e5ef;font-size:13px;text-align:center}
-        .ocean-hunter-controls{display:flex;justify-content:space-between;gap:12px;align-items:center}.ocean-hunter-bet,.ocean-hunter-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.ocean-hunter-bet>span{color:#7f9dac;font-size:9px;font-weight:900;letter-spacing:.12em}.ocean-hunter-bet strong{min-width:92px;text-align:center;color:#ffe06a}.ocean-hunter-controls button{padding:9px 12px;border:1px solid #2c5870;border-radius:8px;background:#102b3b;color:#d9edf5;font-weight:800;cursor:pointer}.ocean-hunter-controls button:hover{border-color:#5bb9df}.ocean-hunter-controls button:disabled{opacity:.45;cursor:not-allowed}.ocean-hunter-controls button.selected{background:#154c42;border-color:#42bd8d;color:#9bf2cf}.ocean-hunter-controls button.selected.lock{background:#5a4215;border-color:#d9a72d;color:#ffe28a}.ocean-hunter-help{margin:13px 0 0;color:#7895a4;font-size:11px;text-align:center}
-        @media(max-width:760px){.ocean-hunter{padding:11px}.ocean-hunter-header{align-items:flex-start;flex-direction:column}.ocean-hunter-metrics{justify-content:flex-start}.ocean-hunter-metrics span{min-width:78px}.ocean-hunter-controls{align-items:stretch;flex-direction:column}.ocean-hunter-bet,.ocean-hunter-actions{justify-content:center}.ocean-hunter h2{font-size:23px}}
+        .ocean-hunter{width:100%;padding:18px;border:1px solid #25516a;border-radius:18px;background:linear-gradient(155deg,#071927,#0b2434);color:#eefaff;box-shadow:0 24px 65px rgba(0,0,0,.38)}.ocean-setup{display:flex;flex-direction:column;align-items:center;gap:14px;max-width:680px;margin:28px auto;padding:28px;border:1px solid #28566d;border-radius:17px;background:#071a27;text-align:center}.ocean-kicker{color:#63d4ee;font-size:9px;font-weight:900;letter-spacing:.17em}.ocean-setup h2,.ocean-header h2{margin:2px 0 0;font-size:29px}.ocean-setup p{margin:0;color:#91aab7;font-size:13px}.ocean-counts{display:grid;grid-template-columns:1fr 1fr;gap:12px;width:100%}.ocean-counts label{display:grid;grid-template-columns:1fr auto;gap:8px;padding:10px;border:1px solid #2b5267;border-radius:9px;color:#91aab7;text-align:left;font-size:9px;font-weight:900;letter-spacing:.1em}.ocean-counts label strong{color:#ffe16f;font-size:16px}.ocean-counts input{grid-column:1/-1;width:100%;accent-color:#56cbea}.ocean-names{display:grid;grid-template-columns:1fr 1fr;gap:7px;width:100%}.ocean-names input{min-width:0;padding:10px;border:1px solid #2b5267;border-radius:7px;outline:0;background:#0c2635;color:white}.arena-preview{display:flex;flex-wrap:wrap;justify-content:center;gap:7px}.arena-preview span{padding:5px 8px;border:1px solid currentColor;border-radius:5px;background:#081722;font-size:9px;font-weight:900}.ocean-setup>button{width:100%;padding:14px;border:0;border-radius:9px;background:linear-gradient(#65dafa,#2a9dc2);box-shadow:0 5px 0 #15566c;color:#05232e;font-weight:950;cursor:pointer}.ocean-setup small{color:#708b99}.ocean-header{display:flex;justify-content:space-between;align-items:flex-end;gap:18px;margin-bottom:11px}.ocean-metrics{display:flex;gap:7px}.ocean-metrics span{min-width:88px;padding:6px 9px;border:1px solid #28536a;border-radius:7px;background:#081723;text-align:right;font-size:12px;font-weight:900}.ocean-metrics small{display:block;color:#7896a5;font-size:7px;letter-spacing:.1em}.hunter-scoreboard{display:grid;grid-template-columns:repeat(4,1fr);gap:7px;margin-bottom:8px}.hunter-scoreboard button{display:grid;grid-template-columns:1fr auto;gap:2px;padding:8px 10px;border:1px solid #294c5e;border-left:4px solid var(--hunter);border-radius:8px;background:#081924;color:#dcecf3;text-align:left;cursor:pointer}.hunter-scoreboard button:disabled{cursor:default}.hunter-scoreboard button.active{box-shadow:0 0 0 2px var(--hunter);background:#102b39}.hunter-scoreboard span,.hunter-scoreboard strong{font-size:11px;font-weight:900}.hunter-scoreboard span small{display:block;color:#6f8a98;font-size:7px}.hunter-scoreboard strong{color:var(--hunter);font-size:17px}.hunter-scoreboard em{grid-column:1/-1;color:#7593a1;font-size:8px;font-style:normal}.ocean-screen{position:relative;overflow:hidden;width:100%;aspect-ratio:15/8.5;border:8px solid #102d42;border-radius:14px;background:#032e47;box-shadow:inset 0 0 40px rgba(0,0,0,.8),0 15px 30px rgba(0,0,0,.3)}.ocean-screen canvas{display:block;width:100%;height:100%;touch-action:none;cursor:crosshair}.ocean-hud{position:absolute;inset:9px 9px auto;display:flex;justify-content:space-between;pointer-events:none}.ocean-hud span{padding:4px 7px;border:1px solid rgba(118,206,235,.3);border-radius:5px;background:rgba(3,20,31,.72);color:#9eb6c2;font-size:8px;font-weight:900;letter-spacing:.08em}.ocean-status{min-height:39px;margin:10px 0;padding:9px 12px;border:1px solid #23485c;border-radius:8px;background:#071620;color:#c9e5ef;font-size:12px;text-align:center}.ocean-controls{display:flex;justify-content:space-between;align-items:center;gap:10px}.shot-power,.ocean-actions{display:flex;align-items:center;gap:7px;flex-wrap:wrap}.shot-power>span{color:#7f9dac;font-size:8px;font-weight:900;letter-spacing:.12em}.shot-power strong{min-width:90px;text-align:center;color:#ffe06a}.ocean-controls button{padding:8px 10px;border:1px solid #2c5870;border-radius:7px;background:#102b3b;color:#d9edf5;font-size:10px;font-weight:850;cursor:pointer}.ocean-controls button:disabled{opacity:.45}.ocean-controls button.selected{background:#154c42;border-color:#42bd8d;color:#9bf2cf}.ocean-controls button.selected.lock{background:#5a4215;border-color:#d9a72d;color:#ffe28a}.ocean-help{margin:11px 0 0;color:#7895a4;font-size:10px;text-align:center}@media(max-width:780px){.ocean-hunter{padding:10px}.ocean-header{align-items:flex-start;flex-direction:column}.hunter-scoreboard{grid-template-columns:1fr 1fr}.ocean-controls{align-items:stretch;flex-direction:column}.shot-power,.ocean-actions{justify-content:center}}@media(max-width:470px){.ocean-counts,.ocean-names{grid-template-columns:1fr}.ocean-metrics span{min-width:70px;font-size:10px}.ocean-screen{border-width:4px}.hunter-scoreboard button{padding:6px}.ocean-hud span:nth-child(2){display:none}}
       `}</style>
     </section>
   );
