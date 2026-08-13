@@ -69,7 +69,6 @@ const ConnectFourGame: React.FC<ConnectFourProps> = ({ playMode, playerNames }) 
   const [isAnimating, setIsAnimating] = useState(false);
   const [hoverCol, setHoverCol] = useState<number | null>(null);
   const [landingPieceId, setLandingPieceId] = useState<number | null>(null);
-  const [isShaking, setIsShaking] = useState(false);
 
 
   const checkWinner = (b: Cell[][]): [Player, [number, number][]] | null => {
@@ -119,8 +118,6 @@ const ConnectFourGame: React.FC<ConnectFourProps> = ({ playMode, playerNames }) 
       // State update is now split: animation starts, then logic finalizes.
       setTimeout(() => {
         setLandingPieceId(newPiece.id);
-        setIsShaking(true);
-        setTimeout(() => setIsShaking(false), 200);
 
         const newBoard = board.map(r => [...r]);
         newBoard[targetRow][col] = player;
@@ -232,7 +229,7 @@ const ConnectFourGame: React.FC<ConnectFourProps> = ({ playMode, playerNames }) 
         {status}
         {gameState === 'playing' && (<div className="w-6 h-6 rounded-full" style={{ backgroundColor: currentPlayer === '1' ? 'var(--connect4-p1-color)' : 'var(--connect4-p2-color)'}}></div>)}
       </div>
-      <div className={`relative w-full max-w-lg aspect-[7/6] ${isShaking ? 'animate-shake' : ''}`} style={{ '--board-gap': 'var(--board-gap)' } as React.CSSProperties}>
+      <div className="relative w-full max-w-lg aspect-[7/6]" style={{ '--board-gap': 'var(--board-gap)' } as React.CSSProperties}>
         {/* Pieces Container - uses a grid that perfectly overlays the board visuals */}
         <div className="absolute inset-0 grid grid-rows-6 grid-cols-7 z-20 pointer-events-none">
             {pieces.map(p => {
@@ -290,15 +287,6 @@ const ConnectFourGame: React.FC<ConnectFourProps> = ({ playMode, playerNames }) 
         }
         .animate-thud {
             animation: thud 0.2s ease-out;
-        }
-        @keyframes shake {
-            0%, 100% { transform: translate(0, 0); }
-            25% { transform: translate(0, 4px); }
-            50% { transform: translate(0, -2px); }
-            75% { transform: translate(0, 2px); }
-        }
-        .animate-shake {
-            animation: shake 0.2s ease-in-out;
         }
       `}</style>
     </div>
