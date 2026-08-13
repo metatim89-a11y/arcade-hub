@@ -392,9 +392,9 @@ const PlinkoGame: React.FC = () => {
         
         const resize = () => {
             const width = Math.min(parent.clientWidth, 800);
-            const height = width * 0.8 + (rows * 10); 
+            const height = width * 0.72 + (rows * 8);
             canvas.width = width;
-            canvas.height = Math.min(height, 650);
+            canvas.height = Math.min(height, 600);
         };
         resize();
         window.addEventListener('resize', resize);
@@ -402,8 +402,8 @@ const PlinkoGame: React.FC = () => {
     }, [rows]);
 
     return (
-        <div className="flex flex-col lg:flex-row gap-6 w-full max-w-7xl items-start justify-center p-4">
-            <div className="w-full lg:w-80 flex flex-col gap-4 bg-gray-900/80 p-6 rounded-2xl border border-gray-700 shadow-xl backdrop-blur-sm h-fit">
+        <div className="flex flex-col lg:flex-row gap-4 lg:gap-6 w-full max-w-7xl items-start justify-center p-2 sm:p-4">
+            <div className="w-full lg:w-80 flex flex-col gap-3 sm:gap-4 bg-gray-900/80 p-4 sm:p-6 rounded-2xl border border-gray-700 shadow-xl backdrop-blur-sm h-fit">
                 <h2 className="text-2xl font-bold text-yellow-400 flex items-center gap-2 mb-2">
                     <span className="text-3xl">💎</span> Plinko
                 </h2>
@@ -439,7 +439,7 @@ const PlinkoGame: React.FC = () => {
                     </div>
                 </div>
 
-                <div className="flex flex-col gap-3 mt-2">
+                <div className="flex flex-col gap-2 sm:gap-3 mt-1 sm:mt-2">
                     <GlassButton onClick={dropBall} className={`w-full py-4 text-xl shadow-[0_0_20px_rgba(234,179,8,0.2)] ${autoMode ? 'opacity-50 cursor-not-allowed' : ''}`} disabled={autoMode}>
                         Drop Ball
                     </GlassButton>
@@ -449,7 +449,7 @@ const PlinkoGame: React.FC = () => {
                 </div>
             </div>
 
-            <div className="flex-1 flex flex-col gap-4 w-full max-w-[800px]">
+            <div className="flex-1 flex flex-col gap-3 sm:gap-4 w-full max-w-[800px]">
                 <div className="w-full bg-gray-900/50 rounded-xl p-2 flex items-center gap-2 overflow-hidden h-14 border border-gray-700">
                     <span className="text-xs text-gray-500 font-bold uppercase px-2">History</span>
                     <div className="flex gap-2 overflow-x-auto hide-scrollbar w-full">
@@ -461,7 +461,7 @@ const PlinkoGame: React.FC = () => {
                     </div>
                 </div>
 
-                <div className="relative w-full bg-gray-900 rounded-2xl border-4 border-gray-800 shadow-2xl overflow-hidden flex justify-center">
+                <div className="relative w-full bg-gray-900 rounded-2xl border-4 border-gray-800 shadow-2xl overflow-hidden flex justify-center min-h-[280px]">
                     <canvas ref={canvasRef} className="block max-w-full" />
                     <div className="absolute top-4 left-0 w-full text-center pointer-events-none">
                         {feedback && (
