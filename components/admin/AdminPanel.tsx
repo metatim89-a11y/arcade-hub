@@ -112,10 +112,10 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
             </div>
           </section>
           <section className="admin-rtp-card">
-            <div className="admin-section-heading"><div><span>GAME RTP</span><small>Enter one number to fill every game, or adjust a game below.</small></div><button type="button" onClick={resetRtp}>RESET ALL</button></div>
-            <div className="admin-rtp-apply"><label>RTP %<input type="number" min="0" max="200" step="1" value={allRtp} onChange={(event) => setAllRtp(event.target.value)} /></label><button type="button" onClick={() => setAllGameRtp(Number(allRtp))}>APPLY TO ALL GAMES</button></div>
+            <div className="admin-section-heading"><div><span>GAME RTP</span><small>Enter one number to update every player’s game settings, or adjust a game below.</small></div><button type="button" onClick={() => void resetRtp().catch((err) => setError(err.message))}>RESET ALL</button></div>
+            <div className="admin-rtp-apply"><label>RTP %<input type="number" min="0" max="200" step="1" value={allRtp} onChange={(event) => setAllRtp(event.target.value)} /></label><button type="button" onClick={() => void setAllGameRtp(Number(allRtp)).catch((err) => setError(err.message))}>APPLY TO ALL GAMES</button></div>
             <div className="admin-rtp-list">
-              {games.map((game) => <label key={game.id}><span>{game.label}<small>{game.id}</small></span><input type="number" min="0" max="200" step="1" value={rtpByGame[game.id] ?? 100} onChange={(event) => setGameRtp(game.id, Number(event.target.value))} /><b>%</b></label>)}
+              {games.map((game) => <label key={game.id}><span>{game.label}<small>{game.id}</small></span><input type="number" min="0" max="200" step="1" value={rtpByGame[game.id] ?? 100} onChange={(event) => void setGameRtp(game.id, Number(event.target.value)).catch((err) => setError(err.message))} /><b>%</b></label>)}
             </div>
           </section>
         </div>
