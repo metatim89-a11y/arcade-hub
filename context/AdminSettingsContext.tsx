@@ -1,4 +1,5 @@
-import React, { createContext, ReactNode, useCallback, useContext, useMemo, useState } from 'react';
+import React, { createContext, ReactNode, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { getSupabase, isSupabaseConfigured } from '../lib/supabase';
 
 export const GAME_RTP_DEFAULTS: Record<string, number> = {
   wheel: 100,
@@ -18,24 +19,15 @@ export const GAME_RTP_DEFAULTS: Record<string, number> = {
   tictactoe: 100
 };
 
-const STORAGE_KEY = 'arcade_admin_rtp_v1';
-
 const readSettings = () => {
-  try {
-    const saved = JSON.parse(window.localStorage.getItem(STORAGE_KEY) ?? '{}') as Record<string, number>;
-    return Object.fromEntries(Object.entries(GAME_RTP_DEFAULTS).map(([id, fallback]) => {
-      const value = Number(saved[id]);
-      return [id, Number.isFinite(value) ? Math.max(0, Math.min(200, value)) : fallback];
-    }));
-  } catch {
-    return { ...GAME_RTP_DEFAULTS };
-  }
+  return { ...GAME_RTP_DEFAULTS };
 };
 
 interface AdminSettingsContextType {
   rtpByGame: Record<string, number>;
-  setGameRtp: (gameId: string, value: number) => void;
-  resetRtp: () => void;
+  setGameRtp: (gameId: string, value: number) => Promise<void>;
+  setAllGameRtp: (value: number) => Promise<void>;
+  resetRtp: () => Promise<void>;
   payoutMultiplierForReason: (reason: string) => number;
 }
 
@@ -60,26 +52,45 @@ export const AdminSettingsProvider: React.FC<{ children: ReactNode }> = ({ child
 
   const persist = useCallback((next: Record<string, number>) => {
     setRtpByGame(next);
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
   }, []);
 
-  const setGameRtp = useCallback((gameId: string, value: number) => {
-    const cleanValue = Math.max(0, Math.min(200, Number.isFinite(value) ? value : 100));
-    setRtpByGame((current) => {
-      const next = { ...current, [gameId]: cleanValue };
-      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
-      return next;
+  useEffect(() => {
+    if (!isSupabaseConfigured) return;
+    let active = true;
+    void getSupabase().from('game_rtp_settings').select('game_id, rtp').then(({ data, error }) => {
+      if (!active || error || !data) return;
+      persist({ ...GAME_RTP_DEFAULTS, ...Object.fromEntries(data.map((row) => [row.game_id, Number(row.rtp)])) });
     });
+    const channel = getSupabase().channel('game-rtp-settings').on('postgres_changes', { event: '*', schema: 'public', table: 'game_rtp_settings' }, () => {
+      void getSupabase().from('game_rtp_settings').select('game_id, rtp').then(({ data }) => {
+        if (active && data) persist({ ...GAME_RTP_DEFAULTS, ...Object.fromEntries(data.map((row) => [row.game_id, Number(row.rtp)])) });
+      });
+    }).subscribe();
+    return () => { active = false; void getSupabase().removeChannel(channel); };
+  }, [persist]);
+
+  const setGameRtp = useCallback(async (gameId: string, value: number) => {
+    const cleanValue = Math.max(0, Math.min(200, Number.isFinite(value) ? value : 100));
+    const { error } = await getSupabase().rpc('set_game_rtp', { p_game_id: gameId, p_rtp: cleanValue });
+    if (error) throw error;
+    setRtpByGame((current) => ({ ...current, [gameId]: cleanValue }));
   }, []);
 
-  const resetRtp = useCallback(() => persist({ ...GAME_RTP_DEFAULTS }), [persist]);
+  const setAllGameRtp = useCallback(async (value: number) => {
+    const cleanValue = Math.max(0, Math.min(200, Number.isFinite(value) ? value : 100));
+    const { error } = await getSupabase().rpc('set_all_game_rtp', { p_rtp: cleanValue });
+    if (error) throw error;
+    persist(Object.fromEntries(Object.keys(GAME_RTP_DEFAULTS).map((gameId) => [gameId, cleanValue])));
+  }, [persist]);
+
+  const resetRtp = useCallback(() => setAllGameRtp(100), [setAllGameRtp]);
 
   const payoutMultiplierForReason = useCallback((reason: string) => {
     const gameId = gameIdFromReason(reason);
     return gameId ? (rtpByGame[gameId] ?? 100) / 100 : 1;
   }, [rtpByGame]);
 
-  const value = useMemo(() => ({ rtpByGame, setGameRtp, resetRtp, payoutMultiplierForReason }), [payoutMultiplierForReason, resetRtp, rtpByGame, setGameRtp]);
+  const value = useMemo(() => ({ rtpByGame, setGameRtp, setAllGameRtp, resetRtp, payoutMultiplierForReason }), [payoutMultiplierForReason, resetRtp, rtpByGame, setAllGameRtp, setGameRtp]);
   return <AdminSettingsContext.Provider value={value}>{children}</AdminSettingsContext.Provider>;
 };
 
