@@ -530,6 +530,11 @@ const TexasHoldemGame: React.FC = () => {
         .seat-cards{z-index:20!important;overflow:visible}.seat-panel{z-index:1!important}.holdem-card{z-index:21!important;overflow:hidden}.holdem-card>span{z-index:2;font-size:15px}.holdem-card>strong{z-index:1}.card-rank-bottom{position:absolute;z-index:2;right:5px;bottom:3px;transform:rotate(180deg);color:#171717;font-size:15px;font-weight:950;line-height:1}.card-rank-bottom.red{color:#cf2838}
         @media(max-width:760px){.holdem-card>span,.card-rank-bottom{font-size:13px}.holdem-card>span{top:3px;left:4px}.card-rank-bottom{right:4px;bottom:3px}}
         @media(max-width:470px){.holdem-card,.holdem-card-slot{width:36px;height:50px}.seat-cards{height:54px}.poker-seat.left .seat-cards,.poker-seat.right .seat-cards{width:75px;height:50px;flex-basis:75px}.poker-seat.left,.poker-seat.right{width:162px}.holdem-card>span,.card-rank-bottom{font-size:14px}.holdem-card>strong{font-size:21px}}
+        /* Keep the side seats out of the shared-card lane. This prevents their
+           hole cards from sitting on top of the community cards at every size. */
+        .poker-seat.left,.poker-seat.right{flex-direction:column;align-items:center;width:158px;gap:3px}.poker-seat.left{left:2%;transform:translateY(-50%)}.poker-seat.right{right:2%;transform:translateY(-50%)}.poker-seat.left .seat-panel,.poker-seat.right .seat-panel{width:100%;margin:0}.poker-seat.left .seat-cards,.poker-seat.right .seat-cards{order:-1;width:76px;height:48px;flex:0 0 48px;transform:scale(.72);transform-origin:center}.table-center{left:23%;right:23%}
+        @media(max-width:760px){.poker-seat.left,.poker-seat.right{width:112px;gap:1px}.poker-seat.left{left:1%}.poker-seat.right{right:1%}.poker-seat.left .seat-cards,.poker-seat.right .seat-cards{width:68px;height:42px;flex-basis:42px;transform:scale(.61)}.table-center{left:22%;right:22%}}
+        @media(max-width:470px){.poker-seat.left,.poker-seat.right{width:92px}.poker-seat.left{left:0}.poker-seat.right{right:0}.poker-seat.left .seat-cards,.poker-seat.right .seat-cards{width:60px;height:36px;flex-basis:36px;transform:scale(.5)}.table-center{left:20%;right:20%}}
       `}</style>
     </section>
   );
