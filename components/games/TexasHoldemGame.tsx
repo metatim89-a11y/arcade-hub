@@ -3,7 +3,7 @@ import React, { useEffect, useRef, useState } from 'react';
 type Suit = '♠' | '♥' | '♦' | '♣';
 type Rank = '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9' | '10' | 'J' | 'Q' | 'K' | 'A';
 type Phase = 'SETUP' | 'PREFLOP' | 'FLOP' | 'TURN' | 'RIVER' | 'SHOWDOWN';
-type Action = 'fold' | 'check-call' | 'raise';
+type Action = 'fold' | 'check-call' | 'raise' | 'all-in';
 
 type Card = { id: string; suit: Suit; rank: Rank; value: number };
 type HandRank = { category: number; kickers: number[]; name: string };
@@ -138,6 +138,14 @@ const TexasHoldemGame: React.FC = () => {
   const [message, setMessage] = useState('Choose how many local players are joining the table.');
   const [handNumber, setHandNumber] = useState(0);
   const [lastBoardCount, setLastBoardCount] = useState(0);
+  const [cpuDifficulty, setCpuDifficulty] = useState<'Casual' | 'Sharp' | 'Expert'>('Sharp');
+  const [tableTheme, setTableTheme] = useState<'Classic' | 'Midnight' | 'Royal'>('Classic');
+  const [practiceInfo, setPracticeInfo] = useState(true);
+  const [tournamentMode, setTournamentMode] = useState(false);
+  const [raiseAmount, setRaiseAmount] = useState(BIG_BLIND);
+  const [history, setHistory] = useState<string[]>([]);
+  const [lastActions, setLastActions] = useState<Record<number, string>>({});
+  const [emotes, setEmotes] = useState<Record<number, string>>({});
 
   const playersRef = useRef<Player[]>([]);
   const communityRef = useRef<Card[]>([]);
@@ -171,6 +179,18 @@ const TexasHoldemGame: React.FC = () => {
   const totalPot = players.reduce((sum, player) => sum + player.contributed, 0);
   const currentPlayer = players[actionIndex];
   const amountToCall = currentPlayer ? Math.max(0, currentBetRef.current - currentPlayer.bet) : 0;
+  const blindMultiplier = tournamentMode ? 2 ** Math.floor(Math.max(0, handNumber - 1) / 5) : 1;
+  const smallBlind = SMALL_BLIND * blindMultiplier;
+  const bigBlind = BIG_BLIND * blindMultiplier;
+  const humanStrength = currentPlayer?.isHuman && currentPlayer.hand.length === 2
+    ? (community.length >= 3 ? evaluateHand([...currentPlayer.hand, ...community]).name : currentPlayer.hand[0].value === currentPlayer.hand[1].value ? 'Pocket Pair' : currentPlayer.hand.some(card => card.value >= 13) ? 'High Cards' : 'Unmade Hand')
+    : null;
+
+  const announce = (playerId: number, action: string, line: string) => {
+    setLastActions(current => ({ ...current, [playerId]: action }));
+    setHistory(current => [line, ...current].slice(0, 12));
+    setMessage(line);
+  };
 
   const settleShowdown = (tablePlayers: Player[], board: Card[]) => {
     const next = tablePlayers.map((player) => ({ ...player }));
@@ -210,6 +230,8 @@ const TexasHoldemGame: React.FC = () => {
     if (winners.length === 1) {
       const winner = winners[0];
       setMessage(`${winner.name} wins with ${ranks.get(winner.id)?.name}.`);
+      setHistory(current => [`${winner.name} wins with ${ranks.get(winner.id)?.name}.`, ...current].slice(0, 12));
+      setEmotes(current => ({ ...current, [winner.id]: '🏆' }));
     } else {
       setMessage(`${winners.map((winner) => winner.name).join(' and ')} split the pot.`);
     }
@@ -294,9 +316,22 @@ const TexasHoldemGame: React.FC = () => {
 
     if (action === 'fold') {
       actor.folded = true;
-      setMessage(`${actor.name} folds.`);
+      announce(actor.id, 'FOLD', `${actor.name} folds.`);
+      setEmotes(current => ({ ...current, [actor.id]: '😑' }));
+    } else if (action === 'all-in') {
+      const contribution = actor.stack;
+      actor.stack = 0;
+      actor.bet += contribution;
+      actor.contributed += contribution;
+      actor.allIn = true;
+      if (actor.bet > currentBetRef.current) {
+        currentBetRef.current = actor.bet;
+        pendingRef.current = new Set(next.filter(player => !player.folded && !player.allIn && player.id !== actor.id).map(player => player.id));
+      }
+      announce(actor.id, 'ALL IN', `${actor.name} moves all in for ${actor.bet}.`);
+      setEmotes(current => ({ ...current, [actor.id]: '🔥' }));
     } else if (action === 'raise' && actor.stack >= callAmount + BIG_BLIND) {
-      const desiredBet = currentBetRef.current + BIG_BLIND;
+      const desiredBet = currentBetRef.current + Math.max(bigBlind, raiseAmount);
       const contribution = Math.min(actor.stack, desiredBet - actor.bet);
       actor.stack -= contribution;
       actor.bet += contribution;
@@ -305,7 +340,7 @@ const TexasHoldemGame: React.FC = () => {
       if (actor.bet > currentBetRef.current) {
         currentBetRef.current = actor.bet;
         pendingRef.current = new Set(next.filter((player) => !player.folded && !player.allIn && player.id !== actor.id).map((player) => player.id));
-        setMessage(`${actor.name} raises to ${actor.bet}.`);
+        announce(actor.id, 'RAISE', `${actor.name} raises to ${actor.bet}.`);
       }
     } else {
       const contribution = Math.min(actor.stack, callAmount);
@@ -313,7 +348,7 @@ const TexasHoldemGame: React.FC = () => {
       actor.bet += contribution;
       actor.contributed += contribution;
       actor.allIn = actor.stack === 0;
-      setMessage(callAmount === 0 ? `${actor.name} checks.` : `${actor.name} calls ${contribution}.`);
+      announce(actor.id, callAmount === 0 ? 'CHECK' : 'CALL', callAmount === 0 ? `${actor.name} checks.` : `${actor.name} calls ${contribution}.`);
     }
 
     pendingRef.current.delete(actor.id);
@@ -354,7 +389,7 @@ const TexasHoldemGame: React.FC = () => {
   };
 
   const startHand = (sourcePlayers = playersRef.current) => {
-    const funded = sourcePlayers.filter((player) => player.stack >= BIG_BLIND);
+    const funded = sourcePlayers.filter((player) => player.stack >= bigBlind);
     if (funded.length < 2) {
       commitPhase('SETUP');
       setMessage('Fewer than two funded seats remain. Start a new table.');
@@ -365,7 +400,7 @@ const TexasHoldemGame: React.FC = () => {
       hand: [],
       bet: 0,
       contributed: 0,
-      folded: player.stack < BIG_BLIND,
+      folded: player.stack < bigBlind,
       allIn: false
     }));
     const dealer = nextIndex(dealerRef.current, next, (player) => !player.folded);
@@ -394,8 +429,8 @@ const TexasHoldemGame: React.FC = () => {
       next[index].contributed += paid;
       next[index].allIn = next[index].stack === 0;
     };
-    postBlind(smallBlindIndex, SMALL_BLIND);
-    postBlind(bigBlindIndex, BIG_BLIND);
+    postBlind(smallBlindIndex, smallBlind);
+    postBlind(bigBlindIndex, bigBlind);
     currentBetRef.current = next[bigBlindIndex].bet;
     pendingRef.current = new Set(next.filter((player) => !player.folded && !player.allIn).map((player) => player.id));
     const firstActor = nextIndex(bigBlindIndex, next, (player) => pendingRef.current.has(player.id));
@@ -403,7 +438,10 @@ const TexasHoldemGame: React.FC = () => {
     commitPhase('PREFLOP');
     commitAction(firstActor);
     setHandNumber((number) => number + 1);
-    setMessage(`${next[smallBlindIndex].name} posts ${SMALL_BLIND}; ${next[bigBlindIndex].name} posts ${BIG_BLIND}.`);
+    setLastActions({}); setEmotes({});
+    setRaiseAmount(bigBlind);
+    setHistory(current => [`Hand ${handNumber + 1} dealt · blinds ${smallBlind}/${bigBlind}`, ...current].slice(0, 12));
+    setMessage(`${next[smallBlindIndex].name} posts ${smallBlind}; ${next[bigBlindIndex].name} posts ${bigBlind}.`);
   };
 
   useEffect(() => {
@@ -416,24 +454,32 @@ const TexasHoldemGame: React.FC = () => {
       const strong = Boolean((rank && rank.category >= 2) || pairedHole || actor.hand.some((card) => card.value >= 13));
       const pressure = toCall / Math.max(1, actor.stack);
       let action: Action = 'check-call';
-      if (toCall > 0 && !strong && pressure > 0.18 && Math.random() < 0.65) action = 'fold';
-      else if (strong && actor.stack >= toCall + BIG_BLIND && Math.random() < 0.28) action = 'raise';
+      const foldChance = cpuDifficulty === 'Casual' ? .35 : cpuDifficulty === 'Expert' ? .78 : .65;
+      const raiseChance = cpuDifficulty === 'Casual' ? .16 : cpuDifficulty === 'Expert' ? .42 : .28;
+      if (toCall > 0 && !strong && pressure > 0.18 && Math.random() < foldChance) action = 'fold';
+      else if (strong && actor.stack >= toCall + bigBlind && Math.random() < raiseChance) action = 'raise';
       actionHandlerRef.current(action);
     }, 650 + Math.random() * 450);
     return () => window.clearTimeout(timer);
-  }, [actionIndex, community, phase, players]);
+  }, [actionIndex, bigBlind, community, cpuDifficulty, phase, players]);
 
   const seatPositions = ['bottom', 'left', 'top', 'right'];
   const boardCards = Array.from({ length: 5 }, (_, index) => community[index]);
   const humanTurn = Boolean(currentPlayer?.isHuman && phase !== 'SHOWDOWN');
 
   return (
-    <section className="holdem-game" aria-label="Four-seat Texas Hold'em">
+    <section className={`holdem-game theme-${tableTheme.toLowerCase()}`} aria-label="Four-seat Texas Hold'em">
       {phase === 'SETUP' ? (
         <div className="holdem-setup">
           <div className="holdem-kicker">LOCAL TABLE</div>
           <h2>Texas Hold’em</h2>
           <p>Seat up to four local players. Empty seats are filled by computer players.</p>
+          <div className="holdem-options">
+            <label>CPU <select value={cpuDifficulty} onChange={event => setCpuDifficulty(event.target.value as typeof cpuDifficulty)}><option>Casual</option><option>Sharp</option><option>Expert</option></select></label>
+            <label>Felt <select value={tableTheme} onChange={event => setTableTheme(event.target.value as typeof tableTheme)}><option>Classic</option><option>Midnight</option><option>Royal</option></select></label>
+            <button type="button" className={practiceInfo ? 'active' : ''} onClick={() => setPracticeInfo(value => !value)}>Practice info</button>
+            <button type="button" className={tournamentMode ? 'active' : ''} onClick={() => setTournamentMode(value => !value)}>Tournament blinds</button>
+          </div>
           <label>HUMAN PLAYERS</label>
           <div className="human-count">
             {[1, 2, 3, 4].map((count) => (
@@ -476,6 +522,8 @@ const TexasHoldemGame: React.FC = () => {
                 const rank = phase === 'SHOWDOWN' && !player.folded ? evaluateHand([...player.hand, ...community]) : null;
                 return (
                   <div key={player.id} className={`poker-seat ${seatPositions[index]}${isActing ? ' acting' : ''}${player.folded ? ' folded' : ''}`}>
+                    {lastActions[player.id] && <div className="seat-action-pop">{lastActions[player.id]}</div>}
+                    {emotes[player.id] && <div className="seat-emote">{emotes[player.id]}</div>}
                     <div className="seat-cards">
                       {player.hand.map((card) => <CardView key={card.id} card={card} hidden={!reveal} />)}
                     </div>
@@ -507,18 +555,22 @@ const TexasHoldemGame: React.FC = () => {
               </>
             ) : humanTurn ? (
               <>
+                {practiceInfo && humanStrength && <div className="practice-readout"><strong>{humanStrength}</strong><span>To call {amountToCall} · pot {totalPot}</span></div>}
                 {amountToCall > 0 && <button type="button" className="fold" onClick={() => handleAction('fold')}>FOLD</button>}
                 <button type="button" className="call" onClick={() => handleAction('check-call')}>
                   {amountToCall === 0 ? 'CHECK' : `CALL ${Math.min(amountToCall, currentPlayer.stack)}`}
                 </button>
-                <button type="button" className="raise" disabled={currentPlayer.stack < amountToCall + BIG_BLIND} onClick={() => handleAction('raise')}>
-                  RAISE TO {currentBetRef.current + BIG_BLIND}
+                <label className="raise-picker">RAISE +{raiseAmount}<input type="range" min={bigBlind} max={Math.max(bigBlind, currentPlayer.stack - amountToCall)} step={bigBlind} value={Math.min(raiseAmount, Math.max(bigBlind, currentPlayer.stack - amountToCall))} onChange={event => setRaiseAmount(Number(event.target.value))} /></label>
+                <button type="button" className="raise" disabled={currentPlayer.stack < amountToCall + bigBlind} onClick={() => handleAction('raise')}>
+                  RAISE TO {currentBetRef.current + raiseAmount}
                 </button>
+                <button type="button" className="all-in" onClick={() => handleAction('all-in')}>ALL IN {currentPlayer.stack}</button>
               </>
             ) : (
               <div className="cpu-thinking"><span /> {currentPlayer?.name ?? 'Table'} is thinking…</div>
             )}
           </div>
+          <details className="hand-history"><summary>HAND HISTORY · {history.length}</summary>{history.map((line, index) => <div key={`${line}-${index}`}>{line}</div>)}</details>
         </>
       )}
 
@@ -535,6 +587,7 @@ const TexasHoldemGame: React.FC = () => {
         .poker-seat.left,.poker-seat.right{flex-direction:column;align-items:center;width:158px;gap:3px}.poker-seat.left{left:2%;transform:translateY(-50%)}.poker-seat.right{right:2%;transform:translateY(-50%)}.poker-seat.left .seat-panel,.poker-seat.right .seat-panel{width:100%;margin:0}.poker-seat.left .seat-cards,.poker-seat.right .seat-cards{order:-1;width:76px;height:48px;flex:0 0 48px;transform:scale(.72);transform-origin:center}.table-center{left:23%;right:23%}
         @media(max-width:760px){.poker-seat.left,.poker-seat.right{width:112px;gap:1px}.poker-seat.left{left:1%}.poker-seat.right{right:1%}.poker-seat.left .seat-cards,.poker-seat.right .seat-cards{width:68px;height:42px;flex-basis:42px;transform:scale(.61)}.table-center{left:22%;right:22%}}
         @media(max-width:470px){.poker-seat.left,.poker-seat.right{width:92px}.poker-seat.left{left:0}.poker-seat.right{right:0}.poker-seat.left .seat-cards,.poker-seat.right .seat-cards{width:60px;height:36px;flex-basis:36px;transform:scale(.5)}.table-center{left:20%;right:20%}}
+        .holdem-game.theme-midnight .poker-table{background:radial-gradient(ellipse,#203968,#122650 54%,#091633 100%);border-color:#192846}.holdem-game.theme-royal .poker-table{background:radial-gradient(ellipse,#722c43,#521b30 54%,#2b0c18 100%);border-color:#6f5422}.holdem-options{display:grid;grid-template-columns:1fr 1fr;gap:7px;width:100%}.holdem-options label,.holdem-options button{display:flex;align-items:center;justify-content:space-between;gap:6px;padding:8px;border:1px solid #395748;border-radius:7px;background:#10221a;color:#9eb2a7;font-size:9px;font-weight:900}.holdem-options select{background:#08150f;color:white;border:0}.holdem-options button.active{border-color:#d2a944;color:#e8c65e}.seat-action-pop{position:absolute;z-index:35;left:50%;top:45%;transform:translate(-50%,-50%);padding:5px 8px;border-radius:6px;background:#e3b63f;color:#241a05;font-size:9px;font-weight:950;animation:action-pop .5s ease-out}.seat-emote{position:absolute;z-index:36;right:-5px;top:-8px;font-size:20px;filter:drop-shadow(0 4px 4px rgba(0,0,0,.6))}.practice-readout{display:grid;min-width:110px;padding:7px 10px;border:1px solid #3c6652;border-radius:8px;background:#10241b;color:#9cc9ae;font-size:9px}.practice-readout strong{color:#f0c85f;font-size:12px}.raise-picker{display:grid;min-width:120px;color:#94a89c;font-size:9px;font-weight:900}.raise-picker input{width:120px;accent-color:#d3aa42}.holdem-controls .all-in{background:#6e3ca1}.hand-history{margin-top:8px;padding:8px 11px;border:1px solid #314a3d;border-radius:8px;background:#0b1812;color:#82978b;font-size:9px}.hand-history summary{cursor:pointer;color:#d0ad4e;font-weight:900;letter-spacing:.1em}.hand-history div{padding:4px 0;border-top:1px solid rgba(255,255,255,.05)}@keyframes action-pop{from{opacity:0;transform:translate(-50%,-25%) scale(.65)}to{opacity:1;transform:translate(-50%,-50%) scale(1)}}
       `}</style>
     </section>
   );
