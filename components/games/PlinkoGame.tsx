@@ -99,10 +99,21 @@ const PlinkoGame: React.FC = () => {
     const [rows, setRows] = useState(16);
     const [risk, setRisk] = useState<RiskLevel>('Medium');
     const [autoMode, setAutoMode] = useState(false);
+    const [theme, setTheme] = useState<'Midnight' | 'Neon' | 'Candy'>('Midnight');
+    const [ballSkin, setBallSkin] = useState<'Risk' | 'Diamond' | 'Rainbow'>('Risk');
+    const [batchSize, setBatchSize] = useState(1);
+    const [slowMotion, setSlowMotion] = useState(true);
+    const [followBall, setFollowBall] = useState(false);
+    const [practicePreview, setPracticePreview] = useState(false);
+    const [challengeBoard, setChallengeBoard] = useState(false);
     
     // Game State
     const [history, setHistory] = useState<number[]>([]);
     const [feedback, setFeedback] = useState('');
+    const [heatmap, setHeatmap] = useState<number[]>([]);
+    const [dailyProgress, setDailyProgress] = useState(0);
+    const [lastReplay, setLastReplay] = useState<number | null>(null);
+    const [isSlowMotion, setIsSlowMotion] = useState(false);
     const currencySymbol = currencyMode === 'fun' ? 'FC' : 'RC';
     
     // Refs for loop
@@ -112,6 +123,17 @@ const PlinkoGame: React.FC = () => {
     const animationRef = useRef<number>();
     const glowingPegRef = useRef<{r: number, c: number, life: number, scale: number}[]>([]);
     const glowingBucketRef = useRef<{index: number, life: number}[]>([]);
+    const audioRef = useRef<AudioContext | null>(null);
+    const lastPingRef = useRef(0);
+
+    const ping = useCallback((frequency = 520) => {
+        const AudioClass = window.AudioContext || (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+        if (!AudioClass) return;
+        const context = audioRef.current ?? new AudioClass(); audioRef.current = context;
+        const oscillator = context.createOscillator(); const gain = context.createGain();
+        oscillator.frequency.value = frequency; gain.gain.setValueAtTime(.025, context.currentTime); gain.gain.exponentialRampToValueAtTime(.001, context.currentTime + .05);
+        oscillator.connect(gain); gain.connect(context.destination); oscillator.start(); oscillator.stop(context.currentTime + .05);
+    }, []);
 
     // Computed Multipliers
     const multipliers = useMemo(() => {
@@ -231,12 +253,13 @@ const PlinkoGame: React.FC = () => {
         for (let i = ballsRef.current.length - 1; i >= 0; i--) {
             const ball = ballsRef.current[i];
             
-            ball.vy += GRAVITY;
+            const timeScale = isSlowMotion ? .36 : 1;
+            ball.vy += GRAVITY * timeScale;
             ball.vx *= AIR_RESISTANCE;
             ball.vy *= AIR_RESISTANCE;
             
-            ball.x += ball.vx;
-            ball.y += ball.vy;
+            ball.x += ball.vx * timeScale;
+            ball.y += ball.vy * timeScale;
 
             if (ball.x < leftWall + ballRadius) {
                 ball.x = leftWall + ballRadius;
@@ -279,6 +302,8 @@ const PlinkoGame: React.FC = () => {
                         ball.x += nx * (overlap + 0.1);
                         ball.y += ny * (overlap + 0.1);
                         glowingPegRef.current.push({r: r, c: c, life: 1.0, scale: 1.5});
+                        for (let spark = 0; spark < 3; spark++) particlesRef.current.push({ x: pegX, y: pegY, vx: (Math.random() - .5) * 2, vy: -Math.random() * 2, life: 1, color: ball.color, size: 2 + Math.random() * 2 });
+                        if (performance.now() - lastPingRef.current > 45) { ping(420 + r * 18); lastPingRef.current = performance.now(); }
                      }
                  }
             }
@@ -314,7 +339,11 @@ const PlinkoGame: React.FC = () => {
                 
                 addCoins(win, `Plinko ${mult}x`);
                 setHistory(prev => [mult, ...prev].slice(0, 5));
+                setHeatmap(current => { const next = Array.from({ length: multipliers.length }, (_, bucket) => current[bucket] ?? 0); next[index] += 1; return next; });
+                setDailyProgress(current => Math.min(10, current + 1));
+                setLastReplay(mult);
                 glowingBucketRef.current.push({index: index, life: 1.0});
+                if (slowMotion && mult >= 10) { setIsSlowMotion(true); window.setTimeout(() => setIsSlowMotion(false), 1100); }
                 
                 if (mult >= 10) setFeedback(`HUGE WIN! ${mult}x`);
                 else if (mult > 1) setFeedback(`Nice! ${mult}x`);
@@ -326,8 +355,11 @@ const PlinkoGame: React.FC = () => {
             }
         }
 
+        particlesRef.current.forEach(particle => { particle.x += particle.vx; particle.y += particle.vy; particle.vy += .08; particle.life -= .05; ctx.globalAlpha = Math.max(0, particle.life); ctx.fillStyle = particle.color; ctx.fillRect(particle.x, particle.y, particle.size, particle.size); });
+        particlesRef.current = particlesRef.current.filter(particle => particle.life > 0); ctx.globalAlpha = 1;
+
         animationRef.current = requestAnimationFrame(updatePhysics);
-    }, [rows, multipliers, addCoins]);
+    }, [rows, multipliers, addCoins, isSlowMotion, ping, slowMotion]);
 
     useEffect(() => {
         animationRef.current = requestAnimationFrame(updatePhysics);
@@ -357,6 +389,7 @@ const PlinkoGame: React.FC = () => {
         const dropJitter = (Math.random() - 0.5) * (spacingX * 0.2);
         const startX = canvas.width / 2 + dropJitter;
 
+        const color = ballSkin === 'Diamond' ? '#73ddff' : ballSkin === 'Rainbow' ? `hsl(${Math.random() * 360} 90% 60%)` : BALL_COLORS[risk];
         ballsRef.current.push({
             id: Date.now() + Math.random(),
             x: startX,
@@ -365,10 +398,14 @@ const PlinkoGame: React.FC = () => {
             vy: 0,
             radius: 5,
             value: bet,
-            color: BALL_COLORS[risk],
+            color,
             trail: [],
             isFinished: false
         });
+    };
+
+    const dropBatch = async () => {
+        for (let index = 0; index < batchSize; index++) { await dropBall(); await new Promise(resolve => window.setTimeout(resolve, 180)); }
     };
 
     useEffect(() => {
@@ -402,7 +439,7 @@ const PlinkoGame: React.FC = () => {
     }, [rows]);
 
     return (
-        <div className="flex flex-col lg:flex-row gap-4 lg:gap-6 w-full max-w-7xl items-start justify-center p-2 sm:p-4">
+        <div className={`plinko-game theme-${theme.toLowerCase()} flex flex-col lg:flex-row gap-4 lg:gap-6 w-full max-w-7xl items-start justify-center p-2 sm:p-4`}>
             <div className="w-full lg:w-80 flex flex-col gap-3 sm:gap-4 bg-gray-900/80 p-4 sm:p-6 rounded-2xl border border-gray-700 shadow-xl backdrop-blur-sm h-fit">
                 <h2 className="text-2xl font-bold text-yellow-400 flex items-center gap-2 mb-2">
                     <span className="text-3xl">💎</span> Plinko
@@ -410,6 +447,7 @@ const PlinkoGame: React.FC = () => {
                 <div className="-mt-3 text-center text-[11px] font-bold uppercase tracking-wider text-gray-400">
                     {risk} risk · {RTP_BY_RISK[risk]}% RTP
                 </div>
+                <div className="plinko-options"><select value={theme} onChange={event => setTheme(event.target.value as typeof theme)}><option>Midnight</option><option>Neon</option><option>Candy</option></select><select value={ballSkin} onChange={event => setBallSkin(event.target.value as typeof ballSkin)}><option>Risk</option><option>Diamond</option><option>Rainbow</option></select></div>
                 
                 <div className="bg-black/30 p-4 rounded-xl border border-gray-700">
                     <label className="text-gray-400 text-xs font-bold uppercase mb-2 block">Bet Amount</label>
@@ -440,12 +478,15 @@ const PlinkoGame: React.FC = () => {
                 </div>
 
                 <div className="flex flex-col gap-2 sm:gap-3 mt-1 sm:mt-2">
-                    <GlassButton onClick={dropBall} className={`w-full py-4 text-xl shadow-[0_0_20px_rgba(234,179,8,0.2)] ${autoMode ? 'opacity-50 cursor-not-allowed' : ''}`} disabled={autoMode}>
-                        Drop Ball
+                    <div className="plinko-batch"><span>Balls</span>{[1,3,5].map(size => <button key={size} className={batchSize === size ? 'active' : ''} onClick={() => setBatchSize(size)}>{size}</button>)}</div>
+                    <GlassButton onClick={dropBatch} className={`w-full py-4 text-xl shadow-[0_0_20px_rgba(234,179,8,0.2)] ${autoMode ? 'opacity-50 cursor-not-allowed' : ''}`} disabled={autoMode}>
+                        Drop {batchSize > 1 ? `${batchSize} Balls` : 'Ball'}
                     </GlassButton>
                     <button onClick={() => setAutoMode(!autoMode)} className={`w-full py-3 rounded-xl font-bold transition-all flex items-center justify-center gap-2 border ${autoMode ? 'bg-red-500/20 border-red-500 text-red-400 animate-pulse' : 'bg-gray-800 border-gray-600 text-gray-400 hover:bg-gray-700'}`}>
                         {autoMode ? '⏹ Stop Auto' : '▶ Start Auto'}
                     </button>
+                    <div className="plinko-toggles"><button className={slowMotion ? 'active' : ''} onClick={() => setSlowMotion(value => !value)}>Slow-mo</button><button className={followBall ? 'active' : ''} onClick={() => setFollowBall(value => !value)}>Follow</button><button className={practicePreview ? 'active' : ''} onClick={() => setPracticePreview(value => !value)}>Preview</button><button className={challengeBoard ? 'active' : ''} onClick={() => setChallengeBoard(value => !value)}>Challenge</button></div>
+                    <div className="plinko-daily">Daily drops {dailyProgress}/10</div>
                 </div>
             </div>
 
@@ -459,9 +500,11 @@ const PlinkoGame: React.FC = () => {
                             </div>
                         ))}
                     </div>
+                    {lastReplay !== null && <button className="plinko-replay" onClick={() => setFeedback(`Replay highlight: ${lastReplay}x landing`)}>↻ Replay</button>}
                 </div>
 
-                <div className="relative w-full bg-gray-900 rounded-2xl border-4 border-gray-800 shadow-2xl overflow-hidden flex justify-center min-h-[280px]">
+                {practicePreview && <div className="plinko-preview">Likely landing zone: center buckets · edge buckets are rare</div>}
+                <div className={`plinko-board relative w-full bg-gray-900 rounded-2xl border-4 border-gray-800 shadow-2xl overflow-hidden flex justify-center min-h-[280px] ${followBall ? 'following' : ''} ${challengeBoard ? 'challenge' : ''}`}>
                     <canvas ref={canvasRef} className="block max-w-full" />
                     <div className="absolute top-4 left-0 w-full text-center pointer-events-none">
                         {feedback && (
@@ -471,7 +514,9 @@ const PlinkoGame: React.FC = () => {
                         )}
                     </div>
                 </div>
+                <div className="plinko-heatmap">{multipliers.map((_, index) => <i key={index} style={{ opacity: .15 + ((heatmap[index] ?? 0) / Math.max(1, ...heatmap)) * .85 }} />)}</div>
             </div>
+            <style>{`.plinko-options,.plinko-batch,.plinko-toggles{display:grid;grid-template-columns:repeat(2,1fr);gap:5px}.plinko-options select,.plinko-batch button,.plinko-toggles button,.plinko-replay{padding:6px;border:1px solid #4b5563;border-radius:7px;background:#1f2937;color:#b7c1cd;font-size:10px;font-weight:800}.plinko-batch{grid-template-columns:auto repeat(3,1fr);align-items:center}.plinko-batch span{color:#8994a3;font-size:10px}.plinko-batch button.active,.plinko-toggles button.active{border-color:#fbbf24;color:#fbbf24}.plinko-daily,.plinko-preview{padding:7px;border-radius:7px;background:#111827;color:#9ca3af;text-align:center;font-size:10px}.plinko-replay{white-space:nowrap}.plinko-board.challenge:after{content:'CHALLENGE BOARD';position:absolute;right:8px;bottom:8px;padding:4px 6px;border-radius:5px;background:#7c3aed;color:white;font-size:8px;font-weight:900}.plinko-board.following canvas{filter:saturate(1.2) brightness(1.08)}.plinko-heatmap{display:grid;grid-template-columns:repeat(${multipliers.length},1fr);gap:2px;height:8px}.plinko-heatmap i{border-radius:3px;background:#f59e0b}.theme-neon .plinko-board{box-shadow:0 0 35px rgba(34,211,238,.28)}.theme-candy .plinko-board{border-color:#ec4899;background:#301a37}`}</style>
         </div>
     );
 };
