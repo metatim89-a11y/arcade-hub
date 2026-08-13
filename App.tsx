@@ -12,6 +12,8 @@ import Footer from './components/Footer';
 import LoginPage from './components/auth/LoginPage';
 import SignupPage from './components/auth/SignupPage';
 import VerificationPage from './components/auth/VerificationPage';
+import ForgotPasswordPage from './components/auth/ForgotPasswordPage';
+import ResetPasswordPage from './components/auth/ResetPasswordPage';
 import ProfilePage from './components/profile/ProfilePage';
 import AestheticShopPage from './components/shop/AestheticShopPage';
 import GlobalChat from './components/ui/GlobalChat';
@@ -19,7 +21,7 @@ import { AdminSettingsProvider } from './context/AdminSettingsContext';
 import { recordSiteEvent } from './lib/analytics';
 
 const AppContent: React.FC = () => {
-  const { user, isAuthenticated, isLoading, verificationPendingEmail } = useAuth();
+  const { user, isAuthenticated, isLoading, verificationPendingEmail, isPasswordRecovery } = useAuth();
   const { notification, clearNotification } = useCoinSystem();
   const [mode, setMode] = useState<GameMode>(GameMode.Under18);
   const [games] = useState(() => {
@@ -29,7 +31,7 @@ const AppContent: React.FC = () => {
   const [selectedGame, setSelectedGame] = useState<Game>(games[0]);
   
   // View States for Auth/Profile
-  const [authView, setAuthView] = useState<'login' | 'signup'>('login');
+  const [authView, setAuthView] = useState<'login' | 'signup' | 'forgot'>('login');
   const [showProfile, setShowProfile] = useState(false);
   const [showShop, setShowShop] = useState(false);
 
@@ -55,6 +57,20 @@ const AppContent: React.FC = () => {
     return <div className="min-h-screen flex items-center justify-center bg-gray-900 text-yellow-400">Loading Arcade...</div>;
   }
 
+  // Password recovery sessions are authenticated by Supabase temporarily, so this
+  // must be evaluated before the normal authenticated application flow.
+  if (isPasswordRecovery) {
+    return (
+      <div className="min-h-screen bg-[radial-gradient(circle_at_50%_25%,_#161b22_60%,_#232a35_100%)] text-gray-100 font-sans flex flex-col">
+        <Header mode={mode} setMode={handleSetMode} simple />
+        <main className="flex-grow flex flex-col items-center w-full pt-10">
+          <ResetPasswordPage onComplete={() => setAuthView('login')} />
+        </main>
+        <Footer />
+      </div>
+    );
+  }
+
   // 1. Verification Flow
   if (verificationPendingEmail && !isAuthenticated) {
       return (
@@ -75,12 +91,14 @@ const AppContent: React.FC = () => {
             <Header mode={mode} setMode={handleSetMode} simple />
             <main className="flex-grow flex flex-col items-center w-full pt-10">
                 {authView === 'login' ? (
-                    <LoginPage onSwitchToSignup={() => setAuthView('signup')} />
-                ) : (
+                    <LoginPage onSwitchToSignup={() => setAuthView('signup')} onForgotPassword={() => setAuthView('forgot')} />
+                ) : authView === 'signup' ? (
                     <SignupPage 
                         onSwitchToLogin={() => setAuthView('login')} 
                         onSignupSuccess={() => {/* Logic handled by verification state in context */}}
                     />
+                ) : (
+                    <ForgotPasswordPage onBackToLogin={() => setAuthView('login')} />
                 )}
             </main>
             <Footer />
