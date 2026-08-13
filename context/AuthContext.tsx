@@ -11,11 +11,15 @@ interface AuthContextType {
   loginAsGuest: () => Promise<void>;
   signup: (username: string, email: string, password: string) => Promise<void>;
   resendVerification: (email: string) => Promise<void>;
+  requestPasswordReset: (email: string) => Promise<void>;
+  completePasswordRecovery: (password: string) => Promise<void>;
   cancelVerification: () => void;
+  cancelPasswordRecovery: () => Promise<void>;
   logout: () => Promise<void>;
   updateProfile: (data: Partial<User>) => Promise<void>;
   changePassword: (password: string) => Promise<void>;
   verificationPendingEmail: string | null;
+  isPasswordRecovery: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -56,6 +60,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [verificationPendingEmail, setVerificationPendingEmail] = useState<string | null>(null);
+  const [isPasswordRecovery, setIsPasswordRecovery] = useState(false);
 
   useEffect(() => {
     removeLegacyPasswordStorage();
@@ -94,8 +99,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       return applyAuthUser(data.user);
     });
 
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: listener } = supabase.auth.onAuthStateChange((event, session) => {
       if (session) window.localStorage.removeItem(GUEST_SESSION_KEY);
+      if (event === 'PASSWORD_RECOVERY') setIsPasswordRecovery(true);
       void applyAuthUser(session?.user ?? null);
     });
 
@@ -168,7 +174,31 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     if (error) throw error;
   }, []);
 
+  const requestPasswordReset = useCallback(async (email: string) => {
+    // GitHub Pages serves this app as a static single-page site, so use a query
+    // parameter instead of a nested path that would otherwise return a 404.
+    const redirectTo = new URL(`${import.meta.env.BASE_URL}?password-recovery=1`, window.location.origin).toString();
+    const { error } = await getSupabase().auth.resetPasswordForEmail(email.trim().toLowerCase(), { redirectTo });
+    if (error) throw error;
+  }, []);
+
+  const completePasswordRecovery = useCallback(async (password: string) => {
+    const { error } = await getSupabase().auth.updateUser({ password });
+    if (error) throw error;
+    setIsPasswordRecovery(false);
+    const { error: signOutError } = await getSupabase().auth.signOut();
+    if (signOutError) console.error('Unable to end password recovery session', signOutError);
+    setUser(null);
+  }, []);
+
   const cancelVerification = useCallback(() => setVerificationPendingEmail(null), []);
+
+  const cancelPasswordRecovery = useCallback(async () => {
+    setIsPasswordRecovery(false);
+    const { error } = await getSupabase().auth.signOut();
+    if (error) console.error('Unable to end password recovery session', error);
+    setUser(null);
+  }, []);
 
   const logout = useCallback(async () => {
     window.localStorage.removeItem(GUEST_SESSION_KEY);
@@ -206,12 +236,16 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     loginAsGuest,
     signup,
     resendVerification,
+    requestPasswordReset,
+    completePasswordRecovery,
     cancelVerification,
+    cancelPasswordRecovery,
     logout,
     updateProfile,
     changePassword,
     verificationPendingEmail,
-  }), [cancelVerification, changePassword, isLoading, login, loginAsGuest, logout, resendVerification, signup, updateProfile, user, verificationPendingEmail]);
+    isPasswordRecovery,
+  }), [cancelPasswordRecovery, cancelVerification, changePassword, completePasswordRecovery, isLoading, isPasswordRecovery, login, loginAsGuest, logout, requestPasswordReset, resendVerification, signup, updateProfile, user, verificationPendingEmail]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
