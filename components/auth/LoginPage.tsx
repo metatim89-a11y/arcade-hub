@@ -5,9 +5,10 @@ import GlassButton from '../ui/GlassButton';
 
 interface LoginPageProps {
   onSwitchToSignup: () => void;
+  onForgotPassword: () => void;
 }
 
-const LoginPage: React.FC<LoginPageProps> = ({ onSwitchToSignup }) => {
+const LoginPage: React.FC<LoginPageProps> = ({ onSwitchToSignup, onForgotPassword }) => {
   const { login, loginAsGuest } = useAuth();
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
@@ -91,6 +92,12 @@ const LoginPage: React.FC<LoginPageProps> = ({ onSwitchToSignup }) => {
             ENTER ARCADE
           </GlassButton>
         </form>
+
+        <div className="mt-4 text-center text-sm">
+          <button onClick={onForgotPassword} className="text-yellow-400 hover:underline font-semibold">
+            Forgot password?
+          </button>
+        </div>
 
         <div className="relative my-6 text-center">
             <div className="absolute inset-0 flex items-center">
