@@ -2,7 +2,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Game, GameMode, PlayMode } from '../types';
 import { useCoinSystem } from '../context/CoinContext';
-import PlayerNameInputs from './PlayerNameInputs';
 
 
 const GameOptionsSelector: React.FC<{
@@ -53,9 +52,6 @@ interface GameAreaProps {
   mode: GameMode;
 }
 
-// Removed 'worm' from this list so it can support vsComputer mode properly
-const TWO_PLAYER_GAMES = ['connect4', 'mancala'];
-
 const GameArea: React.FC<GameAreaProps> = ({ games, selectedGame, onSelectGame, mode }) => {
   const [feedback, setFeedback] = useState('');
   const [playMode, setPlayMode] = useState<PlayMode>('vsPlayer');
@@ -68,8 +64,6 @@ const GameArea: React.FC<GameAreaProps> = ({ games, selectedGame, onSelectGame, 
   const transitionTimeoutRef = useRef<number | null>(null);
   const isInitialMount = useRef(true);
   
-  const isTwoPlayerGame = mode === GameMode.Under18 && TWO_PLAYER_GAMES.includes(selectedGame.id);
-
   useEffect(() => {
     if (isInitialMount.current) {
         isInitialMount.current = false;
@@ -157,21 +151,13 @@ const GameArea: React.FC<GameAreaProps> = ({ games, selectedGame, onSelectGame, 
         ))}
       </nav>
       
-      {/* Game Options / Player Names */}
+      {/* Game Options */}
       <div className="mb-6 h-auto min-h-[40px] flex flex-col items-center justify-center gap-4">
-        {isTwoPlayerGame ? (
-          <PlayerNameInputs 
-            playMode={playMode} 
-            names={playerNames} 
-            onNameChange={setPlayerNames}
-          />
-        ) : (
-          <GameOptionsSelector 
-            mode={mode} 
-            playMode={playMode}
-            setPlayMode={setPlayMode}
-          />
-        )}
+        <GameOptionsSelector
+          mode={mode}
+          playMode={playMode}
+          setPlayMode={setPlayMode}
+        />
       </div>
       
       {/* Game Canvas */}
