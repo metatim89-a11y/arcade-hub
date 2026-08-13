@@ -7,6 +7,12 @@ const PLAYER_2_STORE = 13;
 const INITIAL_PITS = [4, 4, 4, 4, 4, 4, 0, 4, 4, 4, 4, 4, 4, 0];
 const STONE_STACK_THRESHOLD = 12;
 const STONE_COLORS = ['stone-ruby', 'stone-sapphire', 'stone-emerald', 'stone-amethyst', 'stone-amber', 'stone-pearl', 'stone-turquoise'];
+type CpuDifficulty = 'Easy' | 'Normal' | 'Hard';
+type BoardTheme = 'Classic' | 'Midnight' | 'Jungle';
+const PUZZLES = [
+    { name: 'Capture Lesson', description: 'Find the move that captures the opposite pile.', pits: [0, 0, 1, 0, 3, 0, 18, 0, 5, 0, 0, 0, 0, 21] },
+    { name: 'Extra Turn', description: 'Land your final stone in your store.', pits: [2, 0, 0, 0, 0, 1, 20, 3, 2, 1, 0, 0, 0, 19] },
+] as const;
 
 interface MancalaProps {
     playMode: PlayMode;
@@ -25,6 +31,18 @@ const MancalaGame: React.FC<MancalaProps> = ({ playMode, playerNames }) => {
     const [status, setStatus] = useState("Player 1's Turn");
     const [gameOver, setGameOver] = useState(false);
     const [winner, setWinner] = useState<1 | 2 | 'draw' | null>(null);
+    const [cpuDifficulty, setCpuDifficulty] = useState<CpuDifficulty>('Normal');
+    const [theme, setTheme] = useState<BoardTheme>('Classic');
+    const [previewPit, setPreviewPit] = useState<number | null>(null);
+    const [lastMovePath, setLastMovePath] = useState<number[]>([]);
+    const [captureStreak, setCaptureStreak] = useState({ 1: 0, 2: 0 });
+    const [bestCaptureStreak, setBestCaptureStreak] = useState({ 1: 0, 2: 0 });
+    const [matchWins, setMatchWins] = useState({ 1: 0, 2: 0 });
+    const [timerEnabled, setTimerEnabled] = useState(false);
+    const [turnSeconds, setTurnSeconds] = useState(30);
+    const [tutorialOpen, setTutorialOpen] = useState(false);
+    const [puzzleName, setPuzzleName] = useState<string | null>(null);
+    const [stats, setStats] = useState({ moves: 0, captures: 0, extraTurns: 0 });
     const [highlightedPit, setHighlightedPit] = useState<number | null>(null);
     const [flyingStone, setFlyingStone] = useState<{ key: number; fromX: number; fromY: number; toX: number; toY: number; colorClass: string } | null>(null);
     const isAnimating = useRef(false);
@@ -35,11 +53,41 @@ const MancalaGame: React.FC<MancalaProps> = ({ playMode, playerNames }) => {
     const p1Name = playerNames.player1;
     const p2Name = playMode === 'vsPlayer' ? playerNames.player2 : 'Computer';
 
+    const movePath = (index: number, player: 1 | 2, board = pitsRef.current) => {
+        const path: number[] = [];
+        let cursor = index;
+        for (let stone = 0; stone < board[index]; stone++) {
+            cursor = (cursor + 1) % 14;
+            if ((player === 1 && cursor === PLAYER_2_STORE) || (player === 2 && cursor === PLAYER_1_STORE)) cursor = (cursor + 1) % 14;
+            path.push(cursor);
+        }
+        return path;
+    };
+
+    const previewEnd = previewPit === null ? null : movePath(previewPit, currentPlayer).at(-1) ?? null;
+
     useEffect(() => {
       if (gameOver) return;
       const currentName = currentPlayer === 1 ? p1Name : p2Name;
       setStatus(`${currentName}'s Turn`);
     }, [currentPlayer, gameOver, p1Name, p2Name]);
+
+    useEffect(() => {
+        if (!timerEnabled || gameOver || isAnimating.current) return;
+        setTurnSeconds(30);
+        const interval = window.setInterval(() => setTurnSeconds(value => {
+            if (value <= 1) {
+                const valid = currentPlayer === 1
+                    ? Array.from({ length: 6 }, (_, index) => index).filter(index => pitsRef.current[index] > 0)
+                    : Array.from({ length: 6 }, (_, index) => index + 7).filter(index => pitsRef.current[index] > 0);
+                window.clearInterval(interval);
+                if (valid.length) void performMove(valid[0]);
+                return 30;
+            }
+            return value - 1;
+        }), 1000);
+        return () => window.clearInterval(interval);
+    }, [currentPlayer, gameOver, timerEnabled]);
 
 
     // Memoize random styles for stones to prevent them from jumping on every render
@@ -75,6 +123,10 @@ const MancalaGame: React.FC<MancalaProps> = ({ playMode, playerNames }) => {
 
     const performMove = async (index: number) => {
         isAnimating.current = true;
+        const path = movePath(index, currentPlayer);
+        setLastMovePath([index, ...path]);
+        setPreviewPit(null);
+        setStats(current => ({ ...current, moves: current.moves + 1 }));
         let tempPits = [...pitsRef.current];
         let stonesToDistribute = tempPits[index];
         tempPits[index] = 0;
@@ -111,12 +163,21 @@ const MancalaGame: React.FC<MancalaProps> = ({ playMode, playerNames }) => {
                 tempPits[oppositePit] = 0;
                 tempPits[lastPit] = 0;
                 setPits([...tempPits]);
+                setCaptureStreak(current => {
+                    const next = { ...current, [currentPlayer]: current[currentPlayer] + 1 };
+                    setBestCaptureStreak(best => ({ ...best, [currentPlayer]: Math.max(best[currentPlayer], next[currentPlayer]) }));
+                    return next;
+                });
+                setStats(current => ({ ...current, captures: current.captures + 1 }));
             }
+        } else {
+            setCaptureStreak(current => ({ ...current, [currentPlayer]: 0 }));
         }
 
         if ((currentPlayer === 1 && lastPit === PLAYER_1_STORE) || (currentPlayer === 2 && lastPit === PLAYER_2_STORE)) {
             const currentName = currentPlayer === 1 ? p1Name : p2Name;
             setStatus(`${currentName} gets another turn!`);
+            setStats(current => ({ ...current, extraTurns: current.extraTurns + 1 }));
         } else {
             setCurrentPlayer(currentPlayer === 1 ? 2 : 1);
         }
@@ -141,17 +202,24 @@ const MancalaGame: React.FC<MancalaProps> = ({ playMode, playerNames }) => {
                 const validMoves = Array.from({length: 6}, (_, i) => i + 7).filter(i => pits[i] > 0);
                 if (validMoves.length === 0) return;
 
+                if (cpuDifficulty === 'Easy') {
+                    void performMove(validMoves[Math.floor(Math.random() * validMoves.length)]);
+                    return;
+                }
                 let bestMove = -1;
                 for(const move of validMoves) { if ((pits[move] + move) % 14 === PLAYER_2_STORE) { bestMove = move; break; } }
                 if (bestMove === -1) { for(const move of validMoves) { const landIndex = (move + pits[move]) % 14; if(pits[landIndex] === 0 && landIndex > PLAYER_1_STORE && landIndex < PLAYER_2_STORE) { bestMove = move; break; } } }
-                if (bestMove === -1) { bestMove = validMoves[Math.floor(Math.random() * validMoves.length)]; }
+                if (bestMove === -1 && cpuDifficulty === 'Hard') {
+                    bestMove = [...validMoves].sort((left, right) => pits[right] - pits[left])[0];
+                }
+                if (bestMove === -1) bestMove = validMoves[Math.floor(Math.random() * validMoves.length)];
                 
                 performMove(bestMove);
             };
             const timer = setTimeout(computerMove, 1000);
             return () => clearTimeout(timer);
         }
-    }, [currentPlayer, gameOver, playMode, pits]);
+    }, [currentPlayer, cpuDifficulty, gameOver, playMode, pits]);
 
 
     useEffect(() => {
@@ -170,8 +238,8 @@ const MancalaGame: React.FC<MancalaProps> = ({ playMode, playerNames }) => {
             
             setPits(finalPits); setGameOver(true);
             const p1Score = finalPits[PLAYER_1_STORE]; const p2Score = finalPits[PLAYER_2_STORE];
-            if (p1Score > p2Score) { setStatus(`Game Over! ${p1Name} Wins!`); setWinner(1); }
-            else if (p2Score > p1Score) { setStatus(`Game Over! ${p2Name} Wins!`); setWinner(2); }
+            if (p1Score > p2Score) { setStatus(`Game Over! ${p1Name} Wins!`); setWinner(1); setMatchWins(value => ({ ...value, 1: value[1] + 1 })); }
+            else if (p2Score > p1Score) { setStatus(`Game Over! ${p2Name} Wins!`); setWinner(2); setMatchWins(value => ({ ...value, 2: value[2] + 1 })); }
             else { setStatus("Game Over! It's a Draw!"); setWinner('draw'); }
         }
     }, [pits, playMode, gameOver, p1Name, p2Name]);
@@ -179,7 +247,14 @@ const MancalaGame: React.FC<MancalaProps> = ({ playMode, playerNames }) => {
     const handleReset = (startingPlayer: 1 | 2 = 1) => {
         isAnimating.current = false; setFlyingStone(null); setHighlightedPit(null);
         setPits(INITIAL_PITS); setCurrentPlayer(startingPlayer); setStatus(`Player ${startingPlayer}'s Turn`); setGameOver(false); setWinner(null);
+        setLastMovePath([]); setCaptureStreak({ 1: 0, 2: 0 }); setPuzzleName(null); setStats({ moves: 0, captures: 0, extraTurns: 0 });
     }
+
+    const loadPuzzle = (puzzle: typeof PUZZLES[number]) => {
+        isAnimating.current = false;
+        setPits([...puzzle.pits]); setCurrentPlayer(1); setGameOver(false); setWinner(null);
+        setPuzzleName(puzzle.name); setStatus(puzzle.description); setLastMovePath([]); setStats({ moves: 0, captures: 0, extraTurns: 0 });
+    };
     
     const renderStones = (count: number, index: number) => {
         const isHoping = lastHopedPit === index;
@@ -215,6 +290,10 @@ const MancalaGame: React.FC<MancalaProps> = ({ playMode, playerNames }) => {
             <h2 className="text-4xl font-bold text-yellow-400">Game Over</h2>
             <p className="text-2xl">{status}</p>
              <div className="text-xl my-2">Final Score: {pits[PLAYER_1_STORE]} - {pits[PLAYER_2_STORE]}</div>
+            <div className="mancala-final-stats">
+                <span>Moves <strong>{stats.moves}</strong></span><span>Captures <strong>{stats.captures}</strong></span><span>Extra turns <strong>{stats.extraTurns}</strong></span><span>Best streak <strong>{Math.max(bestCaptureStreak[1], bestCaptureStreak[2])}</strong></span>
+            </div>
+            <p>Match score: {p1Name} {matchWins[1]}–{matchWins[2]} {p2Name}</p>
             {winner && winner !== 'draw' && (
               <div className="mt-4">
                 <p className="text-lg mb-2">{winnerName} chooses who starts next:</p>
@@ -235,6 +314,15 @@ const MancalaGame: React.FC<MancalaProps> = ({ playMode, playerNames }) => {
             <div className="flex flex-col items-center gap-2">
                 <h2 className="text-3xl font-bold text-yellow-400">Mancala</h2>
                 <div className="text-xl font-semibold h-7">{status}</div>
+                <div className="mancala-toolbar">
+                    {playMode === 'vsComputer' && <label>CPU <select value={cpuDifficulty} onChange={event => setCpuDifficulty(event.target.value as CpuDifficulty)}>{(['Easy','Normal','Hard'] as CpuDifficulty[]).map(value => <option key={value}>{value}</option>)}</select></label>}
+                    <label>Theme <select value={theme} onChange={event => setTheme(event.target.value as BoardTheme)}>{(['Classic','Midnight','Jungle'] as BoardTheme[]).map(value => <option key={value}>{value}</option>)}</select></label>
+                    <button type="button" onClick={() => setTutorialOpen(value => !value)}>How to play</button>
+                    <button type="button" className={timerEnabled ? 'active' : ''} onClick={() => setTimerEnabled(value => !value)}>Timer {timerEnabled ? `${turnSeconds}s` : 'Off'}</button>
+                </div>
+                {tutorialOpen && <div className="mancala-tutorial">Choose a pit on your side. Stones move counter-clockwise one pit at a time. Land in your store for another turn. Land alone on your side opposite occupied stones to capture them.</div>}
+                <div className="mancala-puzzles">Puzzles: {PUZZLES.map(puzzle => <button key={puzzle.name} onClick={() => loadPuzzle(puzzle)}>{puzzle.name}</button>)}</div>
+                <div className="mancala-round-meta"><span>{puzzleName ?? 'Classic match'}</span><span>Capture streak {captureStreak[currentPlayer]}</span><span>Match {matchWins[1]}–{matchWins[2]}</span></div>
             </div>
             
             {/* Middle: Board (centered) */}
@@ -257,10 +345,10 @@ const MancalaGame: React.FC<MancalaProps> = ({ playMode, playerNames }) => {
                             })}
                             <div></div> {/* Spacer for P1 store */}
                         </div>
-                        <div ref={boardRef} className="mancala-board bg-[#8B4513] p-3 md:p-5 rounded-2xl border-4 border-[#D2691E]">
+                        <div ref={boardRef} className={`mancala-board theme-${theme.toLowerCase()} p-3 md:p-5 rounded-2xl border-4`}>
                             <div className="grid grid-cols-[1.5fr_1fr_1fr_1fr_1fr_1fr_1fr_1.5fr] h-full" style={{ gap: 'var(--mancala-pit-gap)'}}>
                                 {/* Player 2 Store */}
-                                <div ref={(element) => { if (element) pitRefs.current.set(PLAYER_2_STORE, element); }} className={`row-span-2 mancala-store ${highlightedPit === PLAYER_2_STORE ? 'highlight' : ''}`}>
+                                    <div ref={(element) => { if (element) pitRefs.current.set(PLAYER_2_STORE, element); }} className={`row-span-2 mancala-store ${highlightedPit === PLAYER_2_STORE ? 'highlight' : ''} ${previewEnd === PLAYER_2_STORE ? 'preview-end' : ''} ${lastMovePath.includes(PLAYER_2_STORE) ? 'last-path' : ''}`}>
                                     {renderStones(pits[PLAYER_2_STORE], PLAYER_2_STORE)}
                                 </div>
                                 
@@ -268,20 +356,20 @@ const MancalaGame: React.FC<MancalaProps> = ({ playMode, playerNames }) => {
                                 {pits.slice(7, 13).reverse().map((count, i) => {
                                   const pitIndex = 12 - i;
                                   return (
-                                    <div ref={(element) => { if (element) pitRefs.current.set(pitIndex, element); }} key={pitIndex} onClick={() => handlePitClick(pitIndex)} className={`mancala-pit ${highlightedPit === pitIndex ? 'highlight' : ''} ${currentPlayer === 2 && !gameOver && pits[pitIndex] > 0 ? 'cursor-pointer hover:bg-[#D2691E]' : 'cursor-not-allowed'}`}>
+                                    <div ref={(element) => { if (element) pitRefs.current.set(pitIndex, element); }} key={pitIndex} onPointerEnter={() => currentPlayer === 2 && setPreviewPit(pitIndex)} onPointerLeave={() => setPreviewPit(null)} onClick={() => handlePitClick(pitIndex)} className={`mancala-pit ${highlightedPit === pitIndex ? 'highlight' : ''} ${previewEnd === pitIndex ? 'preview-end' : ''} ${lastMovePath.includes(pitIndex) ? 'last-path' : ''} ${currentPlayer === 2 && !gameOver && pits[pitIndex] > 0 ? 'cursor-pointer hover:bg-[#D2691E]' : 'cursor-not-allowed'}`}>
                                       {renderStones(count, pitIndex)}
                                     </div>
                                   );
                                 })}
                                 
                                 {/* Player 1 Store */}
-                                <div ref={(element) => { if (element) pitRefs.current.set(PLAYER_1_STORE, element); }} className={`row-span-2 mancala-store ${highlightedPit === PLAYER_1_STORE ? 'highlight' : ''}`}>
+                                <div ref={(element) => { if (element) pitRefs.current.set(PLAYER_1_STORE, element); }} className={`row-span-2 mancala-store ${highlightedPit === PLAYER_1_STORE ? 'highlight' : ''} ${previewEnd === PLAYER_1_STORE ? 'preview-end' : ''} ${lastMovePath.includes(PLAYER_1_STORE) ? 'last-path' : ''}`}>
                                     {renderStones(pits[PLAYER_1_STORE], PLAYER_1_STORE)}
                                 </div>
                                 
                                 {/* Player 1 Pits */}
                                 {pits.slice(0, 6).map((count, i) => (
-                                  <div ref={(element) => { if (element) pitRefs.current.set(i, element); }} key={i} onClick={() => handlePitClick(i)} className={`mancala-pit ${highlightedPit === i ? 'highlight' : ''} ${currentPlayer === 1 && !gameOver && pits[i] > 0 ? 'cursor-pointer hover:bg-[#D2691E]' : 'cursor-not-allowed'}`}>
+                                  <div ref={(element) => { if (element) pitRefs.current.set(i, element); }} key={i} onPointerEnter={() => currentPlayer === 1 && setPreviewPit(i)} onPointerLeave={() => setPreviewPit(null)} onClick={() => handlePitClick(i)} className={`mancala-pit ${highlightedPit === i ? 'highlight' : ''} ${previewEnd === i ? 'preview-end' : ''} ${lastMovePath.includes(i) ? 'last-path' : ''} ${currentPlayer === 1 && !gameOver && pits[i] > 0 ? 'cursor-pointer hover:bg-[#D2691E]' : 'cursor-not-allowed'}`}>
                                       {renderStones(count, i)}
                                   </div>
                                 ))}
@@ -316,6 +404,8 @@ const MancalaGame: React.FC<MancalaProps> = ({ playMode, playerNames }) => {
 
             <style>{`
                 .mancala-board { position: relative; min-height: 240px; box-shadow: inset 0 0 32px rgba(54,20,4,.72), 0 16px 30px rgba(0,0,0,.32); }
+                .mancala-board.theme-classic{background:#8b4513;border-color:#d2691e}.mancala-board.theme-midnight{background:linear-gradient(145deg,#101d32,#192a49);border-color:#4f75a8;box-shadow:inset 0 0 32px #050b16,0 16px 30px rgba(0,0,0,.4)}.mancala-board.theme-jungle{background:linear-gradient(145deg,#285026,#163819);border-color:#77a849;box-shadow:inset 0 0 32px #0b220c,0 16px 30px rgba(0,0,0,.4)}
+                .mancala-toolbar,.mancala-puzzles,.mancala-round-meta{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:7px;font-size:11px}.mancala-toolbar label{display:flex;align-items:center;gap:5px;color:#aeb9c4}.mancala-toolbar select,.mancala-toolbar button,.mancala-puzzles button{padding:6px 8px;border:1px solid #526477;border-radius:7px;background:#172331;color:#e7edf3;font-weight:800}.mancala-toolbar button.active{border-color:#f4c649;color:#f4c649}.mancala-tutorial{max-width:680px;padding:9px 12px;border:1px solid #4b5d6e;border-radius:8px;background:#101923;color:#bdc9d3;font-size:11px}.mancala-puzzles{color:#8fa0ae}.mancala-puzzles button{padding:4px 7px}.mancala-round-meta span{padding:4px 7px;border-radius:20px;background:rgba(0,0,0,.24);color:#dbbd65}.mancala-final-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:7px}.mancala-final-stats span{display:grid;padding:8px;border:1px solid #425366;border-radius:8px;background:#111b26;color:#8fa0ae;font-size:10px}.mancala-final-stats strong{color:#f2cc64;font-size:18px}
                 .mancala-layout { display: grid; grid-template-columns: 92px minmax(0,1fr) 92px; grid-template-areas: 'p2 board p1'; align-items: center; gap: 12px; }
                 .mancala-score-p2 { grid-area: p2; }
                 .mancala-score-p1 { grid-area: p1; }
@@ -345,9 +435,10 @@ const MancalaGame: React.FC<MancalaProps> = ({ playMode, playerNames }) => {
                     background-color: rgba(210, 105, 30, 0.4);
                     box-shadow: inset 0 0 15px #fbbf24;
                 }
+                .mancala-pit.last-path,.mancala-store.last-path{outline:2px solid rgba(98,190,240,.25);outline-offset:-4px}.mancala-pit.preview-end,.mancala-store.preview-end{outline:3px solid #5ee0a0;outline-offset:-4px;box-shadow:inset 0 0 18px rgba(94,224,160,.55)}
                 @media(max-width: 900px) { .mancala-layout { grid-template-columns: 1fr 1fr; grid-template-areas: 'p2 p1' 'board board'; gap: 8px 12px; } .mancala-score { display: flex; align-items: center; justify-content: center; gap: 8px; } .mancala-score .text-4xl { font-size: 1.55rem; } }
                 @media(max-width: 760px) { .mancala-board { min-height: 150px; padding: 6px !important; border-width: 3px; } .mancala-board .mancala-pit { min-height: 54px; } .mancala-board .mancala-store { min-height: 116px; } .mancala-board .stone { width: 27%; height: 27%; } .flying-mancala-stone { width: 17px; height: 17px; } }
-                @media(max-width: 430px) { .mancala-board { min-height: 126px; } .mancala-board .mancala-pit { min-height: 43px; } .mancala-board .mancala-store { min-height: 94px; } .mancala-layout { gap: 5px; } }
+                @media(max-width: 430px) { .mancala-board { min-height: 126px; } .mancala-board .mancala-pit { min-height: 43px; } .mancala-board .mancala-store { min-height: 94px; } .mancala-layout { gap: 5px; } .mancala-final-stats{grid-template-columns:1fr 1fr}.mancala-tutorial{font-size:10px} }
             `}</style>
         </div>
     );
