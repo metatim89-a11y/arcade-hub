@@ -2,15 +2,19 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { useCoinSystem } from '../../context/CoinContext';
 
-const SEGMENTS = [
-    ...Array.from({ length: 6 }, (_, index) => ({ color: index % 2 ? '#5d2734' : '#361822', label: '0x', multiplier: 0 })),
-    ...Array.from({ length: 6 }, (_, index) => ({ color: index % 2 ? '#B8BEC9' : '#858c99', label: '0.5x', multiplier: 0.5 })),
-    ...Array.from({ length: 4 }, (_, index) => ({ color: index % 2 ? '#B77928' : '#D3973C', label: '1x', multiplier: 1 })),
-    { color: '#D6B84C', label: '1.5x', multiplier: 1.5 },
-    { color: '#A97E20', label: '1.5x', multiplier: 1.5 },
-    { color: '#F4D35E', label: '3x', multiplier: 3 },
-    { color: '#FFD700', label: '6x', multiplier: 6 },
-];
+const SEGMENT_STYLE: Record<number, { color: string; label: string }> = {
+    0: { color: '#4d2330', label: '0x' },
+    0.5: { color: '#9aa1ad', label: '0.5x' },
+    1: { color: '#c98b31', label: '1x' },
+    1.5: { color: '#d6b84c', label: '1.5x' },
+    3: { color: '#f4d35e', label: '3x' },
+    6: { color: '#ffd700', label: '6x' },
+};
+
+// Keep the exact payout distribution, but deliberately alternate outcomes so
+// wins and losses are visually mixed around the wheel.
+const SEGMENT_MULTIPLIERS = [0, 0.5, 1, 0, 1.5, 0.5, 1, 0, 3, 0.5, 1, 0, 6, 0.5, 1.5, 0, 0.5, 1, 0, 0.5];
+const SEGMENTS = SEGMENT_MULTIPLIERS.map((multiplier) => ({ ...SEGMENT_STYLE[multiplier], multiplier }));
 
 const SpinWheelGame: React.FC = () => {
     const canvasRef = useRef<HTMLCanvasElement>(null);
