@@ -103,11 +103,11 @@ const evaluateHand = (cards: Card[]): HandRank => {
   return best ?? { category: 0, kickers: [], name: 'No Hand' };
 };
 
-const CardView: React.FC<{ card?: Card; hidden?: boolean; newlyDealt?: boolean }> = ({ card, hidden = false, newlyDealt = false }) => {
+const CardView: React.FC<{ card?: Card; hidden?: boolean; newlyDealt?: boolean; dealDelay?: number }> = ({ card, hidden = false, newlyDealt = false, dealDelay = 0 }) => {
   if (!card) return <div className="holdem-card-slot" aria-hidden="true" />;
   const red = card.suit === '♥' || card.suit === '♦';
   return (
-    <div className={`holdem-card${newlyDealt ? ' dealt' : ''}${hidden ? ' hidden' : ''}`} aria-label={hidden ? 'Hidden card' : `${card.rank} of ${card.suit}`}>
+    <div className={`holdem-card${newlyDealt ? ' dealt' : ''}${hidden ? ' hidden' : ''}`} style={newlyDealt ? { animationDelay: `${dealDelay}ms` } : undefined} aria-label={hidden ? 'Hidden card' : `${card.rank} of ${card.suit}`}>
       {hidden ? <div className="card-back-mark">AH</div> : (
         <>
           <span className={red ? 'red' : ''}>{card.rank}</span>
@@ -135,6 +135,8 @@ const TexasHoldemGame: React.FC = () => {
   const [community, setCommunity] = useState<Card[]>([]);
   const [actionIndex, setActionIndex] = useState(-1);
   const [dealerIndex, setDealerIndex] = useState(-1);
+  const [smallBlindIndex, setSmallBlindIndex] = useState(-1);
+  const [bigBlindIndex, setBigBlindIndex] = useState(-1);
   const [message, setMessage] = useState('Choose how many local players are joining the table.');
   const [handNumber, setHandNumber] = useState(0);
   const [lastBoardCount, setLastBoardCount] = useState(0);
@@ -391,8 +393,9 @@ const TexasHoldemGame: React.FC = () => {
   const startHand = (sourcePlayers = playersRef.current) => {
     const funded = sourcePlayers.filter((player) => player.stack >= bigBlind);
     if (funded.length < 2) {
-      commitPhase('SETUP');
-      setMessage('Fewer than two funded seats remain. Start a new table.');
+      commitPhase('SHOWDOWN');
+      commitAction(-1);
+      setMessage('Not enough funded seats. Buy back in or start a new table.');
       return;
     }
     const next = sourcePlayers.map((player) => ({
@@ -410,6 +413,8 @@ const TexasHoldemGame: React.FC = () => {
     // Heads-up is the exception: the dealer posts the small blind.
     const smallBlindIndex = activeCount === 2 ? dealer : nextIndex(dealer, next, (player) => !player.folded);
     const bigBlindIndex = nextIndex(smallBlindIndex, next, (player) => !player.folded);
+    setSmallBlindIndex(smallBlindIndex);
+    setBigBlindIndex(bigBlindIndex);
     deckRef.current = createDeck();
     commitCommunity([]);
     setLastBoardCount(0);
@@ -442,6 +447,16 @@ const TexasHoldemGame: React.FC = () => {
     setRaiseAmount(bigBlind);
     setHistory(current => [`Hand ${handNumber + 1} dealt · blinds ${smallBlind}/${bigBlind}`, ...current].slice(0, 12));
     setMessage(`${next[smallBlindIndex].name} posts ${smallBlind}; ${next[bigBlindIndex].name} posts ${bigBlind}.`);
+  };
+
+  const buyIn = (playerId: number) => {
+    const next = playersRef.current.map((player) => player.id === playerId
+      ? { ...player, stack: STARTING_STACK, folded: false, allIn: false, bet: 0, contributed: 0, hand: [] }
+      : player);
+    commitPlayers(next);
+    const player = next.find((candidate) => candidate.id === playerId)!;
+    setHistory(current => [`${player.name} bought back in for ${STARTING_STACK}.`, ...current].slice(0, 12));
+    setMessage(`${player.name} is back in with ${STARTING_STACK} chips.`);
   };
 
   useEffect(() => {
@@ -511,7 +526,7 @@ const TexasHoldemGame: React.FC = () => {
                 <div className="pot-display"><small>TOTAL POT</small><strong>{totalPot}</strong></div>
                 <div className="community-row">
                   {boardCards.map((card, index) => (
-                    <CardView key={card?.id ?? `slot-${index}`} card={card} newlyDealt={Boolean(card && index >= lastBoardCount)} />
+                    <CardView key={card?.id ?? `slot-${index}`} card={card} newlyDealt={Boolean(card && index >= lastBoardCount)} dealDelay={(index - lastBoardCount) * 110} />
                   ))}
                 </div>
                 <div className="table-message" role="status">{message}</div>
@@ -522,10 +537,11 @@ const TexasHoldemGame: React.FC = () => {
                 const rank = phase === 'SHOWDOWN' && !player.folded ? evaluateHand([...player.hand, ...community]) : null;
                 return (
                   <div key={player.id} className={`poker-seat ${seatPositions[index]}${isActing ? ' acting' : ''}${player.folded ? ' folded' : ''}`}>
+                    {isActing && <div className="turn-indicator">YOUR TURN</div>}
                     {lastActions[player.id] && <div className="seat-action-pop">{lastActions[player.id]}</div>}
                     {emotes[player.id] && <div className="seat-emote">{emotes[player.id]}</div>}
                     <div className="seat-cards">
-                      {player.hand.map((card) => <CardView key={card.id} card={card} hidden={!reveal} />)}
+                      {player.hand.map((card, cardIndex) => <CardView key={card.id} card={card} hidden={!reveal} newlyDealt={phase === 'PREFLOP'} dealDelay={(cardIndex * players.length + index) * 85} />)}
                     </div>
                     <div className="seat-panel">
                       <div className="seat-name">
@@ -533,7 +549,11 @@ const TexasHoldemGame: React.FC = () => {
                         <span>{player.isHuman ? 'PLAYER' : 'CPU'}</span>
                       </div>
                       <div className="seat-stack">{player.stack}</div>
-                      {index === dealerIndex && <i className="dealer-button">D</i>}
+                      <div className="position-chips">
+                        {index === dealerIndex && <i className="position-chip dealer-button" title="Dealer">D</i>}
+                        {index === smallBlindIndex && <i className="position-chip small-blind-button" title="Small blind">SB</i>}
+                        {index === bigBlindIndex && <i className="position-chip big-blind-button" title="Big blind">BB</i>}
+                      </div>
                       <div className="seat-badges">
                         {player.bet > 0 && <em className="seat-bet">BET {player.bet}</em>}
                         {player.allIn && <em className="seat-state">ALL IN</em>}
@@ -550,6 +570,9 @@ const TexasHoldemGame: React.FC = () => {
           <div className="holdem-controls">
             {phase === 'SHOWDOWN' ? (
               <>
+                {players.filter(player => player.isHuman && player.stack < bigBlind).map(player => (
+                  <button key={player.id} type="button" className="buy-in" onClick={() => buyIn(player.id)}>BUY IN {player.name} · {STARTING_STACK}</button>
+                ))}
                 <button type="button" className="new-hand" onClick={() => startHand()}>DEAL NEXT HAND</button>
                 <button type="button" className="new-table" onClick={() => { commitPhase('SETUP'); setMessage('Choose how many local players are joining the table.'); }}>NEW TABLE</button>
               </>
@@ -588,6 +611,9 @@ const TexasHoldemGame: React.FC = () => {
         @media(max-width:760px){.poker-seat.left,.poker-seat.right{width:112px;gap:1px}.poker-seat.left{left:1%}.poker-seat.right{right:1%}.poker-seat.left .seat-cards,.poker-seat.right .seat-cards{width:68px;height:42px;flex-basis:42px;transform:scale(.61)}.table-center{left:22%;right:22%}}
         @media(max-width:470px){.poker-seat.left,.poker-seat.right{width:92px}.poker-seat.left{left:0}.poker-seat.right{right:0}.poker-seat.left .seat-cards,.poker-seat.right .seat-cards{width:60px;height:36px;flex-basis:36px;transform:scale(.5)}.table-center{left:20%;right:20%}}
         .holdem-game.theme-midnight .poker-table{background:radial-gradient(ellipse,#203968,#122650 54%,#091633 100%);border-color:#192846}.holdem-game.theme-royal .poker-table{background:radial-gradient(ellipse,#722c43,#521b30 54%,#2b0c18 100%);border-color:#6f5422}.holdem-options{display:grid;grid-template-columns:1fr 1fr;gap:7px;width:100%}.holdem-options label,.holdem-options button{display:flex;align-items:center;justify-content:space-between;gap:6px;padding:8px;border:1px solid #395748;border-radius:7px;background:#10221a;color:#9eb2a7;font-size:9px;font-weight:900}.holdem-options select{background:#08150f;color:white;border:0}.holdem-options button.active{border-color:#d2a944;color:#e8c65e}.seat-action-pop{position:absolute;z-index:35;left:50%;top:45%;transform:translate(-50%,-50%);padding:5px 8px;border-radius:6px;background:#e3b63f;color:#241a05;font-size:9px;font-weight:950;animation:action-pop .5s ease-out}.seat-emote{position:absolute;z-index:36;right:-5px;top:-8px;font-size:20px;filter:drop-shadow(0 4px 4px rgba(0,0,0,.6))}.practice-readout{display:grid;min-width:110px;padding:7px 10px;border:1px solid #3c6652;border-radius:8px;background:#10241b;color:#9cc9ae;font-size:9px}.practice-readout strong{color:#f0c85f;font-size:12px}.raise-picker{display:grid;min-width:120px;color:#94a89c;font-size:9px;font-weight:900}.raise-picker input{width:120px;accent-color:#d3aa42}.holdem-controls .all-in{background:#6e3ca1}.hand-history{margin-top:8px;padding:8px 11px;border:1px solid #314a3d;border-radius:8px;background:#0b1812;color:#82978b;font-size:9px}.hand-history summary{cursor:pointer;color:#d0ad4e;font-weight:900;letter-spacing:.1em}.hand-history div{padding:4px 0;border-top:1px solid rgba(255,255,255,.05)}@keyframes action-pop{from{opacity:0;transform:translate(-50%,-25%) scale(.65)}to{opacity:1;transform:translate(-50%,-50%) scale(1)}}
+        /* Larger table, rotating position chips, and livelier dealing/turn feedback. */
+        .holdem-game{width:min(100%,1160px)}.poker-table{height:720px}.table-center{top:38%}.holdem-card.dealt{animation:deal-card-enhanced .42s cubic-bezier(.18,.82,.28,1.15) both}.poker-seat.acting .seat-panel{animation:active-turn 1.15s ease-in-out infinite}.turn-indicator{position:absolute;z-index:40;left:50%;top:-9px;transform:translate(-50%,-100%);padding:4px 8px;border-radius:10px;background:#f0c75b;color:#251b05;font-size:7px;font-weight:950;letter-spacing:.08em;animation:turn-bounce .85s ease-in-out infinite alternate}.position-chips{position:absolute;right:-12px;bottom:-12px;z-index:8;display:flex;gap:3px}.position-chip{position:static;display:grid;place-items:center;width:27px;height:27px;border:2px solid #999;border-radius:50%;background:#fff;color:#222;font-size:8px;font-style:normal;font-weight:950;box-shadow:0 3px 7px rgba(0,0,0,.5);animation:chip-arrive .45s cubic-bezier(.2,.9,.3,1.25)}.small-blind-button{border-color:#55bde6;background:#d9f5ff;color:#07516d}.big-blind-button{border-color:#e2b33e;background:#fff1bb;color:#624500}.holdem-controls .buy-in{background:linear-gradient(#e2bd59,#b78120);color:#211805}@keyframes deal-card-enhanced{from{opacity:0;transform:translateY(-90px) rotate(-12deg) scale(.55)}to{opacity:1;transform:none}}@keyframes active-turn{50%{transform:scale(1.025);box-shadow:0 0 0 4px rgba(240,199,91,.18),0 0 30px rgba(240,199,91,.42)}}@keyframes turn-bounce{to{transform:translate(-50%,-115%) scale(1.06)}}@keyframes chip-arrive{from{opacity:0;transform:translate(20px,-20px) rotate(160deg) scale(.4)}}@media(max-width:760px){.poker-table{height:680px;border-radius:40%}.table-center{top:39%}}@media(max-width:470px){.poker-table{height:650px}.table-center{top:40%}}
+        @media(prefers-reduced-motion:reduce){.holdem-card.dealt,.poker-seat.acting .seat-panel,.turn-indicator,.position-chip{animation:none}}
       `}</style>
     </section>
   );
