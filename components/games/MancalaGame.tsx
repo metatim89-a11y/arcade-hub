@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { PlayMode } from '../../types';
 import GlassButton from '../ui/GlassButton';
+import MancalaBoard3D from './MancalaBoard3D';
 
 const PLAYER_1_STORE = 6;
 const PLAYER_2_STORE = 13;
@@ -346,7 +347,18 @@ const MancalaGame: React.FC<MancalaProps> = ({ playMode, playerNames }) => {
                             <div></div> {/* Spacer for P1 store */}
                         </div>
                         <div ref={boardRef} className={`mancala-board theme-${theme.toLowerCase()} p-3 md:p-5 rounded-2xl border-4`}>
-                            <div className="grid grid-cols-[1.5fr_1fr_1fr_1fr_1fr_1fr_1fr_1.5fr] h-full" style={{ gap: 'var(--mancala-pit-gap)'}}>
+                            <div className="absolute inset-0 z-10 overflow-hidden rounded-xl">
+                                <MancalaBoard3D
+                                    pits={pits}
+                                    currentPlayer={currentPlayer}
+                                    disabled={gameOver || (playMode === 'vsComputer' && currentPlayer === 2)}
+                                    highlightedPit={highlightedPit}
+                                    lastMovePath={lastMovePath}
+                                    theme={theme}
+                                    onPitClick={handlePitClick}
+                                />
+                            </div>
+                            <div className="pointer-events-none invisible grid grid-cols-[1.5fr_1fr_1fr_1fr_1fr_1fr_1fr_1.5fr] h-full" style={{ gap: 'var(--mancala-pit-gap)'}}>
                                 {/* Player 2 Store */}
                                     <div ref={(element) => { if (element) pitRefs.current.set(PLAYER_2_STORE, element); }} className={`row-span-2 mancala-store ${highlightedPit === PLAYER_2_STORE ? 'highlight' : ''} ${previewEnd === PLAYER_2_STORE ? 'preview-end' : ''} ${lastMovePath.includes(PLAYER_2_STORE) ? 'last-path' : ''}`}>
                                     {renderStones(pits[PLAYER_2_STORE], PLAYER_2_STORE)}

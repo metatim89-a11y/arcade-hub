@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { PlayMode } from '../../types';
 import GlassButton from '../ui/GlassButton';
+import { TicTacToeBoard3D } from './BoardGames3D';
 
 type Player = 'X' | 'O' | null;
 type GameState = 'playing' | 'gameOver';
@@ -64,35 +65,6 @@ const TicTacToeGame: React.FC<TicTacToeGameProps> = ({ playMode, playerNames }) 
     setWinningLine([]);
   };
 
-  const renderSquare = (i: number) => {
-    const value = board[i];
-    const isWinningSquare = winningLine.includes(i);
-    const symbolStyle = {
-      color: value === 'X' ? 'var(--tictactoe-p1-color)' : 'var(--tictactoe-p2-color)'
-    };
-    
-    const symbolClass = `
-      ${value ? 'animate-symbol-pop' : ''}
-      ${isWinningSquare ? 'animate-winning-glow' : ''}
-    `;
-
-    // Borders for grid look without canvas
-    let borderClasses = "border-gray-600";
-    if (i < 6) borderClasses += " border-b-4";
-    if (i % 3 !== 2) borderClasses += " border-r-4";
-
-    return (
-      <button
-        key={i}
-        className={`w-full h-full text-5xl md:text-6xl font-bold flex items-center justify-center transition-colors duration-200 disabled:cursor-not-allowed ${borderClasses}`}
-        onClick={() => handleClick(i)}
-        disabled={gameState === 'gameOver' || !!board[i] || (playMode === 'vsComputer' && !xIsNext)}
-      >
-        {value && <span className={symbolClass.trim()} style={symbolStyle}>{value}</span>}
-      </button>
-    );
-  };
-
   const p1Name = playerNames.player1;
   const p2Name = playMode === 'vsPlayer' ? playerNames.player2 : 'Computer';
 
@@ -110,10 +82,13 @@ const TicTacToeGame: React.FC<TicTacToeGameProps> = ({ playMode, playerNames }) 
       <h2 className="text-3xl font-bold mb-4" style={{ color: 'var(--primary-text-color)' }}>Tic-Tac-Toe</h2>
       <div className="text-2xl mb-4 text-white h-8 font-semibold">{status}</div>
       
-      <div className="relative w-full aspect-square max-w-[320px] bg-black/20 rounded-xl p-4 shadow-xl">
-         <div className="w-full h-full grid grid-cols-3 grid-rows-3">
-            {Array.from({length: 9}, (_, i) => renderSquare(i))}
-         </div>
+      <div className="relative w-full aspect-square max-w-[390px] rounded-2xl overflow-hidden shadow-[0_24px_60px_rgba(0,0,0,.48)]">
+        <TicTacToeBoard3D
+          board={board}
+          winningLine={winningLine}
+          disabled={gameState === 'gameOver' || (playMode === 'vsComputer' && !xIsNext)}
+          onCellClick={handleClick}
+        />
       </div>
       
       <div className="mt-6 min-h-[80px] flex flex-col items-center justify-center">
@@ -138,23 +113,6 @@ const TicTacToeGame: React.FC<TicTacToeGameProps> = ({ playMode, playerNames }) 
         )}
       </div>
 
-      <style>{`
-        @keyframes symbol-pop {
-            0% { transform: scale(0) rotate(-45deg); opacity: 0; }
-            70% { transform: scale(1.2) rotate(10deg); opacity: 1; }
-            100% { transform: scale(1) rotate(0); opacity: 1; }
-        }
-        .animate-symbol-pop {
-            animation: symbol-pop 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
-        }
-        @keyframes winning-glow {
-            0%, 100% { text-shadow: 0 0 10px #fff, 0 0 20px currentColor; transform: scale(1); }
-            50% { text-shadow: 0 0 20px #fff, 0 0 40px currentColor; transform: scale(1.1); }
-        }
-        .animate-winning-glow {
-            animation: winning-glow 1s infinite ease-in-out;
-        }
-      `}</style>
     </div>
   );
 };
