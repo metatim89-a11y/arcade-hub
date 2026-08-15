@@ -103,8 +103,9 @@ const GameArea: React.FC<GameAreaProps> = ({ games, selectedGame, onSelectGame, 
     setFeedback('');
   };
   
-  // Added 'fishing' to the wide layout condition
-  const gameAreaSizeClass = (activeGameProps.game.id === 'mancala' || activeGameProps.game.id === 'worm' || activeGameProps.game.id === 'fishing') ? 'max-w-7xl' : 'max-w-4xl';
+  const gameAreaSizeClass = activeGameProps.game.id === 'fishing'
+    ? 'max-w-[1600px]'
+    : (activeGameProps.game.id === 'mancala' || activeGameProps.game.id === 'worm') ? 'max-w-7xl' : 'max-w-4xl';
 
   const themeClasses = (() => {
     if (mode === GameMode.Adult) {
