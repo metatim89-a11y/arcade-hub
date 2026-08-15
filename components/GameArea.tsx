@@ -124,6 +124,9 @@ const GameArea: React.FC<GameAreaProps> = ({ games, selectedGame, onSelectGame, 
   const PreviousGameComponent = previousGameProps?.game.component;
   const activeNeedsNaturalHeight = activeGameProps.game.id === 'mancala';
   const equippedAesthetic = aesthetics.find((item) => item.id === equippedAesthetics[activeGameProps.game.id]);
+  const stageAccent = equippedAesthetic?.accentColor ?? (mode === GameMode.Adult ? (currencyMode === 'fun' ? '#f2c94c' : '#51d27c') : playMode === 'vsPlayer' ? '#e7bd4a' : '#b68ee8');
+  const stagePanelFrom = mode === GameMode.Adult ? (currencyMode === 'fun' ? '#211b12' : '#102019') : playMode === 'vsPlayer' ? '#111827' : '#191329';
+  const stagePanelTo = mode === GameMode.Adult ? (currencyMode === 'fun' ? '#0e0c09' : '#08100c') : '#080b12';
   const aestheticPattern = equippedAesthetic ? (() => {
     switch (equippedAesthetic.visualKey) {
       case 'gold': return `radial-gradient(circle at 50% 0%, ${equippedAesthetic.accentColor}44, transparent 42%), linear-gradient(135deg, ${equippedAesthetic.gradientFrom}, ${equippedAesthetic.gradientTo})`;
@@ -194,11 +197,14 @@ const GameArea: React.FC<GameAreaProps> = ({ games, selectedGame, onSelectGame, 
         )}
 
         <div 
-          className={`relative z-10 w-full ${activeNeedsNaturalHeight ? 'min-h-[420px] h-auto justify-start' : 'h-full justify-center'} flex flex-col items-center ${previousGameProps ? 'game-transition-in' : ''}`}
+          className={`game-content-layer relative z-10 w-full ${activeNeedsNaturalHeight ? 'min-h-[420px] h-auto justify-start' : 'h-full justify-center'} flex flex-col items-center ${previousGameProps ? 'game-transition-in' : ''}`}
           style={{
             paddingBlock: 'var(--game-area-padding-y)',
             paddingInline: activeGameProps.game.id === 'fishing' ? 'clamp(0rem, 1vw, .75rem)' : activeGameProps.game.id === 'slots' || activeGameProps.game.id === 'mancala' ? 'clamp(.35rem, 2vw, 1rem)' : 'var(--game-area-padding-x)',
-          }}
+            '--stage-accent': stageAccent,
+            '--stage-panel-from': stagePanelFrom,
+            '--stage-panel-to': stagePanelTo,
+          } as React.CSSProperties}
         >
             <ActiveGameComponent 
                 key={activeGameProps.game.id + (activeGameProps.mode === GameMode.Under18 ? activeGameProps.playMode : activeGameProps.currencyMode)} 
@@ -208,6 +214,8 @@ const GameArea: React.FC<GameAreaProps> = ({ games, selectedGame, onSelectGame, 
       </div>
       <style>{`
         .game-engine-stage{isolation:isolate;perspective:1400px;transform-style:preserve-3d}
+        .game-content-layer{border-radius:inherit;background:radial-gradient(circle at 50% -12%,color-mix(in srgb,var(--stage-accent) 18%,transparent),transparent 46%),linear-gradient(145deg,var(--stage-panel-from),var(--stage-panel-to));box-shadow:inset 0 1px color-mix(in srgb,var(--stage-accent) 18%,transparent)}
+        .game-content-layer :where(.volt-slots,.wheel-game,.coin-pusher-game,.crash-game,.color-recall-game,.holdem-game,.online-table-game,.ocean-hunter){background:radial-gradient(circle at 50% -10%,color-mix(in srgb,var(--stage-accent) 14%,transparent),transparent 44%),linear-gradient(145deg,color-mix(in srgb,var(--stage-panel-from) 86%,transparent),color-mix(in srgb,var(--stage-panel-to) 88%,transparent))!important;border-color:color-mix(in srgb,var(--stage-accent) 42%,#394451)!important}
         .game-engine-stage:after{content:'';position:absolute;z-index:2;inset:0;pointer-events:none;border-radius:inherit;background:radial-gradient(circle at 50% 0%,rgba(115,224,255,.08),transparent 42%),linear-gradient(115deg,transparent 25%,rgba(255,255,255,.025) 42%,transparent 58%);mix-blend-mode:screen;animation:engine-light-sweep 9s ease-in-out infinite}
         .game-engine-stage canvas{filter:saturate(1.12) contrast(1.035);transition:filter .4s ease}
         .game-engine-stage :where(button,[role='button']){transform-style:preserve-3d;transition:transform .18s ease,filter .18s ease,box-shadow .18s ease}

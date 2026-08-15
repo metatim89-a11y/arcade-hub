@@ -55,6 +55,7 @@ type CreatureRig = {
   targetRing: THREE.Mesh;
   lastX: number;
   lastY: number;
+  lastDepth: number;
 };
 
 const GAME_WIDTH = 1800;
@@ -288,7 +289,7 @@ const createCreature = (fish: OceanFishView): CreatureRig => {
   targetRing.position.z = .55; targetRing.renderOrder = 19; targetRing.visible = false;
   root.add(healthBack, healthFill, targetRing);
 
-  return { root, body, animated, healthBack, healthFill, targetRing, lastX: fish.x, lastY: fish.y };
+  return { root, body, animated, healthBack, healthFill, targetRing, lastX: fish.x, lastY: fish.y, lastDepth: fish.depth };
 };
 
 const cannonPosition = (side: OceanHunterView['side']) => {
@@ -307,6 +308,7 @@ export class OceanHunter3DRenderer {
   private particles = new Map<number, THREE.Mesh>();
   private cannons = new Map<number, THREE.Group>();
   private background: THREE.Mesh | null = null;
+  private seaPlants: THREE.Group[] = [];
   private disposed = false;
 
   constructor(canvas: HTMLCanvasElement, backgroundUrl: string) {
@@ -334,6 +336,21 @@ export class OceanHunter3DRenderer {
     const floor = mesh(new THREE.PlaneGeometry(34, 18, 18, 10), material(0x123b42, .92, .03));
     floor.rotation.x = -Math.PI / 2.35; floor.position.set(0, -7, -3); floor.receiveShadow = true;
     this.scene.add(floor);
+
+    const rockMaterial = material(0x294b4c, .86, .04);
+    for (let index = 0; index < 18; index += 1) {
+      const rock = mesh(new THREE.DodecahedronGeometry(.35 + index % 4 * .15, 1), rockMaterial, [1.35, .6 + index % 3 * .12, 1]);
+      rock.position.set(-13 + (index * 3.17) % 26, -6.6 + (index % 3) * .16, -2.7 - index % 5 * .48);
+      rock.rotation.set(index * .21, index * .37, index * .12); this.scene.add(rock);
+    }
+    for (let index = 0; index < 24; index += 1) {
+      const plant = new THREE.Group();
+      const hue = index % 3 === 0 ? 0x2f9d7a : index % 3 === 1 ? 0x307b69 : 0x6a8850;
+      const stalk = mesh(new THREE.CylinderGeometry(.035, .09, 1.25 + index % 4 * .28, 7, 4), material(hue, .62, .02));
+      stalk.position.y = .65; plant.add(stalk);
+      plant.position.set(-12 + (index * 2.43) % 24, -6.35, -2.1 - index % 6 * .62);
+      plant.userData.phase = index * .73; plant.userData.speed = .7 + index % 5 * .08; this.scene.add(plant); this.seaPlants.push(plant);
+    }
 
     const loader = new THREE.TextureLoader();
     loader.load(backgroundUrl, texture => {
@@ -379,13 +396,14 @@ export class OceanHunter3DRenderer {
       rig.root.position.lerp(point, .38);
       const dx = fish.x - rig.lastX;
       const dy = fish.y - rig.lastY;
-      rig.lastX = fish.x; rig.lastY = fish.y;
+      const depthVelocity = fish.depth - rig.lastDepth;
+      rig.lastX = fish.x; rig.lastY = fish.y; rig.lastDepth = fish.depth;
       const heading = Math.atan2(-dy, dx || fish.vx);
       rig.body.rotation.z += (heading - rig.body.rotation.z) * .18;
       const targetFacing = fish.vx < 0 ? Math.PI : 0;
       const facingDelta = Math.atan2(Math.sin(targetFacing - rig.body.rotation.y), Math.cos(targetFacing - rig.body.rotation.y));
       rig.body.rotation.y += facingDelta * .12;
-      rig.body.rotation.x = Math.sin(fish.age * 1.7 + fish.phase) * .045 + (fish.depth - 1) * .28;
+      rig.body.rotation.x = Math.sin(fish.age * 1.7 + fish.phase) * .045 + THREE.MathUtils.clamp(depthVelocity * 18, -.32, .32);
       rig.body.position.y = Math.sin(fish.age * 2.4 + fish.phase) * .08;
       rig.animated.forEach((part, index) => {
         part.rotation.y = Math.sin(fish.age * (fish.behavior === 'dart' ? 10 : 6.4) + fish.phase + index * .55) * (.22 + index % 3 * .055);
@@ -471,6 +489,7 @@ export class OceanHunter3DRenderer {
     this.syncCannons(frame);
     const darkness = frame.environment === 'Darkness';
     this.renderer.toneMappingExposure = darkness ? .58 : frame.environment === 'Current' ? 1.24 : 1.05;
+    this.seaPlants.forEach((plant) => { plant.rotation.z = Math.sin(frame.time * .001 * Number(plant.userData.speed) + Number(plant.userData.phase)) * .13; });
     this.camera.position.x = Math.sin(frame.time * .00012) * .16 + (Math.random() - .5) * frame.shake * .003;
     this.camera.position.y = Math.cos(frame.time * .00015) * .1 + (Math.random() - .5) * frame.shake * .003;
     this.camera.lookAt(0, 0, 0);

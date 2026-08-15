@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import Matter from 'matter-js';
 import { CurrencyMode } from '../../types';
 import { useCoinSystem } from '../../context/CoinContext';
+import CoinPusher3D from './CoinPusher3D';
 
 const SHELF_WIDTH = 320;
 const SHELF_HEIGHT = 420;
@@ -385,7 +386,6 @@ const CoinPusherGame: React.FC = () => {
   }, [dropCoinAt]);
 
   const currencySymbol = currencyMode === 'fun' ? 'FC' : 'RC';
-  const aimX = 26 + (aimPercent / 100) * (SHELF_WIDTH - 52);
   const secondsToSwitch = Math.max(0, ((1 - frame.cycleProgress) * frame.strokeDuration) / 1000);
 
   return (
@@ -424,35 +424,7 @@ const CoinPusherGame: React.FC = () => {
             }
           }}
         >
-          <div className="coin-pusher-grid" />
-          <div className="coin-pusher-slow-zone"><span>SLOW ZONE</span></div>
-          <div className="coin-pusher-gutter left">GUTTER</div>
-          <div className="coin-pusher-gutter right">GUTTER</div>
-          <div className="coin-pusher-aim" style={{ left: `${(aimX / SHELF_WIDTH) * 100}%` }}>
-            <span />
-          </div>
-          <div className="coin-pusher-plate" style={{ top: `${((frame.pusherY - 21) / SHELF_HEIGHT) * 100}%` }}>
-            <div className="coin-pusher-plate-face">AUTO PUSH</div>
-          </div>
-          {bumpersActive && [
-            { x: 82, y: 318 }, { x: 160, y: 346 }, { x: 238, y: 318 }, { x: 112, y: 376 }, { x: 208, y: 376 }
-          ].map((bumper, index) => <div key={index} className="coin-power-bumper" style={{ left: `${bumper.x / SHELF_WIDTH * 100}%`, top: `${bumper.y / SHELF_HEIGHT * 100}%` }} />)}
-
-          {frame.coins.map((coin) => (
-            <div
-              key={coin.id}
-              className={`coin-pusher-coin ${coin.kind}${coin.playerCoin ? ' player' : ''}`}
-              style={{
-                left: `${(coin.x / SHELF_WIDTH) * 100}%`,
-                top: `${(coin.y / SHELF_HEIGHT) * 100}%`,
-                width: `${(coin.radius * 2 / SHELF_WIDTH) * 100}%`,
-                transform: `translate(-50%, -50%) rotate(${coin.angle}deg)`
-              }}
-              title={COIN_SPECS[coin.kind].label}
-            >
-              <span>{COIN_SPECS[coin.kind].mark}</span>
-            </div>
-          ))}
+          <CoinPusher3D frame={frame} bumpersActive={bumpersActive} aimPercent={aimPercent} />
         </div>
         <div className="coin-pusher-tray">
           <span>LAST WIN</span>

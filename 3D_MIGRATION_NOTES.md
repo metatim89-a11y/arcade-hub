@@ -65,6 +65,20 @@ Convert every game's actual playable surface and pieces to interactive 3D. The e
 - Plinko now mirrors its existing live physics into a vertical 3D cabinet with modeled rails, pegs, bucket blocks, moving ball meshes and collision lighting. Payout calculations remain unchanged.
 - Keno's flat 80-button grid is replaced by a near top-down ray-cast 3D chip board. Selected, drawn and matched numbers use height, lighting and pulse state while preserving the existing draw and payout logic.
 
+## Fifth graphics batch — build passed, ready to push
+
+- Spin Wheel now uses an interactive Three.js wheel with extruded wedges, a modeled rim, hub, pins, labels and pointer. The existing result math remains authoritative and drives the 3D rotation.
+- Ocean Hunter received another environment pass with procedural rocks, swaying plants and depth-aware creature pitch for less flat movement.
+- Coin Pusher now mirrors the live Matter.js simulation into a Three.js shelf with modeled coins, pusher plate, rails, bumpers, aiming beam and prize tray. The existing physics and wallet rules remain authoritative.
+- Volt Vault Slots received a deeper 3D animation pass:
+  - symbols roll around cylindrical reel depth instead of rotating as one flat panel;
+  - cabinet pillars, floor, axles and glass add physical depth;
+  - pointer parallax, spin vibration, anticipation zoom and 3D win coins add state-driven motion;
+  - misleading `93% RTP` copy was removed, and Power/Free Spin messaging now correctly matches the implemented 1.5× multiplier.
+- Fixed the Keno phone regression: the camera now maintains all ten columns at narrow aspect ratios, uses a true top view with crisp number faces, and selects on pointer-down for reliable touch play.
+- `GameArea` now supplies one shared page-aware surface palette to every game. Root game panels inherit the current gold/green/blue/purple mode or equipped cosmetic accent instead of presenting unrelated opaque backgrounds.
+- Production build passed for this combined batch (`vite build`, 134 modules, 2m 39s). Existing large-chunk warnings only.
+
 ## Planned conversion order
 
 1. Tic-Tac-Toe, Connect Four and Mancala board batch: complete and build-tested.

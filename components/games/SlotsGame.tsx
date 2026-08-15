@@ -163,13 +163,13 @@ const SlotsGame: React.FC = () => {
     clearTimers(); setCelebration(null); setAnticipation(false); setWinInfo(null); setLastWin(0);
     const roundCurrency = currencyMode;
     if (!freeRound) {
-      setStatus(powerSpin ? 'POWER SPIN charged — 2× wins and a guaranteed wild!' : 'Confirming spin…');
+      setStatus(powerSpin ? 'POWER SPIN charged — 1.5× wins and a guaranteed wild!' : 'Confirming spin…');
       const charged = await subtractCoins(totalBet, 'Slots Spin', roundCurrency);
       if (!charged || !mountedRef.current) { setStatus('The spin was not charged.'); setAutoSpin(false); return; }
       setPower(powerSpin ? 0 : Math.min(5, power + 1));
     } else {
       setFreeSpins((current) => Math.max(0, current - 1));
-      setStatus(`FREE SPIN — 2× all line wins · ${Math.max(0, freeSpins - 1)} remaining`);
+      setStatus(`FREE SPIN — 1.5× all line wins · ${Math.max(0, freeSpins - 1)} remaining`);
     }
 
     const layout = Array.from({ length: 5 }, () => Array.from({ length: 3 }, randomSymbol));
@@ -234,7 +234,7 @@ const SlotsGame: React.FC = () => {
 
   return (
     <section className={`volt-slots${anticipation ? ' anticipating' : ''}`}>
-      <header className="volt-header"><div><span>PREMIUM 5×3 SLOTS · 93% RTP</span><h2>VOLT VAULT</h2></div><div className="volt-metrics"><span><small>BALANCE</small>{Math.floor(balance)} {symbol}</span><span><small>BET</small>{totalBet} {symbol}</span><span><small>LAST WIN</small>{lastWin} {symbol}</span></div></header>
+      <header className="volt-header"><div><span>PREMIUM 5×3 SLOTS · 7 ACTIVE LINES</span><h2>VOLT VAULT</h2></div><div className="volt-metrics"><span><small>BALANCE</small>{Math.floor(balance)} {symbol}</span><span><small>BET</small>{totalBet} {symbol}</span><span><small>LAST WIN</small>{lastWin} {symbol}</span></div></header>
       <div className="feature-ribbon"><div><b>🪙 HOLD & SPIN</b><small>3+ COINS · RESETTING RESPINS</small></div><div><b>⭐ FREE SPINS</b><small>3+ STARS · 6 SPINS AT 1.5×</small></div><div className={power >= 5 ? 'ready' : ''}><b>⚡ POWER SPIN</b><small>{power >= 5 ? 'READY · 1.5× + WILD' : `${power}/5 CHARGED`}</small></div></div>
       <div className="volt-machine">
         <div className="volt-lights" aria-hidden="true">{Array.from({ length: 24 }, (_, index) => <i key={index} />)}</div>

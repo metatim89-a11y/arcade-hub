@@ -97,23 +97,25 @@ export const KenoBoard3D: React.FC<{
     void import('three').then((THREE) => {
       if (cancelled) return;
       const renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true }); renderer.setPixelRatio(Math.min(devicePixelRatio, 1.45)); renderer.outputColorSpace = THREE.SRGBColorSpace; renderer.shadowMap.enabled = true;
-      const scene = new THREE.Scene(); const camera = new THREE.PerspectiveCamera(37, 1, .1, 40); camera.position.set(0, 10.8, 3.25); camera.lookAt(0, 0, 0);
+      const scene = new THREE.Scene(); const camera = new THREE.PerspectiveCamera(46, 1, .1, 60); camera.up.set(0, 0, -1); camera.position.set(0, 13.5, 0); camera.lookAt(0, 0, 0);
       scene.add(new THREE.HemisphereLight(0xddf4ff, 0x080b18, 2.5)); const light = new THREE.DirectionalLight(0xffffff, 4.5); light.position.set(-5, 8, 5); light.castShadow = true; scene.add(light);
       const base = new THREE.Mesh(new THREE.BoxGeometry(10.7, .38, 8.7), new THREE.MeshStandardMaterial({ color: 0x131b32, metalness: .52, roughness: .3 })); base.position.y = -.3; base.receiveShadow = true; scene.add(base);
       const meshes: Mesh[] = []; const raycaster = new THREE.Raycaster(); const pointer = new THREE.Vector2(); let hovered = -1;
       for (let index = 0; index < 80; index += 1) {
         const number = index + 1; const texture = new THREE.CanvasTexture(labelCanvas(String(number), '#27334d')); texture.colorSpace = THREE.SRGBColorSpace;
         const material = new THREE.MeshStandardMaterial({ map: texture, metalness: .25, roughness: .3, emissive: 0x000000 });
-        const chip = new THREE.Mesh(new THREE.CylinderGeometry(.42, .42, .13, 28), material); chip.position.set((index % 10 - 4.5) * 1.02, .02, (Math.floor(index / 10) - 3.5) * 1.02); chip.userData.number = number; chip.castShadow = true; scene.add(chip); meshes.push(chip);
+        const chip = new THREE.Mesh(new THREE.CylinderGeometry(.42, .42, .13, 28), material); chip.position.set((index % 10 - 4.5) * 1.02, .02, (Math.floor(index / 10) - 3.5) * 1.02); chip.userData.number = number; chip.castShadow = true;
+        const face = new THREE.Mesh(new THREE.PlaneGeometry(.64, .32), new THREE.MeshBasicMaterial({ map: texture, transparent: false })); face.rotation.x = -Math.PI / 2; face.position.y = .071; chip.add(face);
+        scene.add(chip); meshes.push(chip);
       }
       const pick = (event: PointerEvent) => { const rect = canvas.getBoundingClientRect(); pointer.set(((event.clientX - rect.left) / rect.width) * 2 - 1, -((event.clientY - rect.top) / rect.height) * 2 + 1); raycaster.setFromCamera(pointer, camera); const hit = raycaster.intersectObjects(meshes, false)[0]; hovered = hit ? Number(hit.object.userData.number) : -1; canvas.style.cursor = hovered > 0 && stateRef.current.phase === 'betting' ? 'pointer' : 'default'; };
       const click = (event: PointerEvent) => { pick(event); if (hovered > 0 && stateRef.current.phase === 'betting') stateRef.current.onNumberClick(hovered); };
-      canvas.addEventListener('pointermove', pick); canvas.addEventListener('pointerup', click);
-      const observer = new ResizeObserver(() => { const rect = canvas.getBoundingClientRect(); if (!rect.width || !rect.height) return; renderer.setSize(rect.width, rect.height, false); camera.aspect = rect.width / rect.height; camera.updateProjectionMatrix(); }); observer.observe(canvas);
+      canvas.style.touchAction = 'none'; canvas.addEventListener('pointermove', pick); canvas.addEventListener('pointerdown', click);
+      const observer = new ResizeObserver(() => { const rect = canvas.getBoundingClientRect(); if (!rect.width || !rect.height) return; renderer.setSize(rect.width, rect.height, false); camera.aspect = rect.width / rect.height; const requiredHeight = Math.max(9.3, 11.3 / camera.aspect); camera.position.y = requiredHeight / (2 * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2))); camera.updateProjectionMatrix(); }); observer.observe(canvas);
       let frame = 0;
       const animate = (now: number) => { const live = stateRef.current; meshes.forEach((chip) => { const number = Number(chip.userData.number); const selected = live.selected.has(number); const drawn = live.drawn.has(number); const match = selected && drawn; const material = chip.material as InstanceType<typeof THREE.MeshStandardMaterial>; const color = match ? 0x22d785 : drawn ? 0xf1ad27 : selected ? 0x3488ef : hovered === number ? 0x536984 : 0x000000; material.emissive.setHex(color); material.emissiveIntensity = match ? .85 + Math.sin(now * .01) * .25 : color ? .42 : 0; const targetY = match ? .28 + Math.sin(now * .012 + number) * .06 : selected || drawn || hovered === number ? .18 : .02; chip.position.y += (targetY - chip.position.y) * .16; chip.scale.setScalar(match ? 1.06 : 1); }); renderer.render(scene, camera); frame = requestAnimationFrame(animate); };
       frame = requestAnimationFrame(animate);
-      teardown = () => { cancelAnimationFrame(frame); observer.disconnect(); canvas.removeEventListener('pointermove', pick); canvas.removeEventListener('pointerup', click); dispose(scene); renderer.dispose(); };
+      teardown = () => { cancelAnimationFrame(frame); observer.disconnect(); canvas.removeEventListener('pointermove', pick); canvas.removeEventListener('pointerdown', click); dispose(scene); renderer.dispose(); };
     });
     return () => { cancelled = true; teardown(); };
   }, []);
