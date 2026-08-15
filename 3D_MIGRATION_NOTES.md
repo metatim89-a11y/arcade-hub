@@ -59,6 +59,12 @@ Convert every game's actual playable surface and pieces to interactive 3D. The e
   - cabinet lighting changes for base, Power Spin and Free Spin themes;
   - lever pull, disabled-button and anticipation feedback are state-driven.
 
+## Fourth local graphics batch
+
+- Added `components/games/CasinoBoards3D.tsx`.
+- Plinko now mirrors its existing live physics into a vertical 3D cabinet with modeled rails, pegs, bucket blocks, moving ball meshes and collision lighting. Payout calculations remain unchanged.
+- Keno's flat 80-button grid is replaced by a near top-down ray-cast 3D chip board. Selected, drawn and matched numbers use height, lighting and pulse state while preserving the existing draw and payout logic.
+
 ## Planned conversion order
 
 1. Tic-Tac-Toe, Connect Four and Mancala board batch: complete and build-tested.

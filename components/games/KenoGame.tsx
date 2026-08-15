@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useCallback, memo } from 'react';
 import { useCoinSystem } from '../../context/CoinContext';
 import GlassButton from '../ui/GlassButton';
+import { KenoBoard3D } from './CasinoBoards3D';
 
 // Pick-specific gross-return tables keep every selection count close to 90% RTP.
 const PAYOUTS: Record<number, Record<number, number>> = {
@@ -182,18 +183,8 @@ const KenoGame: React.FC = () => {
   return (
     <div className="flex flex-col items-center gap-4 text-center p-2 md:p-4">
       <div><h2 className="text-3xl font-bold" style={{ color: 'var(--primary-text-color)' }}>Keno</h2><small className="text-gray-400">90% RTP · payout changes with picks</small></div>
-      <div className={`grid grid-cols-10 gap-1 ${phase === 'drawing' ? 'keno-drawing-grid' : ''}`}>
-        {Array.from({ length: 80 }, (_, i) => i + 1).map((num) => (
-            <KenoNumber
-                key={num}
-                num={num}
-                isSelected={selectedNumbers.has(num)}
-                isDrawn={drawnNumbers.has(num)}
-                phase={phase}
-                onClick={toggleNumber}
-                disabled={phase !== 'betting'}
-            />
-        ))}
+      <div className={`h-[540px] w-full max-w-[760px] overflow-hidden rounded-3xl shadow-[0_28px_70px_rgba(0,0,0,.48)] ${phase === 'drawing' ? 'keno-drawing-grid' : ''}`}>
+        <KenoBoard3D selected={selectedNumbers} drawn={drawnNumbers} phase={phase} onNumberClick={toggleNumber} />
       </div>
       <div className="bg-black/20 p-3 rounded-lg text-center w-full min-h-[40px] flex items-center justify-center text-yellow-300 font-semibold">{feedback}</div>
       <div className="flex flex-wrap items-center justify-center gap-2 md:gap-4">

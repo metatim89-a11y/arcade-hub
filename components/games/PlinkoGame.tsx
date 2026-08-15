@@ -3,6 +3,7 @@
 import React, { useRef, useEffect, useState, useCallback, useMemo } from 'react';
 import { useCoinSystem } from '../../context/CoinContext';
 import GlassButton from '../ui/GlassButton';
+import { PlinkoBoard3D } from './CasinoBoards3D';
 
 type RiskLevel = 'Low' | 'Medium' | 'High';
 
@@ -505,8 +506,9 @@ const PlinkoGame: React.FC = () => {
 
                 {practicePreview && <div className="plinko-preview">Likely landing zone: center buckets · edge buckets are rare</div>}
                 <div className={`plinko-board relative w-full bg-gray-900 rounded-2xl border-4 border-gray-800 shadow-2xl overflow-hidden flex justify-center min-h-[280px] ${followBall ? 'following' : ''} ${challengeBoard ? 'challenge' : ''}`}>
-                    <canvas ref={canvasRef} className="block max-w-full" />
-                    <div className="absolute top-4 left-0 w-full text-center pointer-events-none">
+                    <canvas ref={canvasRef} className="invisible block max-w-full pointer-events-none" aria-hidden="true" />
+                    <PlinkoBoard3D physicsCanvasRef={canvasRef} ballsRef={ballsRef} glowingPegRef={glowingPegRef} rows={rows} multipliers={multipliers} theme={theme} />
+                    <div className="absolute z-10 top-4 left-0 w-full text-center pointer-events-none">
                         {feedback && (
                             <div key={feedback} className="inline-block px-6 py-2 bg-black/60 rounded-full text-yellow-400 font-bold text-lg backdrop-blur-md animate-bounce border border-yellow-400/30">
                                 {feedback}
