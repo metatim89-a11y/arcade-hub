@@ -11,7 +11,7 @@ import CrashGame from './components/games/CrashGame';
 import SlotsGame from './components/games/SlotsGame';
 import MancalaGame from './components/games/MancalaGame';
 import BlackjackGame from './components/games/BlackjackGame';
-import TexasHoldemGame from './components/games/TexasHoldemGame';
+import TexasHoldemLobby from './components/games/TexasHoldemLobby';
 import SpinWheelGame from './components/games/SpinWheelGame';
 import CoinPusherGame from './components/games/CoinPusherGame';
 import RPSCardGame from './components/games/RPSCardGame';
@@ -23,7 +23,7 @@ export const ADULT_GAMES: Game[] = [
     { id: 'wheel', label: 'Spin Wheel', component: SpinWheelGame },
     { id: 'crash', label: 'Crash', component: CrashGame },
     { id: 'blackjack', label: 'Blackjack', component: BlackjackGame },
-    { id: 'poker', label: 'Hold\'em', component: TexasHoldemGame },
+    { id: 'poker', label: 'Hold\'em', component: TexasHoldemLobby },
     { id: 'keno', label: 'Keno', component: KenoGame },
     { id: 'plinko', label: 'Plinko', component: PlinkoGame },
     { id: 'slots', label: 'Slots', component: SlotsGame },
