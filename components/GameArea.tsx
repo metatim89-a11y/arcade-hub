@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Game, GameMode, PlayMode } from '../types';
 import { useCoinSystem } from '../context/CoinContext';
+import GameAtmosphere3D from './GameAtmosphere3D';
 
 
 const GameOptionsSelector: React.FC<{
@@ -163,13 +164,15 @@ const GameArea: React.FC<GameAreaProps> = ({ games, selectedGame, onSelectGame, 
       
       {/* Game Canvas */}
       <div 
-        className={`w-full ${gameAreaSizeClass} min-h-[420px] rounded-3xl mb-4 ${activeNeedsNaturalHeight ? 'overflow-visible' : 'overflow-hidden'} transition-colors duration-500 relative ${themeClasses}`}
+        data-game={activeGameProps.game.id}
+        className={`game-engine-stage w-full ${gameAreaSizeClass} min-h-[420px] rounded-3xl mb-4 ${activeNeedsNaturalHeight ? 'overflow-visible' : 'overflow-hidden'} transition-colors duration-500 relative ${themeClasses}`}
         style={equippedAesthetic ? {
           backgroundImage: aestheticPattern,
           border: `2px solid ${equippedAesthetic.accentColor}`,
           boxShadow: `0 0 34px ${equippedAesthetic.accentColor}66, inset 0 0 28px ${equippedAesthetic.accentColor}18`,
         } : undefined}
       >
+        <GameAtmosphere3D gameId={activeGameProps.game.id} />
         {equippedAesthetic && (
           <div className="absolute right-3 top-3 z-20 rounded-full border bg-black/70 px-3 py-1 text-[10px] font-black uppercase tracking-widest" style={{ borderColor: equippedAesthetic.accentColor, color: equippedAesthetic.accentColor }}>
             {equippedAesthetic.name}
@@ -177,7 +180,7 @@ const GameArea: React.FC<GameAreaProps> = ({ games, selectedGame, onSelectGame, 
         )}
         {PreviousGameComponent && previousGameProps && (
             <div 
-              className="absolute inset-0 flex flex-col items-center justify-center game-transition-out"
+              className="absolute inset-0 z-10 flex flex-col items-center justify-center game-transition-out"
               style={{
                 paddingBlock: 'var(--game-area-padding-y)',
                 paddingInline: 'var(--game-area-padding-x)',
@@ -191,7 +194,7 @@ const GameArea: React.FC<GameAreaProps> = ({ games, selectedGame, onSelectGame, 
         )}
 
         <div 
-          className={`w-full ${activeNeedsNaturalHeight ? 'min-h-[420px] h-auto justify-start' : 'h-full justify-center'} flex flex-col items-center ${previousGameProps ? 'game-transition-in' : ''}`}
+          className={`relative z-10 w-full ${activeNeedsNaturalHeight ? 'min-h-[420px] h-auto justify-start' : 'h-full justify-center'} flex flex-col items-center ${previousGameProps ? 'game-transition-in' : ''}`}
           style={{
             paddingBlock: 'var(--game-area-padding-y)',
             paddingInline: activeGameProps.game.id === 'fishing' ? 'clamp(0rem, 1vw, .75rem)' : activeGameProps.game.id === 'slots' || activeGameProps.game.id === 'mancala' ? 'clamp(.35rem, 2vw, 1rem)' : 'var(--game-area-padding-x)',
@@ -203,6 +206,23 @@ const GameArea: React.FC<GameAreaProps> = ({ games, selectedGame, onSelectGame, 
             />
         </div>
       </div>
+      <style>{`
+        .game-engine-stage{isolation:isolate;perspective:1400px;transform-style:preserve-3d}
+        .game-engine-stage:after{content:'';position:absolute;z-index:2;inset:0;pointer-events:none;border-radius:inherit;background:radial-gradient(circle at 50% 0%,rgba(115,224,255,.08),transparent 42%),linear-gradient(115deg,transparent 25%,rgba(255,255,255,.025) 42%,transparent 58%);mix-blend-mode:screen;animation:engine-light-sweep 9s ease-in-out infinite}
+        .game-engine-stage canvas{filter:saturate(1.12) contrast(1.035);transition:filter .4s ease}
+        .game-engine-stage :where(button,[role='button']){transform-style:preserve-3d;transition:transform .18s ease,filter .18s ease,box-shadow .18s ease}
+        .game-engine-stage :where(button,[role='button']):not(:disabled):active{transform:translateY(2px) rotateX(-4deg) scale(.98)}
+        .game-engine-stage :where(.holdem-card-slot,.card-front,.card-back,.reel-deck,.vault-grid,.stone-stack-icon){transform-style:preserve-3d;backface-visibility:hidden}
+        .game-engine-stage :where(.poker-table,.volt-machine,.coin-pusher-machine,.wheel-glass,.color-wheel){filter:drop-shadow(0 18px 28px rgba(0,0,0,.34)) drop-shadow(0 0 16px rgba(88,214,255,.08));animation:engine-stage-breathe 5s ease-in-out infinite}
+        .game-engine-stage[data-game='blackjack']>div>div,.game-engine-stage[data-game='poker']>div>div{transform-style:preserve-3d}
+        .game-engine-stage[data-game='slots'] .volt-machine{transform:rotateX(1.5deg);transform-origin:50% 100%}
+        .game-engine-stage[data-game='connect4'] [class*='rounded-full'],.game-engine-stage[data-game='keno'] button{filter:drop-shadow(0 6px 7px rgba(0,0,0,.34))}
+        .game-engine-stage[data-game='mancala'] .stone-stack-icon{filter:drop-shadow(0 5px 5px rgba(0,0,0,.45));animation:engine-token-float 2.8s ease-in-out infinite}
+        @keyframes engine-light-sweep{0%,100%{background-position:-40vw 0;opacity:.65}50%{background-position:40vw 0;opacity:1}}
+        @keyframes engine-stage-breathe{50%{filter:drop-shadow(0 21px 34px rgba(0,0,0,.4)) drop-shadow(0 0 24px rgba(88,214,255,.15))}}
+        @keyframes engine-token-float{50%{transform:translateZ(10px) translateY(-2px)}}
+        @media(prefers-reduced-motion:reduce){.game-engine-stage:after,.game-engine-stage :where(.poker-table,.volt-machine,.coin-pusher-machine,.wheel-glass,.color-wheel,.stone-stack-icon){animation:none}}
+      `}</style>
     </div>
   );
 };

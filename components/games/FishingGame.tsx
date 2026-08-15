@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import type Phaser from 'phaser';
+import type { OceanHunter3DRenderer } from './oceanHunter3D';
 import { CurrencyMode } from '../../types';
 import { useCoinSystem } from '../../context/CoinContext';
 
@@ -14,7 +15,7 @@ const BOSS_WAVE_SECONDS = 60;
 type ArenaSide = 'bottom' | 'left' | 'top' | 'right';
 type FishBehavior = 'drift' | 'dart' | 'armored' | 'school' | 'swell' | 'ink' | 'glide' | 'surge' | 'boss';
 type FishDefinition = { emoji: string; hp: number; multiplier: number; speed: number; radius: number; weight: number; color: string; behavior: FishBehavior };
-type Fish = FishDefinition & { id: number; x: number; y: number; baseY: number; vx: number; phase: number; age: number; depth: number; currentHp: number; slowUntil: number; flashUntil: number };
+type Fish = FishDefinition & { id: number; x: number; y: number; baseY: number; vx: number; vy: number; phase: number; age: number; depth: number; depthTarget: number; nextManeuverAt: number; currentHp: number; slowUntil: number; flashUntil: number };
 type Hunter = { id: number; name: string; isHuman: boolean; side: ArenaSide; color: string; score: number; catches: number; shots: number; hits: number };
 type Bullet = {
   id: number;
@@ -311,9 +312,12 @@ const OceanHunterGame: React.FC = () => {
       y,
       baseY: y,
       vx: (fromLeft ? 1 : -1) * definition.speed,
+      vy: (Math.random() - .5) * definition.speed * .65,
       phase: Math.random() * Math.PI * 2,
       age: Math.random() * 10,
       depth: .82 + Math.random() * .28,
+      depthTarget: .78 + Math.random() * .4,
+      nextManeuverAt: .7 + Math.random() * 2.8,
       currentHp: definition.hp,
       slowUntil: 0,
       flashUntil: 0
@@ -323,7 +327,8 @@ const OceanHunterGame: React.FC = () => {
   const spawnSpecial = useCallback((definition: FishDefinition) => {
     const fromLeft = Math.random() > .5;
     const y = 150 + Math.random() * (CANVAS_HEIGHT - 300);
-    fishRef.current.push({ ...definition, id: nextIdRef.current++, x: fromLeft ? -definition.radius : CANVAS_WIDTH + definition.radius, y, baseY: y, vx: (fromLeft ? 1 : -1) * definition.speed, phase: 0, age: 0, depth: definition.behavior === 'boss' ? 1 : .92 + Math.random() * .16, currentHp: definition.hp, slowUntil: 0, flashUntil: 0 });
+    const depth = definition.behavior === 'boss' ? 1 : .92 + Math.random() * .16;
+    fishRef.current.push({ ...definition, id: nextIdRef.current++, x: fromLeft ? -definition.radius : CANVAS_WIDTH + definition.radius, y, baseY: y, vx: (fromLeft ? 1 : -1) * definition.speed, vy: (Math.random() - .5) * definition.speed * .45, phase: 0, age: 0, depth, depthTarget: depth, nextManeuverAt: 1 + Math.random() * 2, currentHp: definition.hp, slowUntil: 0, flashUntil: 0 });
   }, []);
 
   const flushPayouts = useCallback(async () => {
@@ -512,8 +517,12 @@ const OceanHunterGame: React.FC = () => {
     if (!isPlaying) return;
     mountedRef.current = true;
     const canvas = canvasRef.current;
-    const context = canvas?.getContext('2d');
-    if (!canvas || !context) return;
+    if (!canvas) return;
+    const legacyCanvas = document.createElement('canvas');
+    legacyCanvas.width = CANVAS_WIDTH;
+    legacyCanvas.height = CANVAS_HEIGHT;
+    const context = legacyCanvas.getContext('2d');
+    if (!context) return;
     bubblesRef.current = Array.from({ length: 48 }, () => ({
       x: Math.random() * CANVAS_WIDTH, y: Math.random() * CANVAS_HEIGHT,
       radius: 2 + Math.random() * 5, speed: 14 + Math.random() * 30
@@ -683,10 +692,23 @@ const OceanHunterGame: React.FC = () => {
         const frozenSpeed = time < fish.slowUntil ? .46 : 1;
         const dartSpeed = fish.behavior === 'dart' ? .72 + Math.max(0, Math.sin(fish.age * 4.5)) * 1.05 : 1;
         const bossPhase = fish.behavior === 'boss' ? 1 + (1 - fish.currentHp / fish.hp) * 1.35 : 1;
+        if (fish.age >= fish.nextManeuverAt) {
+          const edgeTurn = fish.y < 150 ? 1 : fish.y > CANVAS_HEIGHT - 150 ? -1 : Math.random() - .5;
+          const agility = fish.behavior === 'dart' ? 1.35 : fish.behavior === 'boss' || fish.behavior === 'glide' ? .48 : 1;
+          fish.vy = edgeTurn * fish.speed * (.35 + Math.random() * .85) * agility;
+          fish.vx = Math.sign(fish.vx || 1) * fish.speed * (.62 + Math.random() * .82);
+          if (Math.random() < (fish.behavior === 'dart' ? .17 : .07) && fish.x > 260 && fish.x < CANVAS_WIDTH - 260) fish.vx *= -1;
+          fish.depthTarget = fish.behavior === 'boss' ? .96 + Math.random() * .12 : .72 + Math.random() * .55;
+          fish.nextManeuverAt = fish.age + .65 + Math.random() * (fish.behavior === 'dart' ? 1.5 : 3.2);
+        }
+        const curve = Math.sin(fish.age * (fish.behavior === 'school' ? 2.7 : fish.behavior === 'drift' ? 1.15 : 1.8) + fish.phase) * fish.speed * .32;
         fish.x += fish.vx * delta * environmentSpeed * frozenSpeed * dartSpeed * bossPhase;
-        const amplitude = fish.behavior === 'drift' ? 48 : fish.behavior === 'ink' ? 38 : fish.behavior === 'boss' ? 58 : fish.behavior === 'surge' ? 22 : fish.behavior === 'glide' ? 16 : 28;
-        const frequency = fish.behavior === 'drift' ? .8 : fish.behavior === 'ink' ? 2.1 : fish.behavior === 'boss' ? 1.25 : fish.behavior === 'dart' ? 3.2 : 1.55;
-        fish.y = Math.max(fish.radius + 30, Math.min(CANVAS_HEIGHT - fish.radius - 30, fish.baseY + Math.sin(fish.age * frequency + fish.phase) * amplitude));
+        fish.y += (fish.vy + curve) * delta * environmentSpeed * frozenSpeed;
+        fish.depth += (fish.depthTarget - fish.depth) * Math.min(1, delta * (fish.behavior === 'dart' ? 1.8 : .7));
+        const top = fish.radius + 45;
+        const bottom = CANVAS_HEIGHT - fish.radius - 45;
+        if (fish.y < top) { fish.y = top; fish.vy = Math.abs(fish.vy); }
+        if (fish.y > bottom) { fish.y = bottom; fish.vy = -Math.abs(fish.vy); }
       });
       fishRef.current = fishRef.current.filter((fish) => fish.x > -fish.radius - 80 && fish.x < CANVAS_WIDTH + fish.radius + 80);
       targetsRef.current.forEach((targetId, hunterId) => {
@@ -774,26 +796,37 @@ const OceanHunterGame: React.FC = () => {
     // stages, which keeps wallet operations and wave state stable during the
     // migration.
     let game: Phaser.Game | null = null;
+    let arenaRenderer: OceanHunter3DRenderer | null = null;
     let cancelled = false;
     let stepEvent = '';
     let postRenderEvent = '';
-    void import('phaser').then(({ default: PhaserRuntime }) => {
+    const render3D = (time: number) => arenaRenderer?.render({
+      fish: fishRef.current,
+      bullets: bulletsRef.current,
+      particles: particlesRef.current,
+      hunters: huntersRef.current,
+      aims: aimsRef.current,
+      targets: targetsRef.current,
+      environment: environmentRef.current,
+      cannonSkin: cannonSkinRef.current,
+      shake: shakeRef.current,
+      time
+    });
+    void Promise.all([import('phaser'), import('./oceanHunter3D')]).then(([{ default: PhaserRuntime }, { OceanHunter3DRenderer: Renderer }]) => {
       if (cancelled) return;
+      arenaRenderer = new Renderer(canvas, ARENA_BACKGROUND_URL);
       stepEvent = PhaserRuntime.Core.Events.STEP;
       postRenderEvent = PhaserRuntime.Core.Events.POST_RENDER;
       game = new PhaserRuntime.Game({
-        type: PhaserRuntime.CANVAS,
-        canvas,
+        type: PhaserRuntime.HEADLESS,
         width: CANVAS_WIDTH,
         height: CANVAS_HEIGHT,
-        transparent: true,
         banner: false,
         audio: { noAudio: true },
-        render: { clearBeforeRender: true },
         scene: { create: () => undefined }
       });
       game.events.on(stepEvent, update);
-      game.events.on(postRenderEvent, draw);
+      game.events.on(postRenderEvent, render3D);
     });
 
     return () => {
@@ -801,9 +834,10 @@ const OceanHunterGame: React.FC = () => {
       cancelled = true;
       if (game) {
         game.events.off(stepEvent, update);
-        game.events.off(postRenderEvent, draw);
+        game.events.off(postRenderEvent, render3D);
         game.destroy(false);
       }
+      arenaRenderer?.dispose();
       fishRef.current = []; bulletsRef.current = []; effectsRef.current = []; particlesRef.current = []; payoutQueueRef.current = [];
     };
   }, [awardFish, commitHunters, isPlaying, resetOcean, spawnFish, spawnSpecial]);

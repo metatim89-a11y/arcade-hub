@@ -15,7 +15,8 @@
     "matter-js": "^0.20.0",
     "phaser": "^4.2.1",
     "react": "^19.2.0",
-    "react-dom": "^19.2.0"
+    "react-dom": "^19.2.0",
+    "three": "^0.185.1"
   },
   "devDependencies": {
     "@types/node": "^22.14.0",
