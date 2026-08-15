@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { getSupabase, isSupabaseConfigured } from '../../lib/supabase';
 import TexasHoldemGame from './TexasHoldemGame';
+import OnlineHoldemGame from './OnlineHoldemGame';
 
 type OnlineTable = { id: string; name: string; owner_id: string; max_players: number; bot_count: number; small_blind: number; big_blind: number; buy_in: number; status: string };
 type OnlineSeat = { table_id: string; user_id: string; display_name: string; seat_number: number };
@@ -24,7 +25,7 @@ const TexasHoldemLobby: React.FC = () => {
     if (!isSupabaseConfigured || !user || user.isGuest) return;
     const supabase = getSupabase();
     const [{ data: tableRows, error: tableError }, { data: seatRows, error: seatError }] = await Promise.all([
-      supabase.from('holdem_tables').select('id,name,owner_id,max_players,bot_count,small_blind,big_blind,buy_in,status').eq('status', 'waiting').order('created_at'),
+      supabase.from('holdem_tables').select('id,name,owner_id,max_players,bot_count,small_blind,big_blind,buy_in,status').in('status', ['waiting', 'playing']).order('created_at'),
       supabase.from('holdem_table_seats').select('table_id,user_id,display_name,seat_number').order('seat_number'),
     ]);
     if (tableError || seatError) throw tableError || seatError;
@@ -70,8 +71,13 @@ const TexasHoldemLobby: React.FC = () => {
     if (rpcError) throw rpcError;
     setSelectedTableId(null);
   });
+  const startOnlineGame = (id: string) => run(async () => {
+    const { data, error: functionError } = await getSupabase().functions.invoke('holdem-game', { body: { tableId: id, action: 'start' } });
+    if (functionError || data?.error) throw new Error(data?.error || functionError?.message);
+  });
 
   if (practiceMode) return <div className="online-holdem"><button className="lobby-back" onClick={() => setPracticeMode(false)}>← TABLE LOBBY</button><TexasHoldemGame /></div>;
+  if (myTable?.status === 'playing' && user) return <OnlineHoldemGame tableId={myTable.id} userId={user.id} onLeave={() => void leaveTable(myTable.id)} />;
   if (!user || user.isGuest || !isSupabaseConfigured) return (
     <section className="holdem-lobby"><h2>Hold’em Tables</h2><p>Sign in with an Arcade Hub account to join online tables from another device.</p><button onClick={() => setPracticeMode(true)}>PLAY WITH BOTS</button></section>
   );
@@ -89,6 +95,7 @@ const TexasHoldemLobby: React.FC = () => {
             return <div key={index} className={seat ? 'filled' : index >= botStart ? 'bot' : ''}><b>{seat?.display_name ?? (index >= botStart ? `CPU ${index + 1}` : 'Open seat')}</b><span>SEAT {index + 1}</span></div>;
           })}</div>
           <p>Waiting for players. Seats update live across every device.</p>
+          {myTable.owner_id === user.id && <button disabled={busy} onClick={() => startOnlineGame(myTable.id)}>START GAME</button>}
           <button disabled={busy} onClick={() => leaveTable(myTable.id)}>LEAVE TABLE</button>
         </div>
       ) : showCreate ? (
