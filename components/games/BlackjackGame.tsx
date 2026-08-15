@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useCoinSystem } from '../../context/CoinContext';
 import GlassButton from '../ui/GlassButton';
+import { BlackjackTable3D } from './CardGames3D';
 
 type Suit = '♠' | '♥' | '♦' | '♣';
 type Rank = '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9' | '10' | 'J' | 'Q' | 'K' | 'A';
@@ -276,38 +277,26 @@ const BlackjackGame: React.FC = () => {
           </div>
       </div>
 
-      {/* Dealer Hand */}
-      <div className="flex flex-col items-center gap-4 z-10">
-        <div className="bg-black/40 px-4 py-1 rounded-full text-xs font-bold text-gray-300 uppercase tracking-widest border border-white/5">
-            Dealer {gameState !== 'BETTING' && `• ${calculateScore(dealerHand)}`}
+      <div className="relative z-10 mt-8 h-[390px] w-full max-w-3xl overflow-hidden rounded-[38px] border border-yellow-200/15 shadow-[0_30px_70px_rgba(0,0,0,.45)]">
+        <BlackjackTable3D dealerHand={dealerHand} playerHand={playerHand} />
+        <div className="pointer-events-none absolute left-1/2 top-3 -translate-x-1/2 rounded-full border border-white/10 bg-black/55 px-4 py-1 text-xs font-bold uppercase tracking-widest text-gray-200">
+          Dealer {gameState !== 'BETTING' && `• ${calculateScore(dealerHand)}`}
         </div>
-        <div className="flex gap-2 md:gap-4 h-36">
-          {dealerHand.map((c, i) => <CardView key={i} card={c} index={i} />)}
-          {dealerHand.length === 0 && <div className="w-24 h-36 border-4 border-dashed border-green-900/50 rounded-xl"></div>}
+        <div className="pointer-events-none absolute bottom-3 left-1/2 -translate-x-1/2 rounded-full border border-white/10 bg-black/55 px-4 py-1 text-xs font-bold uppercase tracking-widest text-gray-200">
+          Player {gameState !== 'BETTING' && `• ${calculateScore(playerHand)}`}
         </div>
       </div>
 
       {/* Message Board */}
-      <div className="my-8 flex flex-col items-center justify-center min-h-[60px] text-center px-4">
+      <div className="my-5 flex flex-col items-center justify-center min-h-[60px] text-center px-4">
           <div className="text-2xl md:text-3xl font-black text-yellow-400 italic tracking-tight drop-shadow-2xl animate-pulse">
               {message}
           </div>
           {currentBet > 0 && <div className="text-white/60 text-xs font-bold mt-2">ACTIVE BET: {currentBet} {currencySymbol}</div>}
       </div>
 
-      {/* Player Hand */}
-      <div className="flex flex-col items-center gap-4 z-10">
-        <div className="flex gap-2 md:gap-4 h-36">
-          {playerHand.map((c, i) => <CardView key={i} card={c} index={i} />)}
-          {playerHand.length === 0 && <div className="w-24 h-36 border-4 border-dashed border-green-900/50 rounded-xl"></div>}
-        </div>
-        <div className="bg-black/40 px-4 py-1 rounded-full text-xs font-bold text-gray-300 uppercase tracking-widest border border-white/5">
-            Player {gameState !== 'BETTING' && `• ${calculateScore(playerHand)}`}
-        </div>
-      </div>
-
       {/* Control Station */}
-      <div className="w-full mt-10 bg-[#1b1b1b] p-6 rounded-3xl border border-white/10 shadow-2xl flex flex-col md:flex-row gap-6 justify-between items-center">
+      <div className="z-10 w-full mt-3 bg-[#1b1b1b] p-6 rounded-3xl border border-white/10 shadow-2xl flex flex-col md:flex-row gap-6 justify-between items-center">
         
         {gameState === 'BETTING' || gameState === 'GAME_OVER' ? (
            <div className="flex flex-wrap justify-center gap-6 items-center">

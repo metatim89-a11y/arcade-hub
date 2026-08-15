@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { CurrencyMode } from '../../types';
 import { useCoinSystem } from '../../context/CoinContext';
+import SlotsMachine3D from './SlotsMachine3D';
 
 const REEL_COUNT = 5;
 const VISIBLE_SYMBOLS = 3;
@@ -229,6 +230,7 @@ const SlotsGame: React.FC = () => {
   useEffect(() => { mountedRef.current = true; return () => { mountedRef.current = false; clearTimers(); void audioRef.current?.close(); }; }, [clearTimers]);
 
   const winningCell = (reel: number, row: number) => Boolean(winInfo?.winningPaylines.some((line) => line.positions.some(([column, lineRow]) => column === reel && lineRow === row)));
+  const winningPositions = winInfo?.winningPaylines.flatMap((line) => line.positions.map(([column, row]) => `${column}-${row}`)) ?? [];
 
   return (
     <section className={`volt-slots${anticipation ? ' anticipating' : ''}`}>
@@ -238,7 +240,7 @@ const SlotsGame: React.FC = () => {
         <div className="volt-lights" aria-hidden="true">{Array.from({ length: 24 }, (_, index) => <i key={index} />)}</div>
         {freeSpins > 0 && <div className="free-spin-banner"><strong>FREE SPINS ACTIVE</strong><span>{freeSpins} REMAINING · ALL LINE WINS 1.5×</span></div>}
         {phase === 'BONUS' ? <div className={`vault-board${bonusRolling ? ' rolling' : ''}`}><div className="vault-title"><span>HOLD & SPIN VAULT</span><strong>{respins} RESPINS</strong></div><div className="vault-grid">{bonusCells.map((value, index) => <div key={index} className={value !== null ? 'held' : ''}>{value !== null ? <><span>🪙</span><strong>{value}</strong><small>{symbol}</small></> : <i>+</i>}</div>)}</div><p>Fill all 15 spaces to double the entire vault.</p></div> : (
-          <div className="reel-deck">{reels.map((reel, reelIndex) => <div key={reelIndex} className={`volt-reel${reel.spinning ? ' spinning' : ''}`}><div className="volt-track" style={{ transform: `translate3d(0,-${reel.offset}px,0)`, transition: reel.spinning ? `transform ${reel.duration}s cubic-bezier(.08,.7,.1,1)` : 'none' }}>{reel.symbols.map((item, itemIndex) => { const row = reel.symbols.length === 3 ? itemIndex : itemIndex - (reel.symbols.length - 3); const curve = row === 0 ? ' top' : row === 1 ? ' center' : row === 2 ? ' bottom' : ''; return <div key={`${itemIndex}-${item}`} className={`volt-symbol${curve}${row >= 0 && winningCell(reelIndex, row) ? ' winner' : ''}`}><span>{item}</span></div>; })}</div></div>)}</div>
+          <div className="h-[470px] w-full overflow-hidden rounded-xl"><SlotsMachine3D reels={reels} winningPositions={winningPositions} anticipation={anticipation} /></div>
         )}
         {celebration && <div className="win-celebration"><small>{celebration.title}</small><strong>{celebration.amount}</strong><span>{symbol}</span></div>}
         <div className="volt-status" role="status" aria-live="polite">{status}</div>

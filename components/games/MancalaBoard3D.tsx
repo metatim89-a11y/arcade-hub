@@ -46,7 +46,7 @@ const MancalaBoard3D: React.FC<MancalaBoard3DProps> = (props) => {
       renderer.shadowMap.type = THREE.PCFSoftShadowMap;
       const scene = new THREE.Scene();
       const camera = new THREE.PerspectiveCamera(38, 1, .1, 50);
-      camera.position.set(0, 7.7, 7.8);
+      camera.position.set(0, 10.8, 3.5);
       camera.lookAt(0, 0, 0);
       scene.add(new THREE.HemisphereLight(0xffe5bd, 0x09111c, 2.5));
       const key = new THREE.DirectionalLight(0xfff1d5, 5.4);

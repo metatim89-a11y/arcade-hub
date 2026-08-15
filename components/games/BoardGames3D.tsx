@@ -57,7 +57,7 @@ export const TicTacToeBoard3D: React.FC<TicTacToeBoard3DProps> = ({ board, winni
 
       const scene = new THREE.Scene();
       const camera = new THREE.PerspectiveCamera(38, 1, .1, 40);
-      camera.position.set(0, 6.8, 7.8);
+      camera.position.set(0, 9.8, 3.25);
       camera.lookAt(0, 0, 0);
       scene.add(new THREE.HemisphereLight(0xccecff, 0x101523, 2.4));
       const key = new THREE.DirectionalLight(0xffffff, 4.8);

@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { PlayMode } from '../../types';
 import GlassButton from '../ui/GlassButton';
+import { MemoryCards3D } from './CardGames3D';
 
 const SYMBOLS = ['✊', '✋', '✌️', '💣', '💎', '👑', '🔥', '💧'];
 
@@ -139,22 +140,8 @@ const RPSCardGame: React.FC<RPSCardGameProps> = ({ playMode }) => {
                 <span>{computerName}: {scores.player2}</span>
             </div>
             <div className="text-lg font-semibold h-7 mb-2">{status}</div>
-            <div className="grid grid-cols-4 gap-2 md:gap-4">
-                {board.map(card => (
-                    <div
-                        key={card.id}
-                        className="relative w-20 h-20 md:w-24 md:h-24 perspective-1000"
-                        onClick={() => handleCardClick(card.id)}
-                    >
-                        <div className={`card-inner ${card.isFlipped ? 'is-flipped' : ''} ${card.isMatched ? 'is-matched shadow-[0_0_20px_rgba(34,197,94,0.6)]' : ''}`}>
-                            <div className="card-front bg-blue-600 hover:bg-blue-500 rounded-lg cursor-pointer shadow-[inset_0_0_20px_rgba(0,0,0,0.3)] border-2 border-white/10"></div>
-                            <div className="card-back bg-gray-700 rounded-lg flex items-center justify-center text-4xl border-2 border-white/20 shadow-xl">
-                                {card.symbol}
-                            </div>
-                        </div>
-                        {card.isMatched && lastMatchSymbol === card.symbol && <StunDropAnimation />}
-                    </div>
-                ))}
+            <div className="h-[520px] w-full max-w-[620px] overflow-hidden rounded-3xl shadow-[0_28px_70px_rgba(0,0,0,.48)]">
+                <MemoryCards3D cards={board} disabled={gameOver || isChecking || (playMode === 'vsComputer' && currentPlayer === 2)} onCardClick={handleCardClick} />
             </div>
             {gameOver && <GlassButton onClick={handleReset} className="mt-4 text-xl py-3">Play Again</GlassButton>}
 

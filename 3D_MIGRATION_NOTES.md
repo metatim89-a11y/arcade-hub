@@ -27,6 +27,17 @@ Convert every game's actual playable surface and pieces to interactive 3D. The e
   - Existing sowing, capture, puzzle, timer and CPU rules remain in React.
 - Production build passed after all three board conversions (`vite build`, 129 modules, completed in 2m 53s). Only the repository's existing large-chunk warnings remain.
 
+## Second local batch
+
+- Raised Tic-Tac-Toe and Mancala to high, near top-down cameras so the full boards read clearly; Connect Four remains upright.
+- Added `components/games/CardGames3D.tsx`.
+  - Blackjack now has a modeled felt table, rail and dealt 3D card meshes with generated face/back textures.
+  - RPS Memory now has a ray-cast 4×4 board of thick 3D cards with hover lift and matched-card effects.
+- Added `components/games/SlotsMachine3D.tsx` and connected it to `SlotsGame.tsx`.
+  - Upright cabinet, metallic frame, cylindrical reels, generated symbol textures, physical spin rotation, bulbs, anticipation state and win glow are modeled in Three.js.
+  - The existing weighted outcomes, paylines, wallet operations, free spins and Hold & Spin rules are unchanged.
+- Production build passed for this batch (`vite build`, 131 modules). Existing chunk-size warnings only.
+
 ## Planned conversion order
 
 1. Tic-Tac-Toe, Connect Four and Mancala board batch: complete and build-tested.
