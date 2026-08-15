@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+import type Phaser from 'phaser';
 import { CurrencyMode } from '../../types';
 import { useCoinSystem } from '../../context/CoinContext';
 
@@ -13,7 +14,7 @@ const BOSS_WAVE_SECONDS = 60;
 type ArenaSide = 'bottom' | 'left' | 'top' | 'right';
 type FishBehavior = 'drift' | 'dart' | 'armored' | 'school' | 'swell' | 'ink' | 'glide' | 'surge' | 'boss';
 type FishDefinition = { emoji: string; hp: number; multiplier: number; speed: number; radius: number; weight: number; color: string; behavior: FishBehavior };
-type Fish = FishDefinition & { id: number; x: number; y: number; baseY: number; vx: number; phase: number; age: number; currentHp: number; slowUntil: number; flashUntil: number };
+type Fish = FishDefinition & { id: number; x: number; y: number; baseY: number; vx: number; phase: number; age: number; depth: number; currentHp: number; slowUntil: number; flashUntil: number };
 type Hunter = { id: number; name: string; isHuman: boolean; side: ArenaSide; color: string; score: number; catches: number; shots: number; hits: number };
 type Bullet = {
   id: number;
@@ -41,8 +42,8 @@ type WeaponMode = 'Torpedo' | 'Spread' | 'Piercing' | 'Freeze';
 type Mission = { emoji: string; goal: number; progress: number; seconds: number };
 
 const FISH_DEFINITIONS: FishDefinition[] = [
-  { emoji: '🪼', hp: 1, multiplier: 0.8, speed: 82, radius: 24, weight: 15, color: '#c98cff', behavior: 'drift' },
-  { emoji: '🦐', hp: 1, multiplier: 1, speed: 142, radius: 20, weight: 14, color: '#ff8f86', behavior: 'dart' },
+  { emoji: '🪼', hp: 1, multiplier: 0.8, speed: 82, radius: 34, weight: 15, color: '#c98cff', behavior: 'drift' },
+  { emoji: '🦐', hp: 1, multiplier: 1, speed: 142, radius: 24, weight: 14, color: '#ff8f86', behavior: 'dart' },
   { emoji: '🦀', hp: 2, multiplier: 1.4, speed: 64, radius: 28, weight: 13, color: '#ff5c56', behavior: 'armored' },
   { emoji: '🐠', hp: 2, multiplier: 1.8, speed: 126, radius: 32, weight: 14, color: '#4ed4ff', behavior: 'school' },
   { emoji: '🐟', hp: 3, multiplier: 2.4, speed: 112, radius: 34, weight: 13, color: '#78a8d2', behavior: 'school' },
@@ -69,6 +70,7 @@ const FISH_NAMES: Record<string, string> = {
   '🦑': 'Squid', '🐢': 'Sea Turtle', '🦈': 'Shark', '🐋': 'Whale', '🌟': 'Golden Star', '🐙': 'Kraken', '🧰': 'Treasure Chest'
 };
 const SPRITE_ATLAS_URL = `${import.meta.env.BASE_URL}assets/ocean-hunter/creature-atlas.png`;
+const ARENA_BACKGROUND_URL = `${import.meta.env.BASE_URL}assets/ocean-hunter/ocean-arena.webp`;
 const waveName = (wave: number) => wave % 4 === 0 ? 'KRAKEN BOSS ROUND' : wave % 4 === 1 ? 'REEF PATROL' : wave % 4 === 2 ? 'FEEDING FRENZY' : 'TREASURE TIDE';
 const waveDuration = (wave: number) => wave % 4 === 0 ? BOSS_WAVE_SECONDS : NORMAL_WAVE_SECONDS;
 
@@ -117,8 +119,8 @@ const drawCreatureSprite = (context: CanvasRenderingContext2D, atlas: HTMLImageE
 
   const cellWidth = atlas.naturalWidth / 4;
   const cellHeight = atlas.naturalHeight / 4;
-  const drawSize = fish.radius * (fish.behavior === 'boss' ? 2.75 : 2.65);
-  const slices = 12;
+  const drawSize = fish.radius * (fish.behavior === 'boss' ? 3.05 : fish.emoji === '🪼' ? 3.7 : fish.emoji === '🦐' ? 3.2 : 2.95);
+  const slices = 18;
   const pulse = fish.behavior === 'drift' ? 1 + Math.sin(fish.age * 3.2 + fish.phase) * .075
     : fish.behavior === 'swell' ? 1 + Math.max(0, Math.sin(fish.age * 2.4)) * .16
       : 1;
@@ -134,6 +136,38 @@ const drawCreatureSprite = (context: CanvasRenderingContext2D, atlas: HTMLImageE
   context.save();
   context.rotate(tilt);
   context.scale(1 / pulse, pulse);
+  if (fish.emoji === '🪼') {
+    const bellPulse = 1 + Math.sin(fish.age * 3.2 + fish.phase) * .09;
+    const glow = context.createRadialGradient(0, -drawSize * .12, 0, 0, 0, drawSize * .62);
+    glow.addColorStop(0, 'rgba(225,190,255,.34)');
+    glow.addColorStop(.48, 'rgba(133,93,255,.14)');
+    glow.addColorStop(1, 'rgba(72,218,255,0)');
+    context.fillStyle = glow;
+    context.beginPath();
+    context.ellipse(0, 0, drawSize * .65 * bellPulse, drawSize * .7, 0, 0, Math.PI * 2);
+    context.fill();
+    context.globalAlpha = .34;
+    context.strokeStyle = '#bdefff';
+    context.lineWidth = Math.max(1.5, fish.radius * .055);
+    for (let strand = -2; strand <= 2; strand += 1) {
+      const startX = strand * drawSize * .075;
+      context.beginPath();
+      context.moveTo(startX, drawSize * .12);
+      for (let segment = 1; segment <= 6; segment += 1) {
+        const y = drawSize * (.12 + segment * .075);
+        const x = startX + Math.sin(fish.age * 4.4 + fish.phase + segment * .8 + strand) * drawSize * .035;
+        context.lineTo(x, y);
+      }
+      context.stroke();
+    }
+    context.globalAlpha = 1;
+  }
+  if (fish.emoji === '🪼' || fish.emoji === '🦑' || fish.emoji === '🐙' || fish.emoji === '🧰' || fish.emoji === '🌟') {
+    const floatY = Math.sin(fish.age * 2.8 + fish.phase) * fish.radius * .045;
+    context.drawImage(atlas, cell.column * cellWidth, cell.row * cellHeight, cellWidth, cellHeight, -drawSize / 2, -drawSize / 2 + floatY, drawSize, drawSize);
+    context.restore();
+    return;
+  }
   for (let slice = 0; slice < slices; slice += 1) {
     const progress = slice / (slices - 1);
     const tailInfluence = Math.pow(1 - progress, 1.55);
@@ -151,8 +185,10 @@ const drawCreatureSprite = (context: CanvasRenderingContext2D, atlas: HTMLImageE
 
 const OceanHunterGame: React.FC = () => {
   const { canBet, subtractCoins, addCoins, currencyMode, funCoins, realCoins, isProcessing } = useCoinSystem();
+  const arenaRef = useRef<HTMLElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const spriteAtlasRef = useRef<HTMLImageElement | null>(null);
+  const arenaBackgroundRef = useRef<HTMLImageElement | null>(null);
   const fishRef = useRef<Fish[]>([]);
   const bulletsRef = useRef<Bullet[]>([]);
   const effectsRef = useRef<WinEffect[]>([]);
@@ -213,6 +249,7 @@ const OceanHunterGame: React.FC = () => {
   const [showSummary, setShowSummary] = useState(false);
   const [wave, setWave] = useState(1);
   const [waveSeconds, setWaveSeconds] = useState(NORMAL_WAVE_SECONDS);
+  const [isFullscreen, setIsFullscreen] = useState(false);
 
   const currencySymbol = currencyMode === 'fun' ? 'FC' : 'RC';
   const balance = currencyMode === 'fun' ? funCoins : realCoins;
@@ -232,10 +269,29 @@ const OceanHunterGame: React.FC = () => {
   useEffect(() => { missionRef.current = mission; }, [mission]);
   useEffect(() => {
     const atlas = new Image();
+    const backdrop = new Image();
     atlas.decoding = 'async';
+    backdrop.decoding = 'async';
     atlas.src = SPRITE_ATLAS_URL;
+    backdrop.src = ARENA_BACKGROUND_URL;
     atlas.onload = () => { spriteAtlasRef.current = atlas; };
-    return () => { atlas.onload = null; spriteAtlasRef.current = null; };
+    backdrop.onload = () => { arenaBackgroundRef.current = backdrop; };
+    return () => {
+      atlas.onload = null;
+      backdrop.onload = null;
+      spriteAtlasRef.current = null;
+      arenaBackgroundRef.current = null;
+    };
+  }, []);
+  useEffect(() => {
+    const syncFullscreen = () => setIsFullscreen(document.fullscreenElement === arenaRef.current);
+    document.addEventListener('fullscreenchange', syncFullscreen);
+    return () => document.removeEventListener('fullscreenchange', syncFullscreen);
+  }, []);
+
+  const toggleFullscreen = useCallback(async () => {
+    if (document.fullscreenElement) await document.exitFullscreen();
+    else if (arenaRef.current?.requestFullscreen) await arenaRef.current.requestFullscreen();
   }, []);
 
   const commitHunters = useCallback((update: (current: Hunter[]) => Hunter[]) => {
@@ -257,6 +313,7 @@ const OceanHunterGame: React.FC = () => {
       vx: (fromLeft ? 1 : -1) * definition.speed,
       phase: Math.random() * Math.PI * 2,
       age: Math.random() * 10,
+      depth: .82 + Math.random() * .28,
       currentHp: definition.hp,
       slowUntil: 0,
       flashUntil: 0
@@ -266,7 +323,7 @@ const OceanHunterGame: React.FC = () => {
   const spawnSpecial = useCallback((definition: FishDefinition) => {
     const fromLeft = Math.random() > .5;
     const y = 150 + Math.random() * (CANVAS_HEIGHT - 300);
-    fishRef.current.push({ ...definition, id: nextIdRef.current++, x: fromLeft ? -definition.radius : CANVAS_WIDTH + definition.radius, y, baseY: y, vx: (fromLeft ? 1 : -1) * definition.speed, phase: 0, age: 0, currentHp: definition.hp, slowUntil: 0, flashUntil: 0 });
+    fishRef.current.push({ ...definition, id: nextIdRef.current++, x: fromLeft ? -definition.radius : CANVAS_WIDTH + definition.radius, y, baseY: y, vx: (fromLeft ? 1 : -1) * definition.speed, phase: 0, age: 0, depth: definition.behavior === 'boss' ? 1 : .92 + Math.random() * .16, currentHp: definition.hp, slowUntil: 0, flashUntil: 0 });
   }, []);
 
   const flushPayouts = useCallback(async () => {
@@ -464,7 +521,6 @@ const OceanHunterGame: React.FC = () => {
     resetOcean();
     huntersRef.current.filter((hunter) => !hunter.isHuman).forEach((hunter) => botNextShotRef.current.set(hunter.id, performance.now() + 500 + Math.random() * 900));
 
-    let animationFrame = 0;
     let previousTime = performance.now();
     waveStartedRef.current = previousTime;
     let lastSpawn = previousTime;
@@ -476,22 +532,56 @@ const OceanHunterGame: React.FC = () => {
       const shake = shakeRef.current;
       context.save();
       if (shake > .2) context.translate((Math.random() - .5) * shake, (Math.random() - .5) * shake);
+      const backdrop = arenaBackgroundRef.current;
+      if (backdrop?.complete && backdrop.naturalWidth) {
+        const sourceRatio = backdrop.naturalWidth / backdrop.naturalHeight;
+        const canvasRatio = CANVAS_WIDTH / CANVAS_HEIGHT;
+        const sourceWidth = sourceRatio > canvasRatio ? backdrop.naturalHeight * canvasRatio : backdrop.naturalWidth;
+        const sourceHeight = sourceRatio > canvasRatio ? backdrop.naturalHeight : backdrop.naturalWidth / canvasRatio;
+        context.drawImage(backdrop, (backdrop.naturalWidth - sourceWidth) / 2, (backdrop.naturalHeight - sourceHeight) / 2, sourceWidth, sourceHeight, 0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+      } else {
+        context.fillStyle = '#063b5b';
+        context.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+      }
       const gradient = context.createLinearGradient(0, 0, 0, CANVAS_HEIGHT);
-      gradient.addColorStop(0, environmentMode === 'Darkness' ? '#063049' : '#087da4'); gradient.addColorStop(.48, environmentMode === 'Current' ? '#086889' : '#035273'); gradient.addColorStop(1, '#06192e');
+      gradient.addColorStop(0, environmentMode === 'Darkness' ? 'rgba(0,9,24,.66)' : 'rgba(1,93,130,.08)'); gradient.addColorStop(.48, environmentMode === 'Current' ? 'rgba(0,122,160,.18)' : 'rgba(1,40,70,.08)'); gradient.addColorStop(1, 'rgba(0,8,22,.36)');
       context.fillStyle = gradient; context.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
-      context.fillStyle = 'rgba(117,231,255,.07)';
+      context.fillStyle = 'rgba(117,231,255,.045)';
       for (let ray = 0; ray < 8; ray += 1) {
         context.beginPath(); context.moveTo(60 + ray * 210, 0); context.lineTo(180 + ray * 210, CANVAS_HEIGHT);
         context.lineTo(350 + ray * 210, CANVAS_HEIGHT); context.lineTo(160 + ray * 210, 0); context.fill();
       }
-      context.fillStyle = '#082c34'; context.beginPath(); context.moveTo(0, CANVAS_HEIGHT - 30);
+      context.fillStyle = 'rgba(3,24,35,.55)'; context.beginPath(); context.moveTo(0, CANVAS_HEIGHT - 30);
       for (let x = 0; x <= CANVAS_WIDTH; x += 55) context.lineTo(x, CANVAS_HEIGHT - 38 - Math.sin(x * .023) * 17);
       context.lineTo(CANVAS_WIDTH, CANVAS_HEIGHT); context.lineTo(0, CANVAS_HEIGHT); context.fill();
       context.strokeStyle = 'rgba(220,250,255,.22)'; context.lineWidth = 1.5;
       bubblesRef.current.forEach((bubble) => { context.beginPath(); context.arc(bubble.x, bubble.y, bubble.radius, 0, Math.PI * 2); context.stroke(); });
 
       for (const fish of fishRef.current) {
-        context.save(); context.translate(fish.x, fish.y); if (fish.vx < 0) context.scale(-1, 1);
+        context.save(); context.translate(fish.x, fish.y); context.scale(fish.depth, fish.depth); if (fish.vx < 0) context.scale(-1, 1);
+        const swimEnergy = Math.min(1.35, Math.abs(fish.vx) / 110);
+        if (fish.emoji !== '🧰' && fish.behavior !== 'armored') {
+          context.save();
+          context.globalAlpha = .16 + swimEnergy * .1;
+          context.fillStyle = '#c9f7ff';
+          context.shadowColor = '#71dcff';
+          context.shadowBlur = 8;
+          for (let bubbleIndex = 0; bubbleIndex < 4; bubbleIndex += 1) {
+            const travel = (fish.age * (18 + swimEnergy * 16) + bubbleIndex * 23 + fish.phase * 11) % (fish.radius * 2.5 + 54);
+            const bubbleX = -fish.radius * 1.1 - travel;
+            const bubbleY = Math.sin(fish.age * 3 + bubbleIndex * 2.2 + fish.phase) * fish.radius * .23 - travel * .06;
+            const bubbleRadius = 1.6 + bubbleIndex * .8;
+            context.beginPath(); context.arc(bubbleX, bubbleY, bubbleRadius, 0, Math.PI * 2); context.fill();
+          }
+          context.restore();
+        }
+        context.save();
+        context.filter = `blur(${Math.max(5, fish.radius * .13)}px)`;
+        context.globalAlpha = .2;
+        context.fillStyle = fish.color;
+        context.beginPath(); context.ellipse(0, fish.radius * .24, fish.radius * 1.05, fish.radius * .62, 0, 0, Math.PI * 2); context.fill();
+        context.restore();
+        context.globalAlpha = .76 + (fish.depth - .82) * .9;
         if (fish.behavior === 'boss') {
           const pulse = 8 + Math.sin(time * .008) * 5;
           context.strokeStyle = '#ff3b9d'; context.lineWidth = 7; context.shadowColor = '#ff3b9d'; context.shadowBlur = 28;
@@ -500,7 +590,7 @@ const OceanHunterGame: React.FC = () => {
           context.beginPath(); context.ellipse(0, 0, fish.radius + 40 + pulse, fish.radius + 30 + pulse, 0, 0, Math.PI * 2); context.stroke(); context.setLineDash([]);
         }
         context.shadowColor = time < fish.flashUntil ? '#ffffff' : fish.color; context.shadowBlur = time < fish.flashUntil ? 34 : [...targetsRef.current.values()].includes(fish.id) ? 22 : 7;
-        drawCreatureSprite(context, spriteAtlasRef.current, fish); context.shadowBlur = 0;
+        drawCreatureSprite(context, spriteAtlasRef.current, fish); context.shadowBlur = 0; context.globalAlpha = 1;
         if (time < fish.slowUntil) {
           context.strokeStyle = '#8be9ff'; context.lineWidth = 4; context.setLineDash([5, 8]);
           context.beginPath(); context.arc(0, 0, fish.radius + 8, 0, Math.PI * 2); context.stroke(); context.setLineDash([]);
@@ -518,10 +608,12 @@ const OceanHunterGame: React.FC = () => {
       }
 
       bulletsRef.current.forEach((bullet) => {
-        context.strokeStyle = bullet.weapon === 'Freeze' ? '#8be9ff' : bullet.weapon === 'Piercing' ? '#ff79ec' : `${bullet.color}88`; context.lineWidth = bullet.weapon === 'Torpedo' ? 7 : 5; context.beginPath();
+        const isPlayerShot = huntersRef.current.some((hunter) => hunter.id === bullet.ownerId && hunter.isHuman);
+        const projectileRadius = isPlayerShot ? (bullet.weapon === 'Torpedo' ? 13 : 9) : (bullet.weapon === 'Torpedo' ? 9 : 6);
+        context.strokeStyle = bullet.weapon === 'Freeze' ? '#8be9ff' : bullet.weapon === 'Piercing' ? '#ff79ec' : `${bullet.color}88`; context.lineWidth = isPlayerShot ? (bullet.weapon === 'Torpedo' ? 10 : 7) : (bullet.weapon === 'Torpedo' ? 7 : 5); context.beginPath();
         context.moveTo(bullet.previousX, bullet.previousY); context.lineTo(bullet.x, bullet.y); context.stroke();
-        context.fillStyle = bullet.weapon === 'Freeze' ? '#bdf6ff' : '#f7feff'; context.shadowColor = bullet.color; context.shadowBlur = 18;
-        context.beginPath(); context.arc(bullet.x, bullet.y, bullet.weapon === 'Torpedo' ? 9 : 6, 0, Math.PI * 2); context.fill(); context.shadowBlur = 0;
+        context.fillStyle = bullet.weapon === 'Freeze' ? '#bdf6ff' : '#f7feff'; context.shadowColor = bullet.color; context.shadowBlur = isPlayerShot ? 25 : 18;
+        context.beginPath(); context.arc(bullet.x, bullet.y, projectileRadius, 0, Math.PI * 2); context.fill(); context.shadowBlur = 0;
       });
       particlesRef.current.forEach((particle) => {
         context.globalAlpha = Math.max(0, 1 - particle.age / particle.life);
@@ -675,11 +767,43 @@ const OceanHunterGame: React.FC = () => {
         setWaveSeconds(Math.max(0, Math.ceil(waveDuration(activeWave) - elapsedSeconds)));
         lastCountUpdate = time;
       }
-      draw(time); animationFrame = requestAnimationFrame(update);
     };
-    animationFrame = requestAnimationFrame(update);
+
+    // Phaser owns the game clock and canvas lifecycle. The existing gameplay
+    // simulation remains framework-neutral while its renderer is moved over in
+    // stages, which keeps wallet operations and wave state stable during the
+    // migration.
+    let game: Phaser.Game | null = null;
+    let cancelled = false;
+    let stepEvent = '';
+    let postRenderEvent = '';
+    void import('phaser').then(({ default: PhaserRuntime }) => {
+      if (cancelled) return;
+      stepEvent = PhaserRuntime.Core.Events.STEP;
+      postRenderEvent = PhaserRuntime.Core.Events.POST_RENDER;
+      game = new PhaserRuntime.Game({
+        type: PhaserRuntime.CANVAS,
+        canvas,
+        width: CANVAS_WIDTH,
+        height: CANVAS_HEIGHT,
+        transparent: true,
+        banner: false,
+        audio: { noAudio: true },
+        render: { clearBeforeRender: true },
+        scene: { create: () => undefined }
+      });
+      game.events.on(stepEvent, update);
+      game.events.on(postRenderEvent, draw);
+    });
+
     return () => {
-      mountedRef.current = false; cancelAnimationFrame(animationFrame);
+      mountedRef.current = false;
+      cancelled = true;
+      if (game) {
+        game.events.off(stepEvent, update);
+        game.events.off(postRenderEvent, draw);
+        game.destroy(false);
+      }
       fishRef.current = []; bulletsRef.current = []; effectsRef.current = []; particlesRef.current = []; payoutQueueRef.current = [];
     };
   }, [awardFish, commitHunters, isPlaying, resetOcean, spawnFish, spawnSpecial]);
@@ -732,7 +856,7 @@ const OceanHunterGame: React.FC = () => {
   };
 
   return (
-    <section className="ocean-hunter">
+    <section ref={arenaRef} className={`ocean-hunter ${isFullscreen ? 'is-fullscreen' : ''}`}>
       {!isPlaying ? (
         <div className="ocean-setup">
           <div className="ocean-kicker">MULTIPLAYER ARENA</div><h2>Ocean Hunter</h2>
@@ -752,7 +876,7 @@ const OceanHunterGame: React.FC = () => {
         </div>
       ) : (
         <>
-          <header className="ocean-header"><div><div className="ocean-kicker">FOUR-STATION DEEP SEA ARENA</div><h2>Ocean Hunter</h2></div><div className="ocean-metrics"><span><small>Balance</small>{Math.floor(balance)} {currencySymbol}</span><span><small>Last win</small>{lastWin} {currencySymbol}</span><span><small>Targets</small>{fishCount}</span></div></header>
+          <header className="ocean-header"><div><div className="ocean-kicker">FOUR-STATION DEEP SEA ARENA</div><h2>Ocean Hunter</h2></div><div className="ocean-metrics"><span><small>Balance</small>{Math.floor(balance)} {currencySymbol}</span><span><small>Last win</small>{lastWin} {currencySymbol}</span><span><small>Targets</small>{fishCount}</span><button type="button" className="ocean-expand" onClick={() => void toggleFullscreen()} aria-label={isFullscreen ? 'Exit full screen arena' : 'Open full screen arena'}>{isFullscreen ? 'MINIMIZE' : 'FULL SCREEN'}</button></div></header>
           <div className="hunter-scoreboard">{hunters.map((hunter) => <button key={hunter.id} type="button" disabled={!hunter.isHuman} className={hunter.id === activeHunterId ? 'active' : ''} style={{ '--hunter': hunter.color } as React.CSSProperties} onClick={() => { setActiveHunterId(hunter.id); setLockedTargetId(targetsRef.current.get(hunter.id) ?? null); setLockedSpecies(lockSpeciesRef.current.get(hunter.id) ?? null); setStatus(`${hunter.name} has control.`); }}><span>{hunter.name}<small>{hunter.isHuman ? 'PLAYER' : 'BOT'}</small></span><strong>{hunter.score}</strong><em>{hunter.catches} catches</em></button>)}</div>
           <div className={`ocean-wavebar ${wave % 4 === 0 ? 'boss-round' : ''}`}><span>WAVE {wave}</span><strong>{waveName(wave)}</strong><span>{waveSeconds}s</span></div>
           <div className="ocean-mission"><span>MISSION: {FISH_NAMES[mission.emoji]} {mission.progress}/{mission.goal} · BONUS {betAmount * 2} {currencySymbol}</span><strong>{mission.seconds}s</strong><span className={combo > 1 ? 'hot' : ''}>COMBO ×{combo}</span></div>
@@ -770,6 +894,12 @@ const OceanHunterGame: React.FC = () => {
 
       <style>{`
         .ocean-hunter{width:100%;padding:18px;border:1px solid #25516a;border-radius:18px;background:linear-gradient(155deg,#071927,#0b2434);color:#eefaff;box-shadow:0 24px 65px rgba(0,0,0,.38)}.ocean-setup{display:flex;flex-direction:column;align-items:center;gap:14px;max-width:680px;margin:28px auto;padding:28px;border:1px solid #28566d;border-radius:17px;background:#071a27;text-align:center}.ocean-kicker{color:#63d4ee;font-size:9px;font-weight:900;letter-spacing:.17em}.ocean-setup h2,.ocean-header h2{margin:2px 0 0;font-size:29px}.ocean-setup p{margin:0;color:#91aab7;font-size:13px}.ocean-counts{display:grid;grid-template-columns:1fr 1fr;gap:12px;width:100%}.ocean-counts label{display:grid;grid-template-columns:1fr auto;gap:8px;padding:10px;border:1px solid #2b5267;border-radius:9px;color:#91aab7;text-align:left;font-size:9px;font-weight:900;letter-spacing:.1em}.ocean-counts label strong{color:#ffe16f;font-size:16px}.ocean-counts input{grid-column:1/-1;width:100%;accent-color:#56cbea}.ocean-names{display:grid;grid-template-columns:1fr 1fr;gap:7px;width:100%}.ocean-names input{min-width:0;padding:10px;border:1px solid #2b5267;border-radius:7px;outline:0;background:#0c2635;color:white}.ocean-loadout{display:grid;grid-template-columns:1fr 1fr;gap:8px;width:100%}.ocean-loadout label{display:grid;gap:5px;color:#74b9ce;font-size:8px;font-weight:900;letter-spacing:.12em;text-align:left}.ocean-loadout select{width:100%;padding:10px;border:1px solid #2b5267;border-radius:7px;background:#0c2635;color:white}.arena-preview{display:flex;flex-wrap:wrap;justify-content:center;gap:7px}.arena-preview span{padding:5px 8px;border:1px solid currentColor;border-radius:5px;background:#081722;font-size:9px;font-weight:900}.ocean-setup>button{width:100%;padding:14px;border:0;border-radius:9px;background:linear-gradient(#65dafa,#2a9dc2);box-shadow:0 5px 0 #15566c;color:#05232e;font-weight:950;cursor:pointer}.ocean-setup small{color:#708b99}.ocean-header{display:flex;justify-content:space-between;align-items:flex-end;gap:18px;margin-bottom:11px}.ocean-metrics{display:flex;gap:7px}.ocean-metrics span{min-width:88px;padding:6px 9px;border:1px solid #28536a;border-radius:7px;background:#081723;text-align:right;font-size:12px;font-weight:900}.ocean-metrics small{display:block;color:#7896a5;font-size:7px;letter-spacing:.1em}.hunter-scoreboard{display:grid;grid-template-columns:repeat(4,1fr);gap:7px;margin-bottom:8px}.hunter-scoreboard button{display:grid;grid-template-columns:1fr auto;gap:2px;padding:8px 10px;border:1px solid #294c5e;border-left:4px solid var(--hunter);border-radius:8px;background:#081924;color:#dcecf3;text-align:left;cursor:pointer}.hunter-scoreboard button:disabled{cursor:default}.hunter-scoreboard button.active{box-shadow:0 0 0 2px var(--hunter);background:#102b39}.hunter-scoreboard span,.hunter-scoreboard strong{font-size:11px;font-weight:900}.hunter-scoreboard span small{display:block;color:#6f8a98;font-size:7px}.hunter-scoreboard strong{color:var(--hunter);font-size:17px}.hunter-scoreboard em{grid-column:1/-1;color:#7593a1;font-size:8px;font-style:normal}.ocean-wavebar{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;padding:8px 12px;border:1px solid #3a7490;border-radius:8px;background:linear-gradient(90deg,#0b2d3d,#123f50,#0b2d3d);color:#9beeff;font-size:10px;font-weight:950;letter-spacing:.12em}.ocean-wavebar strong{color:#fff;font-size:12px}.ocean-wavebar.boss-round{border-color:#ff4f9c;background:linear-gradient(90deg,#3d0c28,#701342,#3d0c28);color:#ff9fc8;box-shadow:0 0 18px rgba(255,48,142,.25)}.ocean-mission{display:flex;justify-content:space-between;margin-bottom:7px;padding:6px 9px;border:1px solid #2d5d72;border-radius:7px;background:#081c28;color:#70d9ee;font-size:9px;font-weight:900}.ocean-mission strong{color:#ffe06b}.ocean-mission .hot{color:#ffdc58;text-shadow:0 0 10px #ff9d2e;animation:combo-pulse .5s infinite alternate}.boss-warning{padding:9px;border:1px solid #ff6696;background:#58162c;color:#ffd5e3;text-align:center;font-weight:950;animation:boss-flash .45s infinite alternate}.ocean-screen{position:relative;overflow:hidden;width:100%;aspect-ratio:12/7;border:8px solid #102d42;border-radius:14px;background:#032e47;box-shadow:inset 0 0 40px rgba(0,0,0,.8),0 15px 30px rgba(0,0,0,.3)}.ocean-screen.env-darkness:after{content:'';position:absolute;inset:0;pointer-events:none;background:rgba(0,8,18,.32)}.ocean-screen canvas{display:block;width:100%;height:100%;touch-action:none;cursor:crosshair}.ocean-hud{position:absolute;z-index:2;inset:9px 9px auto;display:flex;justify-content:space-between;pointer-events:none}.ocean-hud span{padding:4px 7px;border:1px solid rgba(118,206,235,.3);border-radius:5px;background:rgba(3,20,31,.72);color:#9eb6c2;font-size:8px;font-weight:900;letter-spacing:.08em}.ocean-status{min-height:39px;margin:10px 0;padding:9px 12px;border:1px solid #23485c;border-radius:8px;background:#071620;color:#c9e5ef;font-size:12px;text-align:center}.ocean-controls{display:flex;justify-content:space-between;align-items:center;gap:10px}.shot-power,.ocean-actions{display:flex;align-items:center;gap:7px;flex-wrap:wrap}.shot-power>span{color:#7f9dac;font-size:8px;font-weight:900;letter-spacing:.12em}.shot-power strong{min-width:90px;text-align:center;color:#ffe06a}.ocean-controls button,.ocean-controls select{padding:8px 10px;border:1px solid #2c5870;border-radius:7px;background:#102b3b;color:#d9edf5;font-size:10px;font-weight:850;cursor:pointer}.ocean-controls button:disabled{opacity:.45}.ocean-controls button.selected{background:#154c42;border-color:#42bd8d;color:#9bf2cf}.ocean-controls button.selected.lock{background:#5a4215;border-color:#d9a72d;color:#ffe28a}.ocean-summary{display:grid;grid-template-columns:repeat(4,1fr);gap:7px;margin-top:9px}.ocean-summary div{display:grid;padding:8px;border:1px solid #28536a;border-radius:8px;background:#071823;color:#83a1b0;font-size:9px}.ocean-summary strong{color:#ffe06a;font-size:11px}.ocean-help{margin:11px 0 0;color:#7895a4;font-size:10px;text-align:center}.ocean-help strong{color:#9fe8fa}@keyframes boss-flash{to{filter:brightness(1.5)}}@keyframes combo-pulse{to{transform:scale(1.08)}}@media(max-width:780px){.ocean-hunter{padding:10px}.ocean-header{align-items:flex-start;flex-direction:column}.hunter-scoreboard,.ocean-summary{grid-template-columns:1fr 1fr}.ocean-controls{align-items:stretch;flex-direction:column}.shot-power,.ocean-actions{justify-content:center}}@media(max-width:470px){.ocean-counts,.ocean-names,.ocean-loadout{grid-template-columns:1fr}.ocean-metrics span{min-width:70px;font-size:10px}.ocean-screen{border-width:4px}.ocean-wavebar{font-size:8px;padding:6px}.ocean-wavebar strong{font-size:9px}.hunter-scoreboard button{padding:6px}.ocean-hud span:nth-child(2){display:none}}
+        .ocean-hunter{border-color:#2d7898;border-radius:22px;background:radial-gradient(circle at 50% -15%,rgba(27,163,208,.2),transparent 42%),linear-gradient(155deg,#061521,#0a2b3d);box-shadow:0 28px 80px rgba(0,0,0,.48),0 0 38px rgba(45,188,232,.12),inset 0 1px rgba(167,239,255,.13)}
+        .ocean-header{padding:5px 4px}.ocean-header h2{font-size:clamp(27px,3vw,42px);letter-spacing:-.04em;text-shadow:0 0 24px rgba(85,214,255,.28)}.ocean-metrics{align-items:stretch}.ocean-expand{padding:7px 13px;border:1px solid #57d9ff;border-radius:7px;background:linear-gradient(180deg,#164b62,#0c2c3c);color:#a9efff;font-size:9px;font-weight:950;letter-spacing:.08em;cursor:pointer;box-shadow:inset 0 1px rgba(255,255,255,.12),0 0 15px rgba(52,203,255,.12)}
+        .ocean-screen{border:clamp(5px,1vw,11px) solid #123d56;border-radius:20px;background:#031526;box-shadow:inset 0 0 70px rgba(0,0,0,.62),0 18px 38px rgba(0,0,0,.42),0 0 0 1px #3ba3c7,0 0 28px rgba(33,177,225,.2)}.ocean-screen:before{content:'';position:absolute;z-index:1;inset:0;pointer-events:none;background:radial-gradient(ellipse at center,transparent 52%,rgba(0,7,20,.42) 100%);box-shadow:inset 0 0 45px rgba(31,208,255,.1)}.ocean-hud{z-index:3}.ocean-wavebar,.ocean-mission,.ocean-status,.hunter-scoreboard button{backdrop-filter:blur(10px)}
+        .ocean-hunter.is-fullscreen{box-sizing:border-box;height:100dvh;overflow:auto;padding:12px;border:0;border-radius:0;background:#03111c}.ocean-hunter.is-fullscreen .ocean-screen{height:min(72dvh,calc(100dvw * .5833));max-height:none;aspect-ratio:auto}.ocean-hunter.is-fullscreen .ocean-help{display:none}
+        @media(max-width:780px){.ocean-hunter{width:100vw;margin-inline:calc(50% - 50vw);padding:7px;border-radius:10px}.ocean-header{align-items:center;flex-direction:row}.ocean-header h2{font-size:24px}.ocean-kicker{font-size:7px}.ocean-metrics{gap:4px}.ocean-metrics span{min-width:58px;padding:5px;font-size:9px}.ocean-expand{padding:6px 8px;font-size:7px}.ocean-screen{min-height:54vw;border-radius:12px}.ocean-hud{inset:5px}.ocean-hud span{font-size:7px}.ocean-status{min-height:32px;margin:6px 0;padding:6px}.ocean-hunter.is-fullscreen .ocean-header,.ocean-hunter.is-fullscreen .hunter-scoreboard{display:none}.ocean-hunter.is-fullscreen .ocean-screen{height:76dvh;min-height:76dvh}.ocean-hunter.is-fullscreen .ocean-controls{margin-top:4px}.ocean-hunter.is-fullscreen .ocean-status{margin:3px 0}}
+        .ocean-hunter.is-fullscreen .ocean-header{display:flex}
       `}</style>
     </section>
   );

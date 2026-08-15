@@ -104,7 +104,7 @@ const GameArea: React.FC<GameAreaProps> = ({ games, selectedGame, onSelectGame, 
   };
   
   const gameAreaSizeClass = activeGameProps.game.id === 'fishing'
-    ? 'max-w-[1600px]'
+    ? 'max-w-[1900px]'
     : (activeGameProps.game.id === 'mancala' || activeGameProps.game.id === 'worm') ? 'max-w-7xl' : 'max-w-4xl';
 
   const themeClasses = (() => {
@@ -134,7 +134,7 @@ const GameArea: React.FC<GameAreaProps> = ({ games, selectedGame, onSelectGame, 
   })() : undefined;
 
   return (
-    <div className="flex flex-col items-center w-full px-4 py-6 md:py-8">
+    <div className={`flex flex-col items-center w-full py-6 md:py-8 ${activeGameProps.game.id === 'fishing' ? 'px-0 sm:px-2' : 'px-4'}`}>
       {/* Game Navigation */}
       <nav className="flex justify-center gap-2 md:gap-4 mb-6 flex-wrap">
         {games.map((game) => (
@@ -194,7 +194,7 @@ const GameArea: React.FC<GameAreaProps> = ({ games, selectedGame, onSelectGame, 
           className={`w-full ${activeNeedsNaturalHeight ? 'min-h-[420px] h-auto justify-start' : 'h-full justify-center'} flex flex-col items-center ${previousGameProps ? 'game-transition-in' : ''}`}
           style={{
             paddingBlock: 'var(--game-area-padding-y)',
-            paddingInline: activeGameProps.game.id === 'slots' || activeGameProps.game.id === 'mancala' ? 'clamp(.35rem, 2vw, 1rem)' : 'var(--game-area-padding-x)',
+            paddingInline: activeGameProps.game.id === 'fishing' ? 'clamp(0rem, 1vw, .75rem)' : activeGameProps.game.id === 'slots' || activeGameProps.game.id === 'mancala' ? 'clamp(.35rem, 2vw, 1rem)' : 'var(--game-area-padding-x)',
           }}
         >
             <ActiveGameComponent 
