@@ -63,11 +63,12 @@ const initialProgression: PlayerProgression = {
 };
 
 const CoinContext = createContext<CoinContextType | undefined>(undefined);
+const GUEST_STARTING_FUN_COINS = 250;
 
 export const CoinProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const { user } = useAuth();
   const { payoutMultiplierForReason } = useAdminSettings();
-  const [funCoins, setFunCoins] = useState(1000);
+  const [funCoins, setFunCoins] = useState(GUEST_STARTING_FUN_COINS);
   const [realCoins, setRealCoins] = useState(0);
   const [tickets, setTickets] = useState(0);
   const [progression, setProgression] = useState<PlayerProgression>(initialProgression);
@@ -87,7 +88,7 @@ export const CoinProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     if (!user || user.isGuest) {
       const savedFun = Number(window.localStorage.getItem(funKey));
       const savedVirtual = Number(window.localStorage.getItem(virtualKey));
-      setFunCoins(Number.isFinite(savedFun) && savedFun >= 0 ? savedFun : 1000);
+      setFunCoins(Number.isFinite(savedFun) && savedFun >= 0 ? savedFun : GUEST_STARTING_FUN_COINS);
       setRealCoins(Number.isFinite(savedVirtual) && savedVirtual >= 0 ? savedVirtual : 0);
       setTickets(0);
       setProgression(initialProgression);
@@ -339,7 +340,7 @@ export const CoinProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     if (realDifference !== 0) await applyTransaction(realDifference > 0 ? 'credit' : 'debit', Math.abs(realDifference), 'Admin Balance Adjustment', 'real');
   }, [applyTransaction, funCoins, funKey, realCoins, user, virtualKey]);
 
-  const resetCoins = useCallback(() => setCoinBalances(1000, 0), [setCoinBalances]);
+  const resetCoins = useCallback(() => setCoinBalances(!user || user.isGuest ? GUEST_STARTING_FUN_COINS : 1000, 0), [setCoinBalances, user]);
   const syncBalance = useCallback(() => loadBalances(), [loadBalances]);
   const clearNotification = useCallback(() => setNotification(null), []);
   const activeBalance = currencyMode === 'fun' ? funCoins : realCoins;

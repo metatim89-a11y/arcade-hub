@@ -38,6 +38,27 @@ Convert every game's actual playable surface and pieces to interactive 3D. The e
   - The existing weighted outcomes, paylines, wallet operations, free spins and Hold & Spin rules are unchanged.
 - Production build passed for this batch (`vite build`, 131 modules). Existing chunk-size warnings only.
 
+## Additional product requirement
+
+- Applied Supabase migrations `20260815231952_grant_new_accounts_1000_rc` and then the user-requested correction `20260815232507_set_new_account_balances_1000_gc_5_rc` to production.
+- Final registered-account defaults are 1000 GC (`fun_coins`) and 5 RC (`real_coins`). The existing `auth.users` trigger inserts a balance row without overriding either default.
+- Verified both defaults remotely (`fun_coins = 1000`, `real_coins = 5`). Existing accounts were intentionally not modified.
+- Guest wallets now initialize with 250 GC locally; each guest session gets its own storage key, and guest reset returns to 250 GC / 0 RC.
+
+## Third local graphics batch
+
+- Texas Hold'em now mirrors community cards, all four seats' hole cards and table bets as dealt 3D meshes on a modeled table. Existing seat/status controls remain above the scene.
+- Ocean Hunter creature modeling was revised toward natural silhouettes and materials:
+  - clear-coated marine skin instead of flat plastic materials;
+  - dedicated shark, whale and segmented shrimp rigs;
+  - smaller natural eyes, gills, belly shading, fins and articulated tails;
+  - schooling cohesion/separation and predator pursuit added to randomized routes;
+  - smooth direction turns replace instant model flips.
+- Volt Vault Slots gained direct 3D cabinet interaction:
+  - the lever and illuminated cabinet spin button can trigger a real spin;
+  - cabinet lighting changes for base, Power Spin and Free Spin themes;
+  - lever pull, disabled-button and anticipation feedback are state-driven.
+
 ## Planned conversion order
 
 1. Tic-Tac-Toe, Connect Four and Mancala board batch: complete and build-tested.

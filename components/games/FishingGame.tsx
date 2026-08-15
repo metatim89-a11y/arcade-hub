@@ -701,6 +701,30 @@ const OceanHunterGame: React.FC = () => {
           fish.depthTarget = fish.behavior === 'boss' ? .96 + Math.random() * .12 : .72 + Math.random() * .55;
           fish.nextManeuverAt = fish.age + .65 + Math.random() * (fish.behavior === 'dart' ? 1.5 : 3.2);
         }
+        if (fish.behavior === 'school') {
+          const neighbors = fishRef.current.filter((candidate) => candidate.id !== fish.id && candidate.emoji === fish.emoji && Math.hypot(candidate.x - fish.x, candidate.y - fish.y) < 280);
+          if (neighbors.length) {
+            const centerY = neighbors.reduce((sum, candidate) => sum + candidate.y, 0) / neighbors.length;
+            const averageVy = neighbors.reduce((sum, candidate) => sum + candidate.vy, 0) / neighbors.length;
+            const averageDepth = neighbors.reduce((sum, candidate) => sum + candidate.depth, 0) / neighbors.length;
+            fish.vy += (centerY - fish.y) * delta * .18 + (averageVy - fish.vy) * delta * .34;
+            fish.depthTarget += (averageDepth - fish.depthTarget) * delta * .3;
+            const nearest = neighbors.reduce((closest, candidate) => Math.hypot(candidate.x - fish.x, candidate.y - fish.y) < Math.hypot(closest.x - fish.x, closest.y - fish.y) ? candidate : closest, neighbors[0]);
+            const distance = Math.hypot(nearest.x - fish.x, nearest.y - fish.y);
+            if (distance < 78) fish.vy += Math.sign(fish.y - nearest.y || Math.random() - .5) * fish.speed * delta * 1.2;
+          }
+        }
+        if (fish.behavior === 'surge') {
+          const prey = fishRef.current
+            .filter((candidate) => candidate.id !== fish.id && candidate.radius < 50 && Math.sign(candidate.vx) === Math.sign(fish.vx))
+            .sort((left, right) => Math.hypot(left.x - fish.x, left.y - fish.y) - Math.hypot(right.x - fish.x, right.y - fish.y))[0];
+          if (prey && Math.hypot(prey.x - fish.x, prey.y - fish.y) < 520) {
+            fish.vy += Math.sign(prey.y - fish.y) * fish.speed * delta * .85;
+            fish.depthTarget += (prey.depth - fish.depthTarget) * delta * .6;
+          }
+        }
+        fish.vy *= Math.pow(.988, delta * 60);
+        fish.vy = Math.max(-fish.speed * 1.35, Math.min(fish.speed * 1.35, fish.vy));
         const curve = Math.sin(fish.age * (fish.behavior === 'school' ? 2.7 : fish.behavior === 'drift' ? 1.15 : 1.8) + fish.phase) * fish.speed * .32;
         fish.x += fish.vx * delta * environmentSpeed * frozenSpeed * dartSpeed * bossPhase;
         fish.y += (fish.vy + curve) * delta * environmentSpeed * frozenSpeed;

@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { PokerTable3D } from './CardGames3D';
 
 type Suit = '♠' | '♥' | '♦' | '♣';
 type Rank = '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9' | '10' | 'J' | 'Q' | 'K' | 'A';
@@ -522,6 +523,7 @@ const TexasHoldemGame: React.FC = () => {
           </header>
           <div className="poker-room">
             <div className="poker-table">
+              <div className="poker-table-3d" aria-hidden="true"><PokerTable3D players={players} community={community} showdown={phase === 'SHOWDOWN'} /></div>
               <div className="practice-deck" aria-hidden="true"><i /><i /><i /></div>
               {phase !== 'PREFLOP' && phase !== 'SHOWDOWN' && <div key={phase} className="street-splash">{phase}</div>}
               <div className="table-center">
@@ -618,6 +620,7 @@ const TexasHoldemGame: React.FC = () => {
         .practice-deck{position:absolute;z-index:2;left:50%;top:29%;width:42px;height:58px;transform:translateX(-50%)}.practice-deck i{position:absolute;inset:0;border:2px solid #eee8d8;border-radius:5px;background:repeating-linear-gradient(45deg,#732a31 0 4px,#a84249 4px 8px);box-shadow:0 4px 9px #0009}.practice-deck i:nth-child(2){transform:translate(3px,-3px)}.practice-deck i:nth-child(3){transform:translate(6px,-6px)}.street-splash{position:absolute;z-index:50;left:50%;top:50%;transform:translate(-50%,-50%);padding:10px 22px;border:2px solid #edc65e;border-radius:18px;background:#071b13e8;color:#edc65e;font-size:18px;font-weight:950;letter-spacing:.18em;pointer-events:none;animation:street-splash 1s ease-out forwards}.poker-seat.acting:after{content:'';position:absolute;z-index:-1;inset:-9px;border:2px solid #edc65e;border-radius:16px;animation:turn-ring 1s ease-in-out infinite}.seat-bet{animation:bet-chip-pop .45s cubic-bezier(.2,.9,.3,1.25)}@keyframes street-splash{0%{opacity:0;transform:translate(-50%,-30%) scale(.65)}25%{opacity:1;transform:translate(-50%,-50%) scale(1)}75%{opacity:1}100%{opacity:0;transform:translate(-50%,-70%) scale(1.08)}}@keyframes turn-ring{50%{inset:-15px;opacity:.2}}@keyframes bet-chip-pop{from{opacity:0;transform:translateY(18px) scale(.5)}}
         .holdem-card.dealt{animation-duration:.62s}.seat-cards .holdem-card.dealt{animation-name:practice-deal-hole}@keyframes practice-deal-hole{from{opacity:0;transform:translateY(-190px) rotate(-18deg) scale(.42)}70%{opacity:1;transform:translateY(5px) rotate(2deg) scale(1.04)}to{transform:none}}.community-row .holdem-card.dealt{animation-name:practice-deal-board}@keyframes practice-deal-board{from{opacity:0;transform:translateY(-110px) rotate(-10deg) scale(.5)}to{opacity:1;transform:none}}
         @media(max-width:470px){.practice-deck{top:30%;transform:translateX(-50%) scale(.82)}.street-splash{font-size:14px}.turn-indicator{font-size:6px}}
+        .poker-table-3d{position:absolute;z-index:1;inset:0;overflow:hidden;border-radius:inherit}.poker-table .community-row,.poker-table .seat-cards{visibility:hidden}.table-center,.poker-seat{z-index:3}
         @media(prefers-reduced-motion:reduce){.holdem-card.dealt,.poker-seat.acting .seat-panel,.poker-seat.acting:after,.turn-indicator,.position-chip,.street-splash,.seat-bet{animation:none}}
       `}</style>
     </section>

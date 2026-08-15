@@ -240,7 +240,7 @@ const SlotsGame: React.FC = () => {
         <div className="volt-lights" aria-hidden="true">{Array.from({ length: 24 }, (_, index) => <i key={index} />)}</div>
         {freeSpins > 0 && <div className="free-spin-banner"><strong>FREE SPINS ACTIVE</strong><span>{freeSpins} REMAINING · ALL LINE WINS 1.5×</span></div>}
         {phase === 'BONUS' ? <div className={`vault-board${bonusRolling ? ' rolling' : ''}`}><div className="vault-title"><span>HOLD & SPIN VAULT</span><strong>{respins} RESPINS</strong></div><div className="vault-grid">{bonusCells.map((value, index) => <div key={index} className={value !== null ? 'held' : ''}>{value !== null ? <><span>🪙</span><strong>{value}</strong><small>{symbol}</small></> : <i>+</i>}</div>)}</div><p>Fill all 15 spaces to double the entire vault.</p></div> : (
-          <div className="h-[470px] w-full overflow-hidden rounded-xl"><SlotsMachine3D reels={reels} winningPositions={winningPositions} anticipation={anticipation} /></div>
+          <div className="h-[470px] w-full overflow-hidden rounded-xl"><SlotsMachine3D reels={reels} winningPositions={winningPositions} anticipation={anticipation} theme={freeSpins > 0 ? 'free' : power >= 5 ? 'power' : 'base'} disabled={phase === 'SPINNING' || isProcessing} onSpin={() => void spin()} /></div>
         )}
         {celebration && <div className="win-celebration"><small>{celebration.title}</small><strong>{celebration.amount}</strong><span>{symbol}</span></div>}
         <div className="volt-status" role="status" aria-live="polite">{status}</div>

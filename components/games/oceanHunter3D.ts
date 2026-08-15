@@ -63,12 +63,14 @@ const WORLD_WIDTH = 19;
 const WORLD_HEIGHT = WORLD_WIDTH * GAME_HEIGHT / GAME_WIDTH;
 
 const colorOf = (value: string) => new THREE.Color(value);
-const material = (color: string | number, roughness = .42, metalness = .08, emissive = 0x000000) => new THREE.MeshStandardMaterial({
+const material = (color: string | number, roughness = .42, metalness = .08, emissive = 0x000000) => new THREE.MeshPhysicalMaterial({
   color,
   roughness,
   metalness,
   emissive,
-  emissiveIntensity: emissive ? .28 : 0
+  emissiveIntensity: emissive ? .2 : 0,
+  clearcoat: .28,
+  clearcoatRoughness: .45,
 });
 
 const mesh = (geometry: THREE.BufferGeometry, mat: THREE.Material, scale?: [number, number, number]) => {
@@ -90,19 +92,19 @@ const finGeometry = () => {
 };
 
 const addEyes = (parent: THREE.Group, x: number, y: number, z: number, spread: number, scale = 1) => {
-  const white = material(0xf4fbff, .18, .02);
+  const white = material(0xc8d8d4, .2, .02);
   const black = material(0x07111a, .2, .05, 0x07111a);
   for (const side of [-1, 1]) {
-    const eye = mesh(new THREE.SphereGeometry(.12 * scale, 12, 8), white);
+    const eye = mesh(new THREE.SphereGeometry(.082 * scale, 14, 10), white);
     eye.position.set(x, y, z + side * spread);
-    const pupil = mesh(new THREE.SphereGeometry(.055 * scale, 10, 7), black);
-    pupil.position.set(x + .09 * scale, y, z + side * spread);
+    const pupil = mesh(new THREE.SphereGeometry(.045 * scale, 10, 8), black);
+    pupil.position.set(x + .065 * scale, y, z + side * spread);
     parent.add(eye, pupil);
   }
 };
 
 const makeFishBody = (group: THREE.Group, primary: THREE.Material, accent: THREE.Material, long = 1) => {
-  const body = mesh(new THREE.SphereGeometry(.72, 20, 14), primary, [1.45 * long, .78, .64]);
+  const body = mesh(new THREE.SphereGeometry(.72, 32, 20), primary, [1.45 * long, .78, .64]);
   group.add(body);
   const tailPivot = new THREE.Group();
   tailPivot.position.x = -1.05 * long;
@@ -121,7 +123,55 @@ const makeFishBody = (group: THREE.Group, primary: THREE.Material, accent: THREE
   finRight.rotation.x = -1.15;
   group.add(finLeft, finRight);
   addEyes(group, .87 * long, .18, 0, .42, .9);
+  const gillMaterial = new THREE.MeshBasicMaterial({ color: 0x20343a, transparent: true, opacity: .52 });
+  for (const side of [-1, 1]) {
+    const gill = mesh(new THREE.TorusGeometry(.22, .018, 6, 18, Math.PI * 1.18), gillMaterial);
+    gill.position.set(.52 * long, .02, side * .47); gill.rotation.set(Math.PI / 2, 0, side * .25);
+    group.add(gill);
+  }
   return [tailPivot, finLeft, finRight];
+};
+
+const makeShark = (group: THREE.Group, primary: THREE.Material, accent: THREE.Material) => {
+  const body = mesh(new THREE.SphereGeometry(.72, 36, 22), primary, [2.25, .68, .64]);
+  const belly = mesh(new THREE.SphereGeometry(.69, 30, 18, 0, Math.PI * 2, Math.PI * .45, Math.PI * .55), material(0xd7e0df, .5, .02), [2.15, .68, .65]);
+  belly.position.y = -.03; group.add(body, belly);
+  const nose = mesh(new THREE.ConeGeometry(.52, .95, 28), primary); nose.rotation.z = -Math.PI / 2; nose.position.x = 1.82; nose.scale.set(1, .76, .78); group.add(nose);
+  const tailPivot = new THREE.Group(); tailPivot.position.x = -1.62;
+  for (const sign of [-1, 1]) { const lobe = mesh(new THREE.ConeGeometry(.34, 1.12, 3), accent); lobe.rotation.z = sign * .58 + Math.PI / 2; lobe.position.y = sign * .34; tailPivot.add(lobe); }
+  const dorsal = mesh(new THREE.ConeGeometry(.43, 1.15, 3), primary); dorsal.position.set(-.25, .82, 0); dorsal.rotation.z = -.12;
+  group.add(tailPivot, dorsal);
+  for (const side of [-1, 1]) { const fin = mesh(finGeometry(), primary, [.8, .65, .65]); fin.position.set(.1, -.18, side * .52); fin.rotation.x = side * 1.15; group.add(fin); }
+  addEyes(group, 1.25, .2, 0, .43, .78);
+  for (const side of [-1, 1]) for (let index = 0; index < 3; index += 1) { const gill = mesh(new THREE.BoxGeometry(.025, .34, .012), material(0x243640, .75)); gill.position.set(.73 - index * .12, .02, side * .5); gill.rotation.z = -.12; group.add(gill); }
+  return [tailPivot];
+};
+
+const makeWhale = (group: THREE.Group, primary: THREE.Material, accent: THREE.Material) => {
+  const body = mesh(new THREE.SphereGeometry(.8, 36, 22), primary, [2.35, .82, .82]);
+  const belly = mesh(new THREE.SphereGeometry(.73, 30, 18), material(0x9fb6d3, .55, .03), [2.18, .45, .76]); belly.position.y = -.38;
+  group.add(body, belly);
+  const tailPivot = new THREE.Group(); tailPivot.position.x = -1.78;
+  for (const side of [-1, 1]) { const fluke = mesh(finGeometry(), accent, [.86, .62, .8]); fluke.rotation.x = side * 1.05; fluke.position.z = side * .32; tailPivot.add(fluke); }
+  group.add(tailPivot);
+  for (const side of [-1, 1]) { const fin = mesh(finGeometry(), accent, [.68, .56, .55]); fin.position.set(.1, -.25, side * .62); fin.rotation.x = side * 1.18; group.add(fin); }
+  addEyes(group, 1.22, .12, 0, .58, .7);
+  return [tailPivot];
+};
+
+const makeShrimp = (group: THREE.Group, primary: THREE.Material, accent: THREE.Material) => {
+  const animated: THREE.Object3D[] = [];
+  for (let index = 0; index < 7; index += 1) {
+    const segment = mesh(new THREE.SphereGeometry(.28 - index * .018, 18, 12), index % 2 ? accent : primary, [1.25, .78, .72]);
+    segment.position.set(.68 - index * .3, Math.sin(index * .48) * .13, 0); group.add(segment);
+  }
+  const tailPivot = new THREE.Group(); tailPivot.position.set(-1.35, .1, 0);
+  for (const side of [-1, 1]) { const fan = mesh(finGeometry(), accent, [.38, .35, .35]); fan.rotation.x = side * .72; fan.position.z = side * .16; tailPivot.add(fan); }
+  group.add(tailPivot); animated.push(tailPivot);
+  const antennaMaterial = material(0xffc4ad, .55, .01);
+  for (const side of [-1, 1]) { const antenna = mesh(new THREE.CylinderGeometry(.012, .018, 1.25, 7), antennaMaterial); antenna.rotation.z = -1.2; antenna.rotation.x = side * .18; antenna.position.set(1.05, .25, side * .18); group.add(antenna); }
+  addEyes(group, .83, .2, 0, .2, .72);
+  return animated;
 };
 
 const makeTentacle = (color: THREE.Material, x: number, z: number, length = 1) => {
@@ -190,6 +240,12 @@ const createCreature = (fish: OceanFishView): CreatureRig => {
       body.add(tentacle); animated.push(tentacle);
     }
     addEyes(body, .63, .3, 0, .4, boss ? 1.2 : .9);
+  } else if (fish.emoji === '🦈') {
+    animated.push(...makeShark(body, primary, accent));
+  } else if (fish.emoji === '🐋') {
+    animated.push(...makeWhale(body, primary, accent));
+  } else if (fish.emoji === '🦐') {
+    animated.push(...makeShrimp(body, primary, accent));
   } else if (fish.emoji === '🧰') {
     const chest = mesh(new THREE.BoxGeometry(1.45, .78, .9), primary);
     const lid = mesh(new THREE.CylinderGeometry(.46, .46, 1.45, 12, 1, false, 0, Math.PI), accent);
@@ -206,7 +262,7 @@ const createCreature = (fish: OceanFishView): CreatureRig => {
       body.add(spike);
     }
   } else {
-    const long = fish.emoji === '🦈' ? 1.5 : fish.emoji === '🐋' ? 1.75 : fish.emoji === '🦐' ? 1.25 : 1;
+    const long = 1;
     animated.push(...makeFishBody(body, primary, accent, long));
     if (fish.emoji === '🐡') {
       for (let index = 0; index < 18; index += 1) {
@@ -326,8 +382,10 @@ export class OceanHunter3DRenderer {
       rig.lastX = fish.x; rig.lastY = fish.y;
       const heading = Math.atan2(-dy, dx || fish.vx);
       rig.body.rotation.z += (heading - rig.body.rotation.z) * .18;
-      rig.body.rotation.y = fish.vx < 0 ? Math.PI : 0;
-      rig.body.rotation.x = Math.sin(fish.age * 1.7 + fish.phase) * .08 + (fish.depth - 1) * .35;
+      const targetFacing = fish.vx < 0 ? Math.PI : 0;
+      const facingDelta = Math.atan2(Math.sin(targetFacing - rig.body.rotation.y), Math.cos(targetFacing - rig.body.rotation.y));
+      rig.body.rotation.y += facingDelta * .12;
+      rig.body.rotation.x = Math.sin(fish.age * 1.7 + fish.phase) * .045 + (fish.depth - 1) * .28;
       rig.body.position.y = Math.sin(fish.age * 2.4 + fish.phase) * .08;
       rig.animated.forEach((part, index) => {
         part.rotation.y = Math.sin(fish.age * (fish.behavior === 'dart' ? 10 : 6.4) + fish.phase + index * .55) * (.22 + index % 3 * .055);

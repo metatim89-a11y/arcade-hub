@@ -19,9 +19,16 @@ const dispose = (root: Object3D) => root.traverse((child) => {
   materials.forEach((material) => { material.map?.dispose(); material.dispose(); });
 });
 
-const SlotsMachine3D: React.FC<{ reels: Reel[]; winningPositions: string[]; anticipation: boolean }> = ({ reels, winningPositions, anticipation }) => {
+const SlotsMachine3D: React.FC<{
+  reels: Reel[];
+  winningPositions: string[];
+  anticipation: boolean;
+  theme: 'base' | 'power' | 'free';
+  disabled: boolean;
+  onSpin: () => void;
+}> = ({ reels, winningPositions, anticipation, theme, disabled, onSpin }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const stateRef = useRef({ reels, winningPositions, anticipation }); stateRef.current = { reels, winningPositions, anticipation };
+  const stateRef = useRef({ reels, winningPositions, anticipation, theme, disabled, onSpin }); stateRef.current = { reels, winningPositions, anticipation, theme, disabled, onSpin };
   useEffect(() => {
     const canvas = canvasRef.current; if (!canvas) return;
     let cancelled = false; let teardown = () => undefined;
@@ -43,12 +50,18 @@ const SlotsMachine3D: React.FC<{ reels: Reel[]; winningPositions: string[]; anti
         const group = new THREE.Group(); group.position.x = (reelIndex - 2) * 1.72; machine.add(group); reelGroups.push(group);
         const drum = new THREE.Mesh(new THREE.CylinderGeometry(1.55, 1.55, 1.42, 32, 1, true), new THREE.MeshStandardMaterial({ color: 0xd8d4dc, metalness: .22, roughness: .43 })); drum.rotation.z = Math.PI / 2; drum.position.z = -.08; group.add(drum);
       }
+      const marqueeTexture = new THREE.CanvasTexture(symbolCanvas('⚡')); marqueeTexture.colorSpace = THREE.SRGBColorSpace;
+      const marquee = new THREE.Mesh(new THREE.BoxGeometry(3.1, .72, .2), new THREE.MeshStandardMaterial({ map: marqueeTexture, emissive: 0x9d2bd1, emissiveIntensity: .32 })); marquee.position.set(0, 3.65, .2); machine.add(marquee);
+      const lever = new THREE.Group(); lever.position.set(5.05, .65, .05); machine.add(lever);
+      const leverStem = new THREE.Mesh(new THREE.CylinderGeometry(.1, .13, 2.05, 14), gold); leverStem.position.y = .85; lever.add(leverStem);
+      const leverBall = new THREE.Mesh(new THREE.SphereGeometry(.34, 20, 14), new THREE.MeshStandardMaterial({ color: 0xff3f6f, metalness: .42, roughness: .2, emissive: 0x8c0b31, emissiveIntensity: .25 })); leverBall.position.y = 1.92; leverBall.userData.action = 'spin'; lever.add(leverBall);
+      const spinPad = new THREE.Mesh(new THREE.CylinderGeometry(.62, .7, .2, 30), new THREE.MeshStandardMaterial({ color: 0xffd34f, metalness: .55, roughness: .22, emissive: 0xa45a05, emissiveIntensity: .3 })); spinPad.rotation.x = Math.PI / 2; spinPad.position.set(3.55, -3.72, .65); spinPad.userData.action = 'spin'; machine.add(spinPad);
       const lights: Mesh[] = [];
       for (let index = 0; index < 22; index += 1) {
         const x = -4.35 + (index % 11) * .87; const y = index < 11 ? 2.86 : -2.86;
         const bulb = new THREE.Mesh(new THREE.SphereGeometry(.105, 12, 8), new THREE.MeshStandardMaterial({ color: 0xff5ba7, emissive: 0xff2f8b, emissiveIntensity: 1.2 })); bulb.position.set(x, y, .72); machine.add(bulb); lights.push(bulb);
       }
-      const symbolMeshes = new Map<string, Mesh>(); let signature = '';
+      const symbolMeshes = new Map<string, Mesh>(); let signature = ''; let pullUntil = 0;
       const rebuildSymbols = () => {
         symbolMeshes.forEach((mesh) => { mesh.parent?.remove(mesh); dispose(mesh); }); symbolMeshes.clear();
         stateRef.current.reels.forEach((reel, reelIndex) => {
@@ -63,6 +76,10 @@ const SlotsMachine3D: React.FC<{ reels: Reel[]; winningPositions: string[]; anti
         });
       };
       const observer = new ResizeObserver(() => { const rect = canvas.getBoundingClientRect(); if (!rect.width || !rect.height) return; renderer.setSize(rect.width, rect.height, false); camera.aspect = rect.width / rect.height; camera.updateProjectionMatrix(); }); observer.observe(canvas);
+      const raycaster = new THREE.Raycaster(); const pointer = new THREE.Vector2();
+      const pick = (event: PointerEvent) => { const rect = canvas.getBoundingClientRect(); pointer.set(((event.clientX - rect.left) / rect.width) * 2 - 1, -((event.clientY - rect.top) / rect.height) * 2 + 1); raycaster.setFromCamera(pointer, camera); const hit = raycaster.intersectObjects([leverBall, spinPad], false)[0]; canvas.style.cursor = hit && !stateRef.current.disabled ? 'pointer' : 'default'; return hit; };
+      const activate = (event: PointerEvent) => { const hit = pick(event); if (!hit || stateRef.current.disabled) return; pullUntil = performance.now() + 520; stateRef.current.onSpin(); };
+      canvas.addEventListener('pointermove', pick); canvas.addEventListener('pointerup', activate);
       let frame = 0;
       const animate = (now: number) => {
         const live = stateRef.current; const next = live.reels.map((reel) => `${reel.symbols.slice(-3).join('')}:${reel.spinning}`).join('|'); if (next !== signature) { signature = next; rebuildSymbols(); }
@@ -75,11 +92,16 @@ const SlotsMachine3D: React.FC<{ reels: Reel[]; winningPositions: string[]; anti
             mesh.scale.setScalar(winning ? 1 + Math.sin(now * .01) * .045 : 1);
           });
         });
-        lights.forEach((bulb, index) => { const material = bulb.material as InstanceType<typeof THREE.MeshStandardMaterial>; material.emissiveIntensity = (live.anticipation ? 2.2 : 1.05) + Math.sin(now * (live.anticipation ? .02 : .006) + index) * .65; });
+        const themeColor = live.theme === 'power' ? 0xffb31f : live.theme === 'free' ? 0x38e6c4 : 0xec50ff;
+        pink.color.setHex(themeColor); (marquee.material as InstanceType<typeof THREE.MeshStandardMaterial>).emissive.setHex(themeColor);
+        lights.forEach((bulb, index) => { const material = bulb.material as InstanceType<typeof THREE.MeshStandardMaterial>; material.color.setHex(themeColor); material.emissive.setHex(themeColor); material.emissiveIntensity = (live.anticipation ? 2.2 : 1.05) + Math.sin(now * (live.anticipation ? .02 : .006) + index) * .65; });
+        const pullProgress = Math.max(0, Math.min(1, (pullUntil - now) / 520)); lever.rotation.z = -Math.sin(pullProgress * Math.PI) * .72;
+        spinPad.scale.setScalar(live.disabled ? .88 : 1 + Math.sin(now * .004) * .035);
+        (spinPad.material as InstanceType<typeof THREE.MeshStandardMaterial>).emissiveIntensity = live.disabled ? .08 : .42 + Math.sin(now * .006) * .16;
         machine.rotation.y = Math.sin(now * .00025) * .012; renderer.render(scene, camera); frame = requestAnimationFrame(animate);
       };
       frame = requestAnimationFrame(animate);
-      teardown = () => { cancelAnimationFrame(frame); observer.disconnect(); dispose(scene); renderer.dispose(); };
+      teardown = () => { cancelAnimationFrame(frame); observer.disconnect(); canvas.removeEventListener('pointermove', pick); canvas.removeEventListener('pointerup', activate); dispose(scene); renderer.dispose(); };
     });
     return () => { cancelled = true; teardown(); };
   }, []);

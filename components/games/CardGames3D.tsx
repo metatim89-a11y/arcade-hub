@@ -128,3 +128,54 @@ export const MemoryCards3D: React.FC<{ cards: MemoryCard[]; disabled: boolean; o
   }, []);
   return <canvas ref={canvasRef} className="h-full w-full touch-manipulation" aria-label="Interactive 3D memory cards" />;
 };
+
+type PokerCard = { id: string; suit: string; rank: string };
+type PokerPlayer = { id: number; hand: PokerCard[]; isHuman: boolean; folded: boolean; bet: number };
+
+export const PokerTable3D: React.FC<{ players: PokerPlayer[]; community: PokerCard[]; showdown: boolean }> = ({ players, community, showdown }) => {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const stateRef = useRef({ players, community, showdown }); stateRef.current = { players, community, showdown };
+  useEffect(() => {
+    const canvas = canvasRef.current; if (!canvas) return;
+    let cancelled = false; let teardown = () => undefined;
+    void import('three').then((THREE) => {
+      if (cancelled) return;
+      const renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true }); renderer.setPixelRatio(Math.min(devicePixelRatio, 1.45)); renderer.outputColorSpace = THREE.SRGBColorSpace; renderer.shadowMap.enabled = true;
+      const scene = new THREE.Scene(); const camera = new THREE.PerspectiveCamera(38, 1, .1, 50); camera.position.set(0, 10.7, 4.2); camera.lookAt(0, 0, 0);
+      scene.add(new THREE.HemisphereLight(0xe2f8e8, 0x090d0b, 2.4)); const key = new THREE.DirectionalLight(0xffecc4, 4.8); key.position.set(-5, 9, 5); key.castShadow = true; scene.add(key);
+      const felt = new THREE.Mesh(new THREE.CylinderGeometry(5.5, 5.65, .5, 64), new THREE.MeshStandardMaterial({ color: 0x075c37, roughness: .58, metalness: .06 })); felt.scale.z = .72; felt.position.y = -.32; felt.receiveShadow = true; scene.add(felt);
+      const rail = new THREE.Mesh(new THREE.TorusGeometry(5.25, .34, 14, 64), new THREE.MeshStandardMaterial({ color: 0x5a341c, roughness: .31, metalness: .28 })); rail.rotation.x = Math.PI / 2; rail.scale.y = .72; rail.position.y = -.02; scene.add(rail);
+      const pieces = new THREE.Group(); scene.add(pieces); let signature = '';
+      const makeCard = (card: PokerCard, hidden: boolean, x: number, z: number, rotation: number, delay: number) => {
+        const texture = new THREE.CanvasTexture(cardCanvas(card.rank, card.suit, hidden)); texture.colorSpace = THREE.SRGBColorSpace;
+        const edge = new THREE.MeshStandardMaterial({ color: 0xd8d4ca, roughness: .42 }); const face = new THREE.MeshStandardMaterial({ map: texture, roughness: .38 });
+        const mesh = new THREE.Mesh(new THREE.BoxGeometry(.78, .07, 1.1), [edge, edge, face, edge, edge, edge]); mesh.position.set(x, 2.7 + delay * .001, z); mesh.rotation.y = rotation; mesh.userData.targetY = .09; mesh.userData.birth = performance.now() + delay; mesh.castShadow = true; pieces.add(mesh);
+      };
+      const rebuild = () => {
+        dispose(pieces); pieces.clear();
+        stateRef.current.community.forEach((card, index) => makeCard(card, false, (index - 2) * .9, 0, 0, index * 70));
+        const seats: Array<[number, number, number]> = [[0, 3.15, 0], [-4.25, 0, Math.PI / 2], [0, -3.15, Math.PI], [4.25, 0, -Math.PI / 2]];
+        stateRef.current.players.forEach((player, playerIndex) => {
+          const [baseX, baseZ, rotation] = seats[playerIndex] ?? seats[0];
+          player.hand.forEach((card, cardIndex) => {
+            const horizontal = playerIndex === 1 || playerIndex === 3;
+            const x = baseX + (horizontal ? 0 : (cardIndex - .5) * .56);
+            const z = baseZ + (horizontal ? (cardIndex - .5) * .56 : 0);
+            makeCard(card, !(stateRef.current.showdown || player.isHuman) || player.folded, x, z, rotation, playerIndex * 110 + cardIndex * 70);
+          });
+          for (let chip = 0; chip < Math.min(8, Math.ceil(player.bet / 20)); chip += 1) {
+            const token = new THREE.Mesh(new THREE.CylinderGeometry(.15, .15, .055, 24), new THREE.MeshStandardMaterial({ color: chip % 2 ? 0xe44b5f : 0xf4d45c, metalness: .45, roughness: .28 }));
+            token.position.set(baseX * .62 + (chip % 3) * .12, .05 + Math.floor(chip / 3) * .06, baseZ * .62); pieces.add(token);
+          }
+        });
+      };
+      const observer = new ResizeObserver(() => { const rect = canvas.getBoundingClientRect(); if (!rect.width || !rect.height) return; renderer.setSize(rect.width, rect.height, false); camera.aspect = rect.width / rect.height; camera.updateProjectionMatrix(); }); observer.observe(canvas);
+      let frame = 0;
+      const animate = (now: number) => { const next = JSON.stringify(stateRef.current); if (next !== signature) { signature = next; rebuild(); } pieces.children.forEach((piece) => { if (piece.userData.targetY === undefined) return; const progress = Math.min(1, Math.max(0, (now - Number(piece.userData.birth)) / 420)); const eased = 1 - Math.pow(1 - progress, 3); piece.position.y = 2.7 * (1 - eased) + Number(piece.userData.targetY); piece.rotation.z = (1 - eased) * .22; }); renderer.render(scene, camera); frame = requestAnimationFrame(animate); };
+      frame = requestAnimationFrame(animate);
+      teardown = () => { cancelAnimationFrame(frame); observer.disconnect(); dispose(scene); renderer.dispose(); };
+    });
+    return () => { cancelled = true; teardown(); };
+  }, []);
+  return <canvas ref={canvasRef} className="h-full w-full" aria-label="3D Texas Hold'em table" />;
+};
