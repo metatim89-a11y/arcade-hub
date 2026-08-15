@@ -100,7 +100,7 @@ export const MemoryCards3D: React.FC<{ cards: MemoryCard[]; disabled: boolean; o
     void import('three').then((THREE) => {
       if (cancelled) return;
       const renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true }); renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5)); renderer.outputColorSpace = THREE.SRGBColorSpace; renderer.shadowMap.enabled = true;
-      const scene = new THREE.Scene(); const camera = new THREE.PerspectiveCamera(39, 1, .1, 40); camera.position.set(0, 10.8, 3.4); camera.lookAt(0, 0, 0);
+      const scene = new THREE.Scene(); const camera = new THREE.PerspectiveCamera(43, 1, .1, 55); camera.up.set(0, 0, -1); camera.position.set(0, 12, 0); camera.lookAt(0, 0, 0);
       scene.add(new THREE.HemisphereLight(0xdbeeff, 0x11101d, 2.5)); const light = new THREE.DirectionalLight(0xffffff, 4.5); light.position.set(-4, 8, 5); light.castShadow = true; scene.add(light);
       const base = new THREE.Mesh(new THREE.BoxGeometry(7.5, .32, 7.5), new THREE.MeshStandardMaterial({ color: 0x171c34, metalness: .42, roughness: .32 })); base.position.y = -.28; base.receiveShadow = true; scene.add(base);
       const meshes = new Map<number, Mesh>(); const raycaster = new THREE.Raycaster(); const pointer = new THREE.Vector2(); let hovered = -1; let signature = '';
@@ -117,12 +117,12 @@ export const MemoryCards3D: React.FC<{ cards: MemoryCard[]; disabled: boolean; o
       };
       const pick = (event: PointerEvent) => { const rect = canvas.getBoundingClientRect(); pointer.set(((event.clientX - rect.left) / rect.width) * 2 - 1, -((event.clientY - rect.top) / rect.height) * 2 + 1); raycaster.setFromCamera(pointer, camera); const hit = raycaster.intersectObjects([...meshes.values()], false)[0]; hovered = hit ? Number(hit.object.userData.id) : -1; canvas.style.cursor = hovered >= 0 && !stateRef.current.disabled && !hit?.object.userData.matched ? 'pointer' : 'default'; };
       const click = (event: PointerEvent) => { pick(event); const card = stateRef.current.cards.find((item) => item.id === hovered); if (card && !stateRef.current.disabled && !card.isFlipped && !card.isMatched) stateRef.current.onCardClick(hovered); };
-      canvas.addEventListener('pointermove', pick); canvas.addEventListener('pointerup', click);
-      const observer = new ResizeObserver(() => { const rect = canvas.getBoundingClientRect(); if (!rect.width || !rect.height) return; renderer.setSize(rect.width, rect.height, false); camera.aspect = rect.width / rect.height; camera.updateProjectionMatrix(); }); observer.observe(canvas);
+      canvas.style.touchAction = 'none'; canvas.addEventListener('pointermove', pick); canvas.addEventListener('pointerdown', click);
+      const observer = new ResizeObserver(() => { const rect = canvas.getBoundingClientRect(); if (!rect.width || !rect.height) return; renderer.setSize(rect.width, rect.height, false); camera.aspect = rect.width / rect.height; const requiredHeight = Math.max(8.2, 8.2 / camera.aspect); camera.position.y = requiredHeight / (2 * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2))); camera.updateProjectionMatrix(); }); observer.observe(canvas);
       let frame = 0;
       const animate = (now: number) => { const next = JSON.stringify(stateRef.current.cards); if (next !== signature) { signature = next; rebuild(); } meshes.forEach((mesh, id) => { const active = id === hovered && !stateRef.current.disabled; mesh.position.y += ((mesh.userData.matched ? -.08 : active ? .22 : .06) - mesh.position.y) * .13; if (mesh.userData.matched) mesh.rotation.y = Math.sin(now * .003 + id) * .05; }); renderer.render(scene, camera); frame = requestAnimationFrame(animate); };
       frame = requestAnimationFrame(animate);
-      teardown = () => { cancelAnimationFrame(frame); observer.disconnect(); canvas.removeEventListener('pointermove', pick); canvas.removeEventListener('pointerup', click); dispose(scene); renderer.dispose(); };
+      teardown = () => { cancelAnimationFrame(frame); observer.disconnect(); canvas.removeEventListener('pointermove', pick); canvas.removeEventListener('pointerdown', click); dispose(scene); renderer.dispose(); };
     });
     return () => { cancelled = true; teardown(); };
   }, []);

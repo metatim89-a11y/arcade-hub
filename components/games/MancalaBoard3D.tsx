@@ -45,8 +45,9 @@ const MancalaBoard3D: React.FC<MancalaBoard3DProps> = (props) => {
       renderer.shadowMap.enabled = true;
       renderer.shadowMap.type = THREE.PCFSoftShadowMap;
       const scene = new THREE.Scene();
-      const camera = new THREE.PerspectiveCamera(38, 1, .1, 50);
-      camera.position.set(0, 10.8, 3.5);
+      const camera = new THREE.PerspectiveCamera(42, 1, .1, 70);
+      camera.up.set(0, 0, -1);
+      camera.position.set(0, 14, 0);
       camera.lookAt(0, 0, 0);
       scene.add(new THREE.HemisphereLight(0xffe5bd, 0x09111c, 2.5));
       const key = new THREE.DirectionalLight(0xfff1d5, 5.4);
@@ -152,8 +153,9 @@ const MancalaBoard3D: React.FC<MancalaBoard3DProps> = (props) => {
         pick(event);
         if (isSelectable(hovered)) stateRef.current.onPitClick(hovered);
       };
+      canvas.style.touchAction = 'none';
       canvas.addEventListener('pointermove', pick);
-      canvas.addEventListener('pointerup', click);
+      canvas.addEventListener('pointerdown', click);
       canvas.addEventListener('pointerleave', () => { hovered = -1; });
 
       const observer = new ResizeObserver(() => {
@@ -161,6 +163,8 @@ const MancalaBoard3D: React.FC<MancalaBoard3DProps> = (props) => {
         if (!rect.width || !rect.height) return;
         renderer.setSize(rect.width, rect.height, false);
         camera.aspect = rect.width / rect.height;
+        const requiredHeight = Math.max(4.5, 10.8 / camera.aspect);
+        camera.position.y = requiredHeight / (2 * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)));
         camera.updateProjectionMatrix();
       });
       observer.observe(canvas);
@@ -199,7 +203,7 @@ const MancalaBoard3D: React.FC<MancalaBoard3DProps> = (props) => {
         cancelAnimationFrame(frame);
         observer.disconnect();
         canvas.removeEventListener('pointermove', pick);
-        canvas.removeEventListener('pointerup', click);
+        canvas.removeEventListener('pointerdown', click);
         disposeTree(scene);
         renderer.dispose();
       };

@@ -131,6 +131,7 @@ const MancalaGame: React.FC<MancalaProps> = ({ playMode, playerNames }) => {
         let tempPits = [...pitsRef.current];
         let stonesToDistribute = tempPits[index];
         tempPits[index] = 0;
+        pitsRef.current = [...tempPits];
         setPits([...tempPits]);
         await sleep(200);
 
@@ -146,6 +147,7 @@ const MancalaGame: React.FC<MancalaProps> = ({ playMode, playerNames }) => {
             
             tempPits = [...pitsRef.current];
             tempPits[currentIndex]++;
+            pitsRef.current = [...tempPits];
             setPits([...tempPits]);
             setHighlightedPit(null);
             setTimeout(() => setLastHopedPit(null), 260);
@@ -163,6 +165,7 @@ const MancalaGame: React.FC<MancalaProps> = ({ playMode, playerNames }) => {
                 tempPits[storeIndex] += tempPits[oppositePit] + 1;
                 tempPits[oppositePit] = 0;
                 tempPits[lastPit] = 0;
+                pitsRef.current = [...tempPits];
                 setPits([...tempPits]);
                 setCaptureStreak(current => {
                     const next = { ...current, [currentPlayer]: current[currentPlayer] + 1 };
@@ -184,6 +187,7 @@ const MancalaGame: React.FC<MancalaProps> = ({ playMode, playerNames }) => {
         }
         isAnimating.current = false;
         // Re-emit the final board after animation so the end-of-game sweep can run.
+        pitsRef.current = [...tempPits];
         setPits([...tempPits]);
     };
 

@@ -79,6 +79,19 @@ Convert every game's actual playable surface and pieces to interactive 3D. The e
 - `GameArea` now supplies one shared page-aware surface palette to every game. Root game panels inherit the current gold/green/blue/purple mode or equipped cosmetic accent instead of presenting unrelated opaque backgrounds.
 - Production build passed for this combined batch (`vite build`, 134 modules, 2m 39s). Existing large-chunk warnings only.
 
+## Sixth repair batch — build passed, ready to push
+
+- Fixed RPS Memory's computer-turn deadlock: CPU selections can now use the internal card handler while player taps remain locked during the CPU turn.
+- RPS Memory now uses immediate touch selection and a responsive top camera that keeps the full 4×4 table visible on narrow phones.
+- Mancala now synchronizes its authoritative pit ref after every individual sow/capture mutation, preventing rapid animation state from reading a stale pit layout.
+- Mancala also uses immediate touch selection and responsive top framing so the long board and both stores remain visible on phones.
+- Color Recall is now a real interactive Three.js game surface:
+  - four raised physical color controls with ray-cast input;
+  - modeled base, rim, hub and animated signal rings;
+  - state-driven button travel, emissive flashes, hover lift, phase lighting and pointer parallax;
+  - keyboard controls, sequence logic, timing, scoring, audio and best-score persistence remain intact.
+- Production build passed (`vite build`, 135 modules, 2m 26s). Existing large-chunk warnings only.
+
 ## Planned conversion order
 
 1. Tic-Tac-Toe, Connect Four and Mancala board batch: complete and build-tested.

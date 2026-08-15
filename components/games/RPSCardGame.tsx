@@ -106,16 +106,16 @@ const RPSCardGame: React.FC<RPSCardGameProps> = ({ playMode }) => {
                 const availableCards = board.filter(c => !c.isFlipped);
                 if (availableCards.length > 0) {
                     const randomIndex = Math.floor(Math.random() * availableCards.length);
-                    handleCardClick(availableCards[randomIndex].id);
+                    handleCardClick(availableCards[randomIndex].id, true);
                 }
             }, 700 + flippedCards.length * 200);
             return () => clearTimeout(timer);
         }
     }, [currentPlayer, playMode, gameOver, board, isChecking, flippedCards]);
 
-    const handleCardClick = (id: number) => {
+    const handleCardClick = (id: number, computerMove = false) => {
         const card = board.find(c => c.id === id);
-        if (isChecking || !card || card.isFlipped || flippedCards.length >= 2 || (playMode === 'vsComputer' && currentPlayer === 2)) return;
+        if (isChecking || !card || card.isFlipped || flippedCards.length >= 2 || (playMode === 'vsComputer' && currentPlayer === 2 && !computerMove)) return;
         setFlippedCards(prev => [...prev, id]);
         setBoard(prev => prev.map(c => c.id === id ? { ...c, isFlipped: true } : c));
     };
@@ -141,7 +141,7 @@ const RPSCardGame: React.FC<RPSCardGameProps> = ({ playMode }) => {
             </div>
             <div className="text-lg font-semibold h-7 mb-2">{status}</div>
             <div className="h-[520px] w-full max-w-[620px] overflow-hidden rounded-3xl shadow-[0_28px_70px_rgba(0,0,0,.48)]">
-                <MemoryCards3D cards={board} disabled={gameOver || isChecking || (playMode === 'vsComputer' && currentPlayer === 2)} onCardClick={handleCardClick} />
+                <MemoryCards3D cards={board} disabled={gameOver || isChecking || (playMode === 'vsComputer' && currentPlayer === 2)} onCardClick={(id) => handleCardClick(id)} />
             </div>
             {gameOver && <GlassButton onClick={handleReset} className="mt-4 text-xl py-3">Play Again</GlassButton>}
 
