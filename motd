@@ -1,9 +1,23 @@
 --------------------------------------------------------------------------------
                               ARCADE HUB CORE
 --------------------------------------------------------------------------------
-Version: 0.0.7
-Project: Gemini Engineering Protocol (MEP-v2)
-Status: UPGRADING
+Version: 0.0.25
+Project: Arcade Hub
+Status: READY
+Website: https://metatim89-a11y.github.io/arcade-hub/
+Supabase Project: arcade-hub (ybgxtqzoevcmondbddsc)
+Supabase Dashboard: https://supabase.com/dashboard/project/ybgxtqzoevcmondbddsc
 --------------------------------------------------------------------------------
-Welcome to the Digital Refinery. All systems are being aligned with MEP-v2.
+PROJECT ALIASES (alias -> complete command)
+
+arcade-help -> bash "$PROJECT_ROOT/custom.sh" help
+start       -> bash "$PROJECT_ROOT/custom.sh" start
+build       -> bash "$PROJECT_ROOT/custom.sh" build
+preview     -> bash "$PROJECT_ROOT/custom.sh" preview
+install     -> bash "$PROJECT_ROOT/custom.sh" install
+repo-check  -> bash "$PROJECT_ROOT/custom.sh" repo-check
+repo-status -> bash "$PROJECT_ROOT/custom.sh" repo-status
+repo-diff   -> bash "$PROJECT_ROOT/custom.sh" repo-diff
+
+Run arcade-help at any time to see the command guide.
 --------------------------------------------------------------------------------

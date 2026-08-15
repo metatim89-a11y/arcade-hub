@@ -49,3 +49,9 @@ The workflow in [`.github/workflows/deploy-pages.yml`](.github/workflows/deploy-
 - `npm run dev` — local development server
 - `npm run build` — production build
 - `npm run preview` — preview the production build
+- `npm run repo:check` — compare this checkout with GitHub and ask before synchronizing
+- `bash custom.sh help` — list the complete project-local commands and aliases
+
+When this directory is active in the Termux project shell, `.project/termux.sh`
+loads the project-scoped aliases from `.ali`. Every alias delegates to a complete
+command implemented by `custom.sh`; the full mappings are recorded in `motd`.
