@@ -28,7 +28,10 @@ const AppContent: React.FC = () => {
       // Initial games logic - effect below updates it
       return mode === GameMode.Adult ? ADULT_GAMES : UNDER18_GAMES;
   });
-  const [selectedGame, setSelectedGame] = useState<Game>(games[0]);
+  const [selectedGame, setSelectedGame] = useState<Game>(() => {
+    const requested = new URLSearchParams(window.location.search).get('game');
+    return games.find((game) => game.id === requested) ?? games[0];
+  });
   
   // View States for Auth/Profile
   const [authView, setAuthView] = useState<'login' | 'signup' | 'forgot'>('login');
@@ -37,7 +40,23 @@ const AppContent: React.FC = () => {
 
   useEffect(() => {
     void recordSiteEvent('page_view', undefined, user && !user.isGuest ? user.id : undefined);
+    const params = new URLSearchParams(window.location.search);
+    const source = params.get('utm_source') || params.get('ref');
+    const storedSource = window.localStorage.getItem('arcade_campaign_source');
+    if (source && source !== storedSource) {
+      window.localStorage.setItem('arcade_campaign_source', source);
+      void recordSiteEvent('referral_visit', undefined, user && !user.isGuest ? user.id : undefined, source);
+    }
+    const sessionKey = `arcade_session_${new Date().toISOString().slice(0, 10)}`;
+    if (!window.sessionStorage.getItem(sessionKey)) {
+      window.sessionStorage.setItem(sessionKey, '1');
+      void recordSiteEvent('session_start', undefined, user && !user.isGuest ? user.id : undefined, storedSource || source || undefined);
+    }
   }, [user?.id]);
+
+  useEffect(() => {
+    document.title = `${selectedGame.label} · Arcade Hub`;
+  }, [selectedGame.label]);
 
   // Handle Game Mode switching
   const handleSetMode = (newMode: GameMode) => {
@@ -45,11 +64,17 @@ const AppContent: React.FC = () => {
       setMode(newMode);
       const newGames = newMode === GameMode.Adult ? ADULT_GAMES : UNDER18_GAMES;
       setSelectedGame(newGames[0]);
+      const url = new URL(window.location.href);
+      url.searchParams.set('game', newGames[0].id);
+      window.history.replaceState({}, '', `${url.pathname}${url.search}${url.hash}`);
     }
   };
 
   const handleSelectGame = (game: Game) => {
     setSelectedGame(game);
+    const url = new URL(window.location.href);
+    url.searchParams.set('game', game.id);
+    window.history.replaceState({}, '', `${url.pathname}${url.search}${url.hash}`);
     void recordSiteEvent('game_opened', game.id, user && !user.isGuest ? user.id : undefined);
   };
 

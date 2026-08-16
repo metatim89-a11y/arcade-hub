@@ -3,6 +3,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Game, GameMode, PlayMode } from '../types';
 import { useCoinSystem } from '../context/CoinContext';
 import GameAtmosphere3D from './GameAtmosphere3D';
+import { recordSiteEvent } from '../lib/analytics';
 
 
 const GameOptionsSelector: React.FC<{
@@ -103,6 +104,19 @@ const GameArea: React.FC<GameAreaProps> = ({ games, selectedGame, onSelectGame, 
     onSelectGame(game);
     setFeedback('');
   };
+
+  const shareGame = async () => {
+    const url = `${window.location.origin}${window.location.pathname}?game=${encodeURIComponent(selectedGame.id)}`;
+    const shareData = { title: `${selectedGame.label} · Arcade Hub`, text: `Play ${selectedGame.label} at Arcade Hub`, url };
+    try {
+      if (navigator.share) await navigator.share(shareData);
+      else await navigator.clipboard.writeText(url);
+      void recordSiteEvent('share_clicked', selectedGame.id);
+      setFeedback(navigator.share ? 'Shared!' : 'Game link copied!');
+    } catch {
+      setFeedback('Share cancelled');
+    }
+  };
   
   const gameAreaSizeClass = activeGameProps.game.id === 'fishing'
     ? 'max-w-[1900px]'
@@ -140,7 +154,8 @@ const GameArea: React.FC<GameAreaProps> = ({ games, selectedGame, onSelectGame, 
   return (
     <div className={`flex flex-col items-center w-full py-6 md:py-8 ${activeGameProps.game.id === 'fishing' ? 'px-0 sm:px-2' : 'px-4'}`}>
       {/* Game Navigation */}
-      <label className="game-picker-mobile mb-3 w-full max-w-md md:hidden">
+      <div className="game-picker-row mb-3 w-full max-w-7xl">
+      <label className="game-picker-mobile w-full max-w-md md:hidden">
         <span>CHOOSE GAME</span>
         <select
           aria-label="Choose a game"
@@ -168,6 +183,8 @@ const GameArea: React.FC<GameAreaProps> = ({ games, selectedGame, onSelectGame, 
           </button>
         ))}
       </nav>
+      <button type="button" className="game-share-button" onClick={() => void shareGame()} aria-label={`Share ${selectedGame.label}`}>↗ Share {selectedGame.label}</button>
+      </div>
       
       {/* Game Options */}
       <div className="mb-4 h-auto min-h-[34px] flex flex-col items-center justify-center gap-2">
@@ -226,7 +243,7 @@ const GameArea: React.FC<GameAreaProps> = ({ games, selectedGame, onSelectGame, 
         </div>
       </div>
       <style>{`
-        .game-picker-mobile{position:relative;display:grid;gap:4px}.game-picker-mobile span{padding-left:4px;color:#d5b544;font-size:8px;font-weight:950;letter-spacing:.18em}.game-picker-mobile select{width:100%;min-height:44px;padding:0 42px 0 14px;border:1px solid #8a7228;border-radius:12px;appearance:none;background:linear-gradient(145deg,#253040,#111822);box-shadow:0 8px 20px rgba(0,0,0,.28),inset 0 1px rgba(255,255,255,.08);color:#ffd84f;font-size:15px;font-weight:900}.game-picker-mobile:after{content:'▾';position:absolute;right:15px;bottom:10px;color:#ffd84f;pointer-events:none}@media(min-width:768px){.game-picker-mobile{display:none}}
+        .game-picker-row{display:flex;align-items:center;justify-content:center;gap:8px}.game-picker-mobile{position:relative;display:grid;gap:4px}.game-picker-mobile span{padding-left:4px;color:#d5b544;font-size:8px;font-weight:950;letter-spacing:.18em}.game-picker-mobile select{width:100%;min-height:44px;padding:0 42px 0 14px;border:1px solid #8a7228;border-radius:12px;appearance:none;background:linear-gradient(145deg,#253040,#111822);box-shadow:0 8px 20px rgba(0,0,0,.28),inset 0 1px rgba(255,255,255,.08);color:#ffd84f;font-size:15px;font-weight:900}.game-picker-mobile:after{content:'▾';position:absolute;right:15px;bottom:10px;color:#ffd84f;pointer-events:none}.game-share-button{align-self:flex-end;min-height:40px;padding:0 13px;border:1px solid #4c7190;border-radius:10px;background:#13283a;color:#bfeaff;font-size:11px;font-weight:900;white-space:nowrap;cursor:pointer}.game-share-button:hover{border-color:#ffd84f;color:#ffe37b}@media(min-width:768px){.game-picker-mobile{display:none}}@media(max-width:767px){.game-picker-row{align-items:stretch}.game-share-button{align-self:end;min-height:44px;padding-inline:10px;font-size:10px}.game-picker-mobile{flex:1}}
         .game-engine-stage{isolation:isolate;perspective:1400px;transform-style:preserve-3d}
         .game-content-layer{border-radius:inherit;background:radial-gradient(circle at 50% -12%,color-mix(in srgb,var(--stage-accent) 18%,transparent),transparent 46%),linear-gradient(145deg,var(--stage-panel-from),var(--stage-panel-to));box-shadow:inset 0 1px color-mix(in srgb,var(--stage-accent) 18%,transparent)}
         .game-content-layer :where(.volt-slots,.wheel-game,.coin-pusher-game,.crash-game,.color-recall-game,.holdem-game,.online-table-game,.ocean-hunter){background:radial-gradient(circle at 50% -10%,color-mix(in srgb,var(--stage-accent) 14%,transparent),transparent 44%),linear-gradient(145deg,color-mix(in srgb,var(--stage-panel-from) 86%,transparent),color-mix(in srgb,var(--stage-panel-to) 88%,transparent))!important;border-color:color-mix(in srgb,var(--stage-accent) 42%,#394451)!important}

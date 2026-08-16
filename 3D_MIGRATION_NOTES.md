@@ -170,6 +170,13 @@ Convert every game's actual playable surface and pieces to interactive 3D. The e
 - Replaced the horizontally scrolling phone game button strip with one compact native game picker; desktop keeps the full button navigation.
 - Deployment rule: increment `APP_VERSION`, `package.json`, `package-lock.json`, and `motd` for every deployed release.
 
+## Growth pass — discovery and retention foundation
+
+- Replaced the generic browser title/default Vite icon with Arcade Hub SEO metadata, Open Graph/Twitter previews, a branded favicon, and a share preview image.
+- Game URLs now support direct links such as `?game=plinko`; the selected game is restored on load and the document title follows it.
+- Added a one-tap mobile share/copy control beside game selection.
+- Added privacy-minimal `session_start`, `referral_visit`, and `share_clicked` analytics events plus a nullable campaign source; existing analytics remains anonymous unless a signed-in user explicitly supplies their ID.
+
 ## Planned conversion order
 
 1. Tic-Tac-Toe, Connect Four and Mancala board batch: complete and build-tested.
