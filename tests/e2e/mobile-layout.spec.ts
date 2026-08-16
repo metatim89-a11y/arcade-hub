@@ -5,7 +5,7 @@ const games = ['connect4', 'rubikscube', 'crash', 'blackjack', 'poker', 'slots',
 test.beforeEach(async ({ page }) => {
   await page.goto('./');
   await page.getByRole('button', { name: 'Play as Guest' }).click();
-  await expect(page.getByLabel('Choose a game')).toBeVisible();
+  await expect(page.getByRole('combobox', { name: 'Choose a game' })).toBeVisible();
 });
 
 for (const gameId of games) {
@@ -13,7 +13,7 @@ for (const gameId of games) {
     if (['crash', 'blackjack', 'poker', 'slots', 'fishing', 'coinpusher'].includes(gameId)) {
       await page.getByRole('button', { name: /Casino \(18\+\)/i }).click();
     }
-    await page.getByLabel('Choose a game').selectOption(gameId);
+    await page.getByRole('combobox', { name: 'Choose a game' }).selectOption(gameId);
     const stage = page.locator('.game-engine-stage');
     await expect(stage).toBeVisible();
     await page.waitForTimeout(500);
