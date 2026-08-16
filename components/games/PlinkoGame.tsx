@@ -18,6 +18,7 @@ interface Ball {
     color: string;
     trail: {x: number, y: number}[];
     isFinished: boolean;
+    slowMotionTriggered?: boolean;
 }
 
 interface Particle {
@@ -103,7 +104,7 @@ const PlinkoGame: React.FC = () => {
     const [theme, setTheme] = useState<'Midnight' | 'Neon' | 'Candy'>('Midnight');
     const [ballSkin, setBallSkin] = useState<'Risk' | 'Diamond' | 'Rainbow'>('Risk');
     const [batchSize, setBatchSize] = useState(1);
-    const [slowMotion, setSlowMotion] = useState(true);
+    const [slowMotion, setSlowMotion] = useState(() => !window.matchMedia('(prefers-reduced-motion: reduce)').matches);
     const [followBall, setFollowBall] = useState(false);
     const [practicePreview, setPracticePreview] = useState(false);
     const [challengeBoard, setChallengeBoard] = useState(false);
@@ -127,6 +128,13 @@ const PlinkoGame: React.FC = () => {
     const audioRef = useRef<AudioContext | null>(null);
     const lastPingRef = useRef(0);
     const physicsLastTimeRef = useRef(0);
+    const slowMotionTimerRef = useRef<number | null>(null);
+    const feedbackTimerRef = useRef<number | null>(null);
+
+    useEffect(() => () => {
+        if (slowMotionTimerRef.current) window.clearTimeout(slowMotionTimerRef.current);
+        if (feedbackTimerRef.current) window.clearTimeout(feedbackTimerRef.current);
+    }, []);
 
     const ping = useCallback((frequency = 520) => {
         const AudioClass = window.AudioContext || (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
@@ -256,6 +264,19 @@ const PlinkoGame: React.FC = () => {
         // 3. Update & Draw Balls
         for (let i = ballsRef.current.length - 1; i >= 0; i--) {
             const ball = ballsRef.current[i];
+
+            if (slowMotion && !ball.slowMotionTriggered && ball.y > bucketY - spacingY * 1.8) {
+                const projectedIndex = Math.max(0, Math.min(multipliers.length - 1, Math.floor((ball.x - lastRowStartX) / spacingX)));
+                if (multipliers[projectedIndex] >= 10) {
+                    ball.slowMotionTriggered = true;
+                    setIsSlowMotion(true);
+                    if (slowMotionTimerRef.current) window.clearTimeout(slowMotionTimerRef.current);
+                    slowMotionTimerRef.current = window.setTimeout(() => {
+                        setIsSlowMotion(false);
+                        slowMotionTimerRef.current = null;
+                    }, 1100);
+                }
+            }
             
             const timeScale = (isSlowMotion ? .36 : 1) * frameScale;
             ball.vy += GRAVITY * timeScale;
@@ -347,12 +368,14 @@ const PlinkoGame: React.FC = () => {
                 setDailyProgress(current => Math.min(10, current + 1));
                 setLastReplay(mult);
                 glowingBucketRef.current.push({index: index, life: 1.0});
-                if (slowMotion && mult >= 10) { setIsSlowMotion(true); window.setTimeout(() => setIsSlowMotion(false), 1100); }
-                
                 if (mult >= 10) setFeedback(`HUGE WIN! ${mult}x`);
                 else if (mult > 1) setFeedback(`Nice! ${mult}x`);
                 
-                setTimeout(() => setFeedback(prev => prev.includes(`${mult}x`) ? '' : prev), 3000);
+                if (feedbackTimerRef.current) window.clearTimeout(feedbackTimerRef.current);
+                feedbackTimerRef.current = window.setTimeout(() => {
+                    setFeedback(prev => prev.includes(`${mult}x`) ? '' : prev);
+                    feedbackTimerRef.current = null;
+                }, 3000);
                 ballsRef.current.splice(i, 1);
             } else if (ball.y > height + 50) {
                 ballsRef.current.splice(i, 1);
@@ -377,7 +400,11 @@ const PlinkoGame: React.FC = () => {
         if (!canBet(bet)) {
             if (autoMode) setAutoMode(false);
             setFeedback('Insufficient Funds');
-            setTimeout(() => setFeedback(''), 2000);
+            if (feedbackTimerRef.current) window.clearTimeout(feedbackTimerRef.current);
+            feedbackTimerRef.current = window.setTimeout(() => {
+                setFeedback('');
+                feedbackTimerRef.current = null;
+            }, 2000);
             return;
         }
         const success = await subtractCoins(bet, 'Plinko Drop');

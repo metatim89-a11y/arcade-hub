@@ -45,11 +45,19 @@ const MancalaGame: React.FC<MancalaProps> = ({ playMode, playerNames }) => {
     const [puzzleName, setPuzzleName] = useState<string | null>(null);
     const [stats, setStats] = useState({ moves: 0, captures: 0, extraTurns: 0 });
     const [highlightedPit, setHighlightedPit] = useState<number | null>(null);
-    const [flyingStone, setFlyingStone] = useState<{ key: number; fromX: number; fromY: number; toX: number; toY: number; colorClass: string } | null>(null);
+    const [flyingStone, setFlyingStone] = useState<{ key: number; fromX: number; fromY: number; toX: number; toY: number; colorClass: string; duration: number } | null>(null);
     const isAnimating = useRef(false);
     const boardRef = useRef<HTMLDivElement>(null);
     const pitRefs = useRef(new Map<number, HTMLDivElement>());
     const flightKeyRef = useRef(0);
+    const lastHopTimerRef = useRef<number | null>(null);
+    const moveGenerationRef = useRef(0);
+    const reduceMotionRef = useRef(window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+
+    useEffect(() => () => {
+        moveGenerationRef.current += 1;
+        if (lastHopTimerRef.current) window.clearTimeout(lastHopTimerRef.current);
+    }, []);
 
     const p1Name = playerNames.player1;
     const p2Name = playMode === 'vsPlayer' ? playerNames.player2 : 'Computer';
@@ -99,12 +107,12 @@ const MancalaGame: React.FC<MancalaProps> = ({ playMode, playerNames }) => {
         colorClass: STONE_COLORS[Math.floor(Math.random() * STONE_COLORS.length)],
     })), []);
 
-    const flyStone = async (fromIndex: number, toIndex: number, colorClass: string) => {
+    const flyStone = async (fromIndex: number, toIndex: number, colorClass: string, duration: number) => {
         const board = boardRef.current;
         const from = pitRefs.current.get(fromIndex);
         const to = pitRefs.current.get(toIndex);
         if (!board || !from || !to) {
-            await sleep(260);
+            await sleep(duration);
             return;
         }
         const boardBounds = board.getBoundingClientRect();
@@ -116,13 +124,15 @@ const MancalaGame: React.FC<MancalaProps> = ({ playMode, playerNames }) => {
             fromY: fromBounds.top + fromBounds.height / 2 - boardBounds.top,
             toX: toBounds.left + toBounds.width / 2 - boardBounds.left,
             toY: toBounds.top + toBounds.height / 2 - boardBounds.top,
-            colorClass
+            colorClass,
+            duration
         });
-        await sleep(430);
+        await sleep(duration);
         setFlyingStone(null);
     };
 
     const performMove = async (index: number) => {
+        const generation = ++moveGenerationRef.current;
         isAnimating.current = true;
         const path = movePath(index, currentPlayer);
         setLastMovePath([index, ...path]);
@@ -130,10 +140,12 @@ const MancalaGame: React.FC<MancalaProps> = ({ playMode, playerNames }) => {
         setStats(current => ({ ...current, moves: current.moves + 1 }));
         let tempPits = [...pitsRef.current];
         let stonesToDistribute = tempPits[index];
+        const flightDuration = reduceMotionRef.current ? 0 : stonesToDistribute > 12 ? 170 : stonesToDistribute > 7 ? 250 : 430;
         tempPits[index] = 0;
         pitsRef.current = [...tempPits];
         setPits([...tempPits]);
-        await sleep(200);
+        await sleep(reduceMotionRef.current ? 0 : 200);
+        if (generation !== moveGenerationRef.current) return;
 
         let currentIndex = index;
         for (let i = 0; i < stonesToDistribute; i++) {
@@ -142,7 +154,8 @@ const MancalaGame: React.FC<MancalaProps> = ({ playMode, playerNames }) => {
                 currentIndex = (currentIndex + 1) % 14;
             }
             setHighlightedPit(currentIndex);
-            await flyStone(index, currentIndex, STONE_COLORS[i % STONE_COLORS.length]);
+            await flyStone(index, currentIndex, STONE_COLORS[i % STONE_COLORS.length], flightDuration);
+            if (generation !== moveGenerationRef.current) return;
             setLastHopedPit(currentIndex);
             
             tempPits = [...pitsRef.current];
@@ -150,7 +163,8 @@ const MancalaGame: React.FC<MancalaProps> = ({ playMode, playerNames }) => {
             pitsRef.current = [...tempPits];
             setPits([...tempPits]);
             setHighlightedPit(null);
-            setTimeout(() => setLastHopedPit(null), 260);
+            if (lastHopTimerRef.current) window.clearTimeout(lastHopTimerRef.current);
+            lastHopTimerRef.current = window.setTimeout(() => setLastHopedPit(null), Math.min(260, flightDuration));
         }
 
         // End of move logic
@@ -160,7 +174,8 @@ const MancalaGame: React.FC<MancalaProps> = ({ playMode, playerNames }) => {
         if (tempPits[lastPit] === 1 && lastPitIsOnCurrentPlayerSide) {
             const oppositePit = 12 - lastPit;
             if (tempPits[oppositePit] > 0) {
-                await sleep(400); // Slightly longer pause for capture
+                await sleep(reduceMotionRef.current ? 0 : 400); // Let the capture read after the final stone lands.
+                if (generation !== moveGenerationRef.current) return;
                 const storeIndex = currentPlayer === 1 ? PLAYER_1_STORE : PLAYER_2_STORE;
                 tempPits[storeIndex] += tempPits[oppositePit] + 1;
                 tempPits[oppositePit] = 0;
@@ -250,12 +265,16 @@ const MancalaGame: React.FC<MancalaProps> = ({ playMode, playerNames }) => {
     }, [pits, playMode, gameOver, p1Name, p2Name]);
 
     const handleReset = (startingPlayer: 1 | 2 = 1) => {
+        moveGenerationRef.current += 1;
+        if (lastHopTimerRef.current) window.clearTimeout(lastHopTimerRef.current);
         isAnimating.current = false; setFlyingStone(null); setHighlightedPit(null);
         setPits(INITIAL_PITS); setCurrentPlayer(startingPlayer); setStatus(`Player ${startingPlayer}'s Turn`); setGameOver(false); setWinner(null);
         setLastMovePath([]); setCaptureStreak({ 1: 0, 2: 0 }); setPuzzleName(null); setStats({ moves: 0, captures: 0, extraTurns: 0 });
     }
 
     const loadPuzzle = (puzzle: typeof PUZZLES[number]) => {
+        moveGenerationRef.current += 1;
+        if (lastHopTimerRef.current) window.clearTimeout(lastHopTimerRef.current);
         isAnimating.current = false;
         setPits([...puzzle.pits]); setCurrentPlayer(1); setGameOver(false); setWinner(null);
         setPuzzleName(puzzle.name); setStatus(puzzle.description); setLastMovePath([]); setStats({ moves: 0, captures: 0, extraTurns: 0 });
@@ -393,7 +412,8 @@ const MancalaGame: React.FC<MancalaProps> = ({ playMode, playerNames }) => {
                             {flyingStone && <div key={flyingStone.key} className={`flying-mancala-stone ${flyingStone.colorClass}`} style={{
                                 left: flyingStone.fromX,
                                 top: flyingStone.fromY,
-                                offsetPath: `path("M 0 0 Q ${(flyingStone.toX - flyingStone.fromX) / 2} ${(flyingStone.toY - flyingStone.fromY) / 2 - 85} ${flyingStone.toX - flyingStone.fromX} ${flyingStone.toY - flyingStone.fromY}")`
+                                offsetPath: `path("M 0 0 Q ${(flyingStone.toX - flyingStone.fromX) / 2} ${(flyingStone.toY - flyingStone.fromY) / 2 - 85} ${flyingStone.toX - flyingStone.fromX} ${flyingStone.toY - flyingStone.fromY}")`,
+                                animationDuration: `${flyingStone.duration}ms`
                             }} />}
                         </div>
 
@@ -477,6 +497,7 @@ const MancalaGame: React.FC<MancalaProps> = ({ playMode, playerNames }) => {
                 @media(max-width: 900px) { .mancala-layout { grid-template-columns: 1fr 1fr; grid-template-areas: 'p2 p1' 'board board'; gap: 8px 12px; } .mancala-score { display: flex; align-items: center; justify-content: center; gap: 8px; } .mancala-score .text-4xl { font-size: 1.55rem; } }
                 @media(max-width: 760px) { .mancala-board { min-height: 190px; padding: 6px !important; border-width: 3px; } .mancala-board .mancala-pit { min-height: 70px; } .mancala-board .mancala-store { min-height: 150px; } .mancala-board .stone { width: 27%; height: 27%; } .flying-mancala-stone { width: 17px; height: 17px; } }
                 @media(max-width: 430px) { .mancala-board { min-height: 180px; } .mancala-board .mancala-pit { min-height: 64px; } .mancala-board .mancala-store { min-height: 138px; } .mancala-layout { gap: 5px; } .mancala-final-stats{grid-template-columns:1fr 1fr}.mancala-tutorial{font-size:10px} }
+                @media(prefers-reduced-motion:reduce){.flying-mancala-stone,.animate-stone-hop{animation:none!important}}
             `}</style>
         </div>
     );

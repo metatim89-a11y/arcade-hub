@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { PlayMode } from '../../types';
 import GlassButton from '../ui/GlassButton';
 import { MemoryCards3D } from './CardGames3D';
@@ -53,6 +53,14 @@ const RPSCardGame: React.FC<RPSCardGameProps> = ({ playMode }) => {
     const [gameOver, setGameOver] = useState(false);
     const [isChecking, setIsChecking] = useState(false);
     const [lastMatchSymbol, setLastMatchSymbol] = useState<string | null>(null);
+    const resolutionTimerRef = useRef<number | null>(null);
+
+    const clearResolutionTimer = () => {
+        if (resolutionTimerRef.current) window.clearTimeout(resolutionTimerRef.current);
+        resolutionTimerRef.current = null;
+    };
+
+    useEffect(() => () => clearResolutionTimer(), []);
 
     const checkMatch = () => {
         if (flippedCards.length !== 2) return;
@@ -65,18 +73,27 @@ const RPSCardGame: React.FC<RPSCardGameProps> = ({ playMode }) => {
             setBoard(prev => prev.map(card => card.symbol === firstCard.symbol ? { ...card, isMatched: true, isFlipped: true } : card));
             setScores(s => currentPlayer === 1 ? { ...s, player1: s.player1 + 1 } : { ...s, player2: s.player2 + 1 });
             setLastMatchSymbol(firstCard.symbol);
-            setTimeout(() => setLastMatchSymbol(null), 500); // Animation display time
+            const currentName = currentPlayer === 1 ? 'Player 1' : playMode === 'vsComputer' ? 'Computer' : 'Player 2';
+            setStatus(`${currentName} matched ${firstCard.symbol}!`);
+            clearResolutionTimer();
+            resolutionTimerRef.current = window.setTimeout(() => {
+                setLastMatchSymbol(null);
+                setStatus(`${currentName}'s Turn`);
+                resolutionTimerRef.current = null;
+            }, 650);
             setFlippedCards([]);
             setIsChecking(false);
         } else {
-            setTimeout(() => {
+            clearResolutionTimer();
+            resolutionTimerRef.current = window.setTimeout(() => {
                 setBoard(prev => prev.map(card => flippedCards.includes(card.id) ? { ...card, isFlipped: false } : card));
                 const nextPlayer = currentPlayer === 1 ? 2 : 1;
                 setCurrentPlayer(nextPlayer);
                 setStatus(`Player ${nextPlayer}'s Turn`);
                 setFlippedCards([]);
                 setIsChecking(false);
-            }, 1000);
+                resolutionTimerRef.current = null;
+            }, 900);
         }
     };
 
@@ -121,6 +138,7 @@ const RPSCardGame: React.FC<RPSCardGameProps> = ({ playMode }) => {
     };
 
     const handleReset = () => {
+        clearResolutionTimer();
         setBoard(createShuffledBoard());
         setFlippedCards([]);
         setCurrentPlayer(1);
@@ -128,6 +146,7 @@ const RPSCardGame: React.FC<RPSCardGameProps> = ({ playMode }) => {
         setStatus("Player 1's Turn");
         setGameOver(false);
         setIsChecking(false);
+        setLastMatchSymbol(null);
     };
 
     const computerName = playMode === 'vsComputer' ? 'Computer' : 'Player 2';
@@ -140,8 +159,9 @@ const RPSCardGame: React.FC<RPSCardGameProps> = ({ playMode }) => {
                 <span>{computerName}: {scores.player2}</span>
             </div>
             <div className="text-lg font-semibold h-7 mb-2">{status}</div>
-            <div className="h-[580px] w-full max-w-[720px] overflow-hidden rounded-3xl shadow-[0_28px_70px_rgba(0,0,0,.48)] max-sm:h-[500px]">
+            <div className="relative h-[580px] w-full max-w-[720px] overflow-hidden rounded-3xl shadow-[0_28px_70px_rgba(0,0,0,.48)] max-sm:h-[500px]">
                 <MemoryCards3D cards={board} disabled={gameOver || isChecking || (playMode === 'vsComputer' && currentPlayer === 2)} onCardClick={(id) => handleCardClick(id)} />
+                {lastMatchSymbol && <div key={lastMatchSymbol} className="match-celebration"><StunDropAnimation /><strong>{lastMatchSymbol} MATCH</strong></div>}
             </div>
             <details className="w-full max-w-[720px] rounded-xl border border-slate-600 bg-slate-950/70 p-3">
                 <summary className="cursor-pointer font-bold text-yellow-300">Accessible card controls</summary>
@@ -198,6 +218,10 @@ const RPSCardGame: React.FC<RPSCardGameProps> = ({ playMode }) => {
                     0% { transform: translate(0,0) scale(1); opacity: 1; }
                     100% { transform: translate(var(--x-end), var(--y-end)) scale(0); opacity: 0; }
                 }
+                .match-celebration { position:absolute; inset:0; z-index:20; display:grid; place-items:center; pointer-events:none; }
+                .match-celebration strong { position:relative; z-index:22; padding:10px 18px; border-radius:999px; background:rgba(7,15,36,.88); border:2px solid #fbbf24; color:#fff5bd; font-size:20px; box-shadow:0 0 35px rgba(251,191,36,.65); animation:match-label .65s ease-out forwards; }
+                @keyframes match-label { 0% { opacity:0; transform:scale(.45); } 25%,70% { opacity:1; transform:scale(1.08); } 100% { opacity:0; transform:scale(.9); } }
+                @media (prefers-reduced-motion: reduce) { .stun-flash-effect,.stun-particle,.match-celebration strong { animation:none; } }
             `}</style>
         </div>
     );

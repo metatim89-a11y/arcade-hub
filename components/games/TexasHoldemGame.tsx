@@ -159,6 +159,7 @@ const TexasHoldemGame: React.FC = () => {
   const currentBetRef = useRef(0);
   const pendingRef = useRef<Set<number>>(new Set());
   const actionHandlerRef = useRef<(action: Action) => void>(() => undefined);
+  const actionTimersRef = useRef(new Map<number, number>());
 
   const commitPlayers = (next: Player[]) => {
     playersRef.current = next;
@@ -190,10 +191,25 @@ const TexasHoldemGame: React.FC = () => {
     : null;
 
   const announce = (playerId: number, action: string, line: string) => {
+    const existingTimer = actionTimersRef.current.get(playerId);
+    if (existingTimer) window.clearTimeout(existingTimer);
     setLastActions(current => ({ ...current, [playerId]: action }));
+    actionTimersRef.current.set(playerId, window.setTimeout(() => {
+      setLastActions(current => {
+        const next = { ...current };
+        delete next[playerId];
+        return next;
+      });
+      actionTimersRef.current.delete(playerId);
+    }, 1000));
     setHistory(current => [line, ...current].slice(0, 12));
     setMessage(line);
   };
+
+  useEffect(() => () => {
+    actionTimersRef.current.forEach((timer) => window.clearTimeout(timer));
+    actionTimersRef.current.clear();
+  }, []);
 
   const settleShowdown = (tablePlayers: Player[], board: Card[]) => {
     const next = tablePlayers.map((player) => ({ ...player }));
@@ -392,6 +408,8 @@ const TexasHoldemGame: React.FC = () => {
   };
 
   const startHand = (sourcePlayers = playersRef.current) => {
+    actionTimersRef.current.forEach((timer) => window.clearTimeout(timer));
+    actionTimersRef.current.clear();
     const funded = sourcePlayers.filter((player) => player.stack >= bigBlind);
     if (funded.length < 2) {
       commitPhase('SHOWDOWN');
@@ -523,7 +541,7 @@ const TexasHoldemGame: React.FC = () => {
           </header>
           <div className="poker-room">
             <div className="poker-table">
-              <div className="poker-table-3d" aria-hidden="true"><PokerTable3D players={players} community={community} showdown={phase === 'SHOWDOWN'} /></div>
+              <div className="poker-table-3d" aria-hidden="true"><PokerTable3D players={players} community={community} showdown={phase === 'SHOWDOWN'} handId={handNumber} /></div>
               <div className="practice-deck" aria-hidden="true"><i /><i /><i /></div>
               {phase !== 'PREFLOP' && phase !== 'SHOWDOWN' && <div key={phase} className="street-splash">{phase}</div>}
               <div className="table-center">
@@ -542,7 +560,7 @@ const TexasHoldemGame: React.FC = () => {
                 return (
                   <div key={player.id} className={`poker-seat ${seatPositions[index]}${isActing ? ' acting' : ''}${player.folded ? ' folded' : ''}`}>
                     {isActing && <div key={`${phase}-${player.id}-${lastActions[player.id] ?? ''}`} className="turn-indicator">{player.isHuman ? 'YOUR TURN' : `${player.name}’S TURN`}</div>}
-                    {lastActions[player.id] && <div className="seat-action-pop">{lastActions[player.id]}</div>}
+                    {lastActions[player.id] && <div key={lastActions[player.id]} className="seat-action-pop">{lastActions[player.id]}</div>}
                     {emotes[player.id] && <div className="seat-emote">{emotes[player.id]}</div>}
                     <div className="seat-cards">
                       {player.hand.map((card, cardIndex) => <CardView key={card.id} card={card} hidden={!reveal} newlyDealt={phase === 'PREFLOP'} dealDelay={(cardIndex * players.length + index) * 85} />)}
@@ -559,7 +577,7 @@ const TexasHoldemGame: React.FC = () => {
                         {index === bigBlindIndex && <i className="position-chip big-blind-button" title="Big blind">BB</i>}
                       </div>
                       <div className="seat-badges">
-                        {player.bet > 0 && <em className="seat-bet">BET {player.bet}</em>}
+                        {player.bet > 0 && <em key={`bet-${player.bet}`} className="seat-bet">BET {player.bet}</em>}
                         {player.allIn && <em className="seat-state">ALL IN</em>}
                         {player.folded && <em className="seat-state">FOLDED</em>}
                         {rank && <em className="seat-rank">{rank.name}</em>}
@@ -614,14 +632,14 @@ const TexasHoldemGame: React.FC = () => {
         .poker-seat.left,.poker-seat.right{flex-direction:column;align-items:center;width:158px;gap:3px}.poker-seat.left{left:2%;transform:translateY(-50%)}.poker-seat.right{right:2%;transform:translateY(-50%)}.poker-seat.left .seat-panel,.poker-seat.right .seat-panel{width:100%;margin:0}.poker-seat.left .seat-cards,.poker-seat.right .seat-cards{order:-1;width:76px;height:48px;flex:0 0 48px;transform:scale(.72);transform-origin:center}.table-center{left:23%;right:23%}
         @media(max-width:760px){.poker-seat.left,.poker-seat.right{width:112px;gap:1px}.poker-seat.left{left:1%}.poker-seat.right{right:1%}.poker-seat.left .seat-cards,.poker-seat.right .seat-cards{width:68px;height:42px;flex-basis:42px;transform:scale(.61)}.table-center{left:22%;right:22%}}
         @media(max-width:470px){.poker-seat.left,.poker-seat.right{width:92px}.poker-seat.left{left:0}.poker-seat.right{right:0}.poker-seat.left .seat-cards,.poker-seat.right .seat-cards{width:60px;height:36px;flex-basis:36px;transform:scale(.5)}.table-center{left:20%;right:20%}}
-        .holdem-game.theme-midnight .poker-table{background:radial-gradient(ellipse,#203968,#122650 54%,#091633 100%);border-color:#192846}.holdem-game.theme-royal .poker-table{background:radial-gradient(ellipse,#722c43,#521b30 54%,#2b0c18 100%);border-color:#6f5422}.holdem-options{display:grid;grid-template-columns:1fr 1fr;gap:7px;width:100%}.holdem-options label,.holdem-options button{display:flex;align-items:center;justify-content:space-between;gap:6px;padding:8px;border:1px solid #395748;border-radius:7px;background:#10221a;color:#9eb2a7;font-size:9px;font-weight:900}.holdem-options select{background:#08150f;color:white;border:0}.holdem-options button.active{border-color:#d2a944;color:#e8c65e}.seat-action-pop{position:absolute;z-index:35;left:50%;top:45%;transform:translate(-50%,-50%);padding:5px 8px;border-radius:6px;background:#e3b63f;color:#241a05;font-size:9px;font-weight:950;animation:action-pop .5s ease-out}.seat-emote{position:absolute;z-index:36;right:-5px;top:-8px;font-size:20px;filter:drop-shadow(0 4px 4px rgba(0,0,0,.6))}.practice-readout{display:grid;min-width:110px;padding:7px 10px;border:1px solid #3c6652;border-radius:8px;background:#10241b;color:#9cc9ae;font-size:9px}.practice-readout strong{color:#f0c85f;font-size:12px}.raise-picker{display:grid;min-width:120px;color:#94a89c;font-size:9px;font-weight:900}.raise-picker input{width:120px;accent-color:#d3aa42}.holdem-controls .all-in{background:#6e3ca1}.hand-history{margin-top:8px;padding:8px 11px;border:1px solid #314a3d;border-radius:8px;background:#0b1812;color:#82978b;font-size:9px}.hand-history summary{cursor:pointer;color:#d0ad4e;font-weight:900;letter-spacing:.1em}.hand-history div{padding:4px 0;border-top:1px solid rgba(255,255,255,.05)}@keyframes action-pop{from{opacity:0;transform:translate(-50%,-25%) scale(.65)}to{opacity:1;transform:translate(-50%,-50%) scale(1)}}
+        .holdem-game.theme-midnight .poker-table{background:radial-gradient(ellipse,#203968,#122650 54%,#091633 100%);border-color:#192846}.holdem-game.theme-royal .poker-table{background:radial-gradient(ellipse,#722c43,#521b30 54%,#2b0c18 100%);border-color:#6f5422}.holdem-options{display:grid;grid-template-columns:1fr 1fr;gap:7px;width:100%}.holdem-options label,.holdem-options button{display:flex;align-items:center;justify-content:space-between;gap:6px;padding:8px;border:1px solid #395748;border-radius:7px;background:#10221a;color:#9eb2a7;font-size:9px;font-weight:900}.holdem-options select{background:#08150f;color:white;border:0}.holdem-options button.active{border-color:#d2a944;color:#e8c65e}.seat-action-pop{position:absolute;z-index:35;left:50%;top:45%;transform:translate(-50%,-50%);padding:5px 8px;border-radius:6px;background:#e3b63f;color:#241a05;font-size:9px;font-weight:950;animation:action-pop 1s ease-out forwards}.seat-emote{position:absolute;z-index:36;right:-5px;top:-8px;font-size:20px;filter:drop-shadow(0 4px 4px rgba(0,0,0,.6))}.practice-readout{display:grid;min-width:110px;padding:7px 10px;border:1px solid #3c6652;border-radius:8px;background:#10241b;color:#9cc9ae;font-size:9px}.practice-readout strong{color:#f0c85f;font-size:12px}.raise-picker{display:grid;min-width:120px;color:#94a89c;font-size:9px;font-weight:900}.raise-picker input{width:120px;accent-color:#d3aa42}.holdem-controls .all-in{background:#6e3ca1}.hand-history{margin-top:8px;padding:8px 11px;border:1px solid #314a3d;border-radius:8px;background:#0b1812;color:#82978b;font-size:9px}.hand-history summary{cursor:pointer;color:#d0ad4e;font-weight:900;letter-spacing:.1em}.hand-history div{padding:4px 0;border-top:1px solid rgba(255,255,255,.05)}@keyframes action-pop{0%{opacity:0;transform:translate(-50%,-25%) scale(.65)}20%,72%{opacity:1;transform:translate(-50%,-50%) scale(1)}100%{opacity:0;transform:translate(-50%,-62%) scale(.94)}}
         /* Larger table, rotating position chips, and livelier dealing/turn feedback. */
         .holdem-game{width:min(100%,1160px)}.poker-table{height:720px}.table-center{top:38%}.holdem-card.dealt{animation:deal-card-enhanced .42s cubic-bezier(.18,.82,.28,1.15) both}.poker-seat.acting .seat-panel{animation:active-turn 1.15s ease-in-out infinite}.turn-indicator{position:absolute;z-index:40;left:50%;top:-9px;transform:translate(-50%,-100%);padding:4px 8px;border-radius:10px;background:#f0c75b;color:#251b05;font-size:7px;font-weight:950;letter-spacing:.08em;animation:turn-bounce .85s ease-in-out infinite alternate}.position-chips{position:absolute;right:-12px;bottom:-12px;z-index:8;display:flex;gap:3px}.position-chip{position:static;display:grid;place-items:center;width:27px;height:27px;border:2px solid #999;border-radius:50%;background:#fff;color:#222;font-size:8px;font-style:normal;font-weight:950;box-shadow:0 3px 7px rgba(0,0,0,.5);animation:chip-arrive .45s cubic-bezier(.2,.9,.3,1.25)}.small-blind-button{border-color:#55bde6;background:#d9f5ff;color:#07516d}.big-blind-button{border-color:#e2b33e;background:#fff1bb;color:#624500}.holdem-controls .buy-in{background:linear-gradient(#e2bd59,#b78120);color:#211805}@keyframes deal-card-enhanced{from{opacity:0;transform:translateY(-90px) rotate(-12deg) scale(.55)}to{opacity:1;transform:none}}@keyframes active-turn{50%{transform:scale(1.025);box-shadow:0 0 0 4px rgba(240,199,91,.18),0 0 30px rgba(240,199,91,.42)}}@keyframes turn-bounce{to{transform:translate(-50%,-115%) scale(1.06)}}@keyframes chip-arrive{from{opacity:0;transform:translate(20px,-20px) rotate(160deg) scale(.4)}}@media(max-width:760px){.poker-table{height:680px;border-radius:40%}.table-center{top:39%}}@media(max-width:470px){.poker-table{height:650px}.table-center{top:40%}}
         .practice-deck{position:absolute;z-index:2;left:50%;top:29%;width:42px;height:58px;transform:translateX(-50%)}.practice-deck i{position:absolute;inset:0;border:2px solid #eee8d8;border-radius:5px;background:repeating-linear-gradient(45deg,#732a31 0 4px,#a84249 4px 8px);box-shadow:0 4px 9px #0009}.practice-deck i:nth-child(2){transform:translate(3px,-3px)}.practice-deck i:nth-child(3){transform:translate(6px,-6px)}.street-splash{position:absolute;z-index:50;left:50%;top:50%;transform:translate(-50%,-50%);padding:10px 22px;border:2px solid #edc65e;border-radius:18px;background:#071b13e8;color:#edc65e;font-size:18px;font-weight:950;letter-spacing:.18em;pointer-events:none;animation:street-splash 1s ease-out forwards}.poker-seat.acting:after{content:'';position:absolute;z-index:-1;inset:-9px;border:2px solid #edc65e;border-radius:16px;animation:turn-ring 1s ease-in-out infinite}.seat-bet{animation:bet-chip-pop .45s cubic-bezier(.2,.9,.3,1.25)}@keyframes street-splash{0%{opacity:0;transform:translate(-50%,-30%) scale(.65)}25%{opacity:1;transform:translate(-50%,-50%) scale(1)}75%{opacity:1}100%{opacity:0;transform:translate(-50%,-70%) scale(1.08)}}@keyframes turn-ring{50%{inset:-15px;opacity:.2}}@keyframes bet-chip-pop{from{opacity:0;transform:translateY(18px) scale(.5)}}
         .holdem-card.dealt{animation-duration:.62s}.seat-cards .holdem-card.dealt{animation-name:practice-deal-hole}@keyframes practice-deal-hole{from{opacity:0;transform:translateY(-190px) rotate(-18deg) scale(.42)}70%{opacity:1;transform:translateY(5px) rotate(2deg) scale(1.04)}to{transform:none}}.community-row .holdem-card.dealt{animation-name:practice-deal-board}@keyframes practice-deal-board{from{opacity:0;transform:translateY(-110px) rotate(-10deg) scale(.5)}to{opacity:1;transform:none}}
         @media(max-width:470px){.practice-deck{top:30%;transform:translateX(-50%) scale(.82)}.street-splash{font-size:14px}.turn-indicator{font-size:6px}}
         .poker-table-3d{position:absolute;z-index:1;inset:0;overflow:hidden;border-radius:inherit}.poker-table .community-row,.poker-table .seat-cards{visibility:hidden}.table-center,.poker-seat{z-index:3}
-        @media(prefers-reduced-motion:reduce){.holdem-card.dealt,.poker-seat.acting .seat-panel,.poker-seat.acting:after,.turn-indicator,.position-chip,.street-splash,.seat-bet{animation:none}}
+        @media(prefers-reduced-motion:reduce){.holdem-card.dealt,.poker-seat.acting .seat-panel,.poker-seat.acting:after,.turn-indicator,.position-chip,.street-splash,.seat-bet,.seat-action-pop{animation:none}}
       `}</style>
     </section>
   );

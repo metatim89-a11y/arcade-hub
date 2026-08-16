@@ -47,6 +47,7 @@ export const TicTacToeBoard3D: React.FC<TicTacToeBoard3DProps> = ({ board, winni
 
     void import('three').then((THREE) => {
       if (cancelled) return;
+      const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
       const renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true, powerPreference: 'high-performance' });
       renderer.setPixelRatio(Math.min(devicePixelRatio, 1.75));
       renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -139,8 +140,8 @@ export const TicTacToeBoard3D: React.FC<TicTacToeBoard3DProps> = ({ board, winni
         }
         const col = index % 3;
         const row = Math.floor(index / 3);
-        group.position.set((col - 1) * 2.08, 1.2, (row - 1) * 2.08);
-        group.scale.setScalar(.05);
+        group.position.set((col - 1) * 2.08, reduceMotion ? .32 : 1.2, (row - 1) * 2.08);
+        group.scale.setScalar(reduceMotion ? 1 : .05);
         group.userData.birth = performance.now();
         group.userData.targetY = .32;
         group.userData.mark = mark;
@@ -174,16 +175,16 @@ export const TicTacToeBoard3D: React.FC<TicTacToeBoard3DProps> = ({ board, winni
           cellMaterial.emissiveIntensity = activeHover ? .45 : 0;
         });
         pieces.forEach((piece, index) => {
-          const age = Math.min(1, (now - Number(piece.userData.birth)) / 420);
+          const age = reduceMotion ? 1 : Math.min(1, (now - Number(piece.userData.birth)) / 420);
           const eased = 1 - Math.pow(1 - age, 3);
           piece.scale.setScalar(eased);
           piece.position.y += (Number(piece.userData.targetY) - piece.position.y) * smooth;
           const winning = live.winningLine.includes(index);
-          const pulse = winning ? 1 + Math.sin(now * .009) * .1 : 1;
+          const pulse = winning && !reduceMotion ? 1 + Math.sin(now * .009) * .1 : 1;
           piece.scale.multiplyScalar(pulse);
-          piece.rotation.y = Math.sin(now * .0015 + index) * (winning ? .16 : .025);
+          piece.rotation.y = reduceMotion ? 0 : Math.sin(now * .0015 + index) * (winning ? .16 : .025);
         });
-        boardRoot.rotation.x = Math.sin(now * .00035) * .012;
+        boardRoot.rotation.x = reduceMotion ? 0 : Math.sin(now * .00035) * .012;
         renderer.render(scene, camera);
         frame = requestAnimationFrame(animate);
       };
@@ -217,6 +218,7 @@ export const ConnectFourBoard3D: React.FC<ConnectFourBoard3DProps> = ({ pieces, 
     let teardown = () => undefined;
     void import('three').then((THREE) => {
       if (cancelled) return;
+      const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
       const renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true, powerPreference: 'high-performance' });
       renderer.setPixelRatio(Math.min(devicePixelRatio, 1.65));
       renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -300,10 +302,10 @@ export const ConnectFourBoard3D: React.FC<ConnectFourBoard3DProps> = ({ pieces, 
         const material = new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: .22, metalness: .42, roughness: .25 });
         const disc = new THREE.Mesh(new THREE.CylinderGeometry(.425, .425, .22, 40, 1, false), material);
         disc.rotation.x = Math.PI / 2;
-        disc.position.set(piece.col - 3, 4.25, .34);
+        disc.position.set(piece.col - 3, reduceMotion ? 2.5 - piece.row : 4.25, .34);
         disc.userData.targetY = 2.5 - piece.row;
         disc.userData.velocity = 0;
-        disc.userData.landed = false;
+        disc.userData.landed = reduceMotion;
         disc.castShadow = true;
         boardRoot.add(disc);
         pieceMeshes.set(piece.id, disc);
@@ -344,15 +346,15 @@ export const ConnectFourBoard3D: React.FC<ConnectFourBoard3DProps> = ({ pieces, 
           const source = live.pieces.find((piece) => piece.id === id);
           const winning = !!source && live.winningLine.some(([row, col]) => row === source.row && col === source.col);
           const material = mesh.material as InstanceType<typeof THREE.MeshStandardMaterial>;
-          material.emissiveIntensity = winning ? .65 + Math.sin(now * .01) * .28 : .22;
-          mesh.scale.setScalar(winning ? 1 + Math.sin(now * .009) * .07 : 1);
+          material.emissiveIntensity = winning ? (reduceMotion ? .82 : .65 + Math.sin(now * .01) * .28) : .22;
+          mesh.scale.setScalar(winning && !reduceMotion ? 1 + Math.sin(now * .009) * .07 : 1);
         });
         hitMeshes.forEach((hit, col) => {
           const material = hit.material as InstanceType<typeof THREE.MeshBasicMaterial>;
           material.opacity = hovered === col && !live.disabled ? .09 : 0;
           material.color.setHex(live.currentPlayer === '1' ? 0xff4054 : 0xffd83d);
         });
-        boardRoot.rotation.y = -.055 + Math.sin(now * .0003) * .012;
+        boardRoot.rotation.y = -.055 + (reduceMotion ? 0 : Math.sin(now * .0003) * .012);
         renderer.render(scene, camera);
         frame = requestAnimationFrame(animate);
       };

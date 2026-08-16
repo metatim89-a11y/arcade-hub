@@ -472,6 +472,7 @@ const CoinPusherGame: React.FC = () => {
         .coin-pusher-gutter{z-index:2;top:70%;bottom:0;height:auto;background:linear-gradient(90deg,rgba(5,10,14,.72),rgba(18,29,37,.08));border-top:1px solid rgba(97,113,123,.35)}.coin-pusher-gutter.left{border-right:2px dashed rgba(113,137,150,.28)}.coin-pusher-gutter.right{border-left:2px dashed rgba(113,137,150,.28);background:linear-gradient(270deg,rgba(5,10,14,.72),rgba(18,29,37,.08))}
         @keyframes pusher-pulse{0%,68%,100%{transform:scale(1);filter:brightness(1)}34%{transform:scale(1.2);filter:brightness(1.35)}}
         @media(max-width:520px){.coin-pusher-game{padding:12px;border-radius:12px}.coin-pusher-header{align-items:flex-end}.coin-pusher-header h2{font-size:22px}.coin-pusher-rules{font-size:10px}.coin-pusher-machine{padding:8px 8px 0}.coin-pusher-shelf{aspect-ratio:320/345}.coin-pusher-controls{margin-top:13px}}
+        @media(prefers-reduced-motion:reduce){.status-light.active{animation:none!important}}
       `}</style>
     </section>
   );

@@ -81,6 +81,12 @@ const GameArea: React.FC<GameAreaProps> = ({ games, selectedGame, onSelectGame, 
             clearTimeout(transitionTimeoutRef.current);
         }
 
+        if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+            setPreviousGameProps(null);
+            setActiveGameProps({ game: selectedGame, playMode, currencyMode, mode, playerNames });
+            return;
+        }
+
         setPreviousGameProps(activeGameProps);
         setActiveGameProps({ game: selectedGame, playMode, currencyMode, mode, playerNames });
 

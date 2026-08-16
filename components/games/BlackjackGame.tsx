@@ -8,6 +8,7 @@ type Suit = '♠' | '♥' | '♦' | '♣';
 type Rank = '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9' | '10' | 'J' | 'Q' | 'K' | 'A';
 
 interface Card {
+  id: string;
   suit: Suit;
   rank: Rank;
   value: number;
@@ -18,6 +19,7 @@ const SUITS: Suit[] = ['♠', '♥', '♦', '♣'];
 const RANKS: Rank[] = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A'];
 const DECKS_IN_SHOE = 6;
 const SHUFFLE_THRESHOLD = 60; // Shuffle when fewer than 60 cards remain
+const wait = (milliseconds: number) => new Promise<void>((resolve) => window.setTimeout(resolve, milliseconds));
 
 const getCardValue = (rank: Rank): number => {
   if (['J', 'Q', 'K'].includes(rank)) return 10;
@@ -36,6 +38,9 @@ const BlackjackGame: React.FC = () => {
   const [dealerHand, setDealerHand] = useState<Card[]>([]);
   const [gameState, setGameState] = useState<'BETTING' | 'PLAYING' | 'DEALER_TURN' | 'GAME_OVER'>('BETTING');
   const [message, setMessage] = useState('Place your bet to start');
+  const [animationLocked, setAnimationLocked] = useState(false);
+  const [roundId, setRoundId] = useState(0);
+  const operationRef = useRef(0);
   
   const currencySymbol = currencyMode === 'fun' ? 'FC' : 'RC';
 
@@ -45,7 +50,7 @@ const BlackjackGame: React.FC = () => {
     for (let d = 0; d < DECKS_IN_SHOE; d++) {
         for (const suit of SUITS) {
             for (const rank of RANKS) {
-                newShoe.push({ suit, rank, value: getCardValue(rank) });
+                newShoe.push({ id: `${d}-${suit}-${rank}`, suit, rank, value: getCardValue(rank) });
             }
         }
     }
@@ -83,16 +88,25 @@ const BlackjackGame: React.FC = () => {
 
   // --- Game Actions ---
   const dealGame = async () => {
+    if (animationLocked) return;
     if (!canBet(baseBet)) {
       setMessage('Insufficient funds!');
       return;
     }
 
+    const operation = ++operationRef.current;
+    setAnimationLocked(true);
+    setMessage('Dealing opening cards…');
+
     // Integrity: Ensure shoe is ready
     let currentShoe = shoe.length < SHUFFLE_THRESHOLD ? createShoe() : [...shoe];
     
     const success = await subtractCoins(baseBet, 'Blackjack Bet');
-    if (!success) return;
+    if (!success) {
+      if (operation === operationRef.current) setAnimationLocked(false);
+      return;
+    }
+    if (operation !== operationRef.current) return;
 
     setCurrentBet(baseBet);
     
@@ -106,43 +120,68 @@ const BlackjackGame: React.FC = () => {
     res = drawCard(currentShoe, true); dHand.push(res.card); currentShoe = res.newShoe;
 
     setShoe(currentShoe);
+    setRoundId((value) => value + 1);
     setPlayerHand(pHand);
     setDealerHand(dHand);
     setGameState('PLAYING');
-    setMessage('Hit, Stand or Double?');
+    await wait(1050);
+    if (operation !== operationRef.current) return;
 
     // Instant Blackjack Check
     const pScore = calculateScore(pHand);
     const dScore = calculateScore(dHand.map(c => ({...c, isHidden: false})));
     
     if (pScore === 21) {
-       handleGameOver(pHand, dHand.map(c => ({...c, isHidden: false})), true);
+       handleGameOver(pHand, dHand.map(c => ({...c, isHidden: false})), true, baseBet);
+    } else {
+       setAnimationLocked(false);
+       setMessage('Hit, Stand or Double?');
     }
   };
 
-  const hit = () => {
+  const hit = async () => {
+    if (animationLocked || gameState !== 'PLAYING') return;
+    const operation = ++operationRef.current;
+    setAnimationLocked(true);
+    setMessage('Dealing a card…');
     const { card, newShoe } = drawCard(shoe);
     const newHand = [...playerHand, card];
     setShoe(newShoe);
     setPlayerHand(newHand);
 
     const score = calculateScore(newHand);
+    await wait(540);
+    if (operation !== operationRef.current) return;
     if (score > 21) {
       handleGameOver(newHand, dealerHand.map(c => ({...c, isHidden: false})), false);
+    } else {
+      setAnimationLocked(false);
+      setMessage('Hit, Stand or Double?');
     }
   };
 
   const stand = () => {
+    if (animationLocked || gameState !== 'PLAYING') return;
+    setAnimationLocked(true);
+    setMessage('Dealer reveals…');
     setGameState('DEALER_TURN');
   };
 
   const doubleDown = async () => {
+    if (animationLocked || gameState !== 'PLAYING') return;
     if (!canBet(baseBet)) {
         setMessage("Not enough coins to double!");
         return;
     }
+    const operation = ++operationRef.current;
+    setAnimationLocked(true);
+    setMessage('Doubling down…');
     const success = await subtractCoins(baseBet, 'Blackjack Double');
-    if (!success) return;
+    if (!success) {
+      if (operation === operationRef.current) setAnimationLocked(false);
+      return;
+    }
+    if (operation !== operationRef.current) return;
 
     setCurrentBet(prev => prev + baseBet);
     
@@ -152,9 +191,12 @@ const BlackjackGame: React.FC = () => {
     setPlayerHand(newHand);
     
     const score = calculateScore(newHand);
+    await wait(540);
+    if (operation !== operationRef.current) return;
     if (score > 21) {
         handleGameOver(newHand, dealerHand.map(c => ({...c, isHidden: false})), false, baseBet * 2);
     } else {
+        setMessage('Dealer reveals…');
         setGameState('DEALER_TURN');
     }
   };
@@ -162,13 +204,15 @@ const BlackjackGame: React.FC = () => {
   // --- Dealer Logic ---
   useEffect(() => {
     if (gameState === 'DEALER_TURN') {
+      let cancelled = false;
       const playDealer = async () => {
         let currentDealerHand = dealerHand.map(c => ({ ...c, isHidden: false }));
         let currentShoe = [...shoe];
         let dScore = calculateScore(currentDealerHand);
 
         setDealerHand(currentDealerHand); // Reveal
-        await new Promise(r => setTimeout(r, 800));
+        await wait(560);
+        if (cancelled) return;
 
         while (dScore < 17) {
           const res = drawCard(currentShoe);
@@ -178,14 +222,19 @@ const BlackjackGame: React.FC = () => {
           
           setDealerHand(currentDealerHand);
           setShoe(currentShoe);
-          await new Promise(r => setTimeout(r, 800));
+          setMessage('Dealer hits…');
+          await wait(620);
+          if (cancelled) return;
         }
         
         handleGameOver(playerHand, currentDealerHand);
       };
-      playDealer();
+      void playDealer();
+      return () => { cancelled = true; };
     }
   }, [gameState, playerHand, drawCard]);
+
+  useEffect(() => () => { operationRef.current += 1; }, []);
 
   const handleGameOver = (pHand: Card[], dHand: Card[], isPBlackjack = false, finalBet?: number) => {
     const betAmount = finalBet || currentBet;
@@ -194,6 +243,7 @@ const BlackjackGame: React.FC = () => {
     const isDBlackjack = dScore === 21 && dHand.length === 2;
     
     setGameState('GAME_OVER');
+    setAnimationLocked(false);
     setDealerHand(dHand.map(c => ({...c, isHidden: false})));
 
     if (isPBlackjack) {
@@ -278,7 +328,7 @@ const BlackjackGame: React.FC = () => {
       </div>
 
       <div className="relative z-10 mt-8 h-[460px] w-full max-w-[850px] overflow-hidden rounded-[38px] border border-yellow-200/15 shadow-[0_30px_70px_rgba(0,0,0,.45)] max-sm:h-[390px]">
-        <BlackjackTable3D dealerHand={dealerHand} playerHand={playerHand} />
+        <BlackjackTable3D dealerHand={dealerHand} playerHand={playerHand} roundId={roundId} />
         <div className="pointer-events-none absolute left-1/2 top-3 -translate-x-1/2 rounded-full border border-white/10 bg-black/55 px-4 py-1 text-xs font-bold uppercase tracking-widest text-gray-200">
           Dealer {gameState !== 'BETTING' && `• ${calculateScore(dealerHand)}`}
         </div>
@@ -301,14 +351,14 @@ const BlackjackGame: React.FC = () => {
         {gameState === 'BETTING' || gameState === 'GAME_OVER' ? (
            <div className="flex flex-wrap justify-center gap-6 items-center">
                <div className="flex items-center gap-3 bg-black/60 p-3 rounded-2xl border border-white/10">
-                   <button onClick={() => setBaseBet(Math.max(10, baseBet - 10))} className="w-10 h-10 bg-gray-800 hover:bg-red-900 rounded-xl text-white font-black shadow-lg transition-all">-</button>
+                   <button disabled={animationLocked} onClick={() => setBaseBet(Math.max(10, baseBet - 10))} className="w-10 h-10 bg-gray-800 hover:bg-red-900 rounded-xl text-white font-black shadow-lg transition-all disabled:opacity-30">-</button>
                    <div className="text-center w-20">
                        <div className="text-[10px] text-gray-500 font-bold uppercase">BET</div>
                        <div className="text-yellow-500 font-black text-xl">{baseBet}</div>
                    </div>
-                   <button onClick={() => setBaseBet(baseBet + 10)} className="w-10 h-10 bg-gray-800 hover:bg-green-900 rounded-xl text-white font-black shadow-lg transition-all">+</button>
+                   <button disabled={animationLocked} onClick={() => setBaseBet(baseBet + 10)} className="w-10 h-10 bg-gray-800 hover:bg-green-900 rounded-xl text-white font-black shadow-lg transition-all disabled:opacity-30">+</button>
                </div>
-               <GlassButton onClick={dealGame} className="!py-4 !px-12 text-xl font-black !bg-yellow-500 hover:!bg-yellow-400 !text-black shadow-[0_5px_0_rgb(154,52,18)] active:translate-y-1 active:shadow-none">
+               <GlassButton disabled={animationLocked} onClick={dealGame} className="!py-4 !px-12 text-xl font-black !bg-yellow-500 hover:!bg-yellow-400 !text-black shadow-[0_5px_0_rgb(154,52,18)] active:translate-y-1 active:shadow-none disabled:opacity-40">
                    {gameState === 'GAME_OVER' ? 'RE-DEAL' : 'DEAL HAND'}
                </GlassButton>
            </div>
@@ -316,14 +366,14 @@ const BlackjackGame: React.FC = () => {
            <div className="flex flex-wrap justify-center gap-4">
                <button 
                  onClick={hit} 
-                 disabled={gameState !== 'PLAYING'}
+                 disabled={gameState !== 'PLAYING' || animationLocked}
                  className="bg-green-600 hover:bg-green-500 text-white font-black py-4 px-10 rounded-2xl shadow-[0_5px_0_rgb(21,128,61)] active:translate-y-1 active:shadow-none transition-all disabled:opacity-30"
                >
                  HIT
                </button>
                <button 
                  onClick={stand} 
-                 disabled={gameState !== 'PLAYING'}
+                 disabled={gameState !== 'PLAYING' || animationLocked}
                  className="bg-red-600 hover:bg-red-500 text-white font-black py-4 px-10 rounded-2xl shadow-[0_5px_0_rgb(153,27,27)] active:translate-y-1 active:shadow-none transition-all disabled:opacity-30"
                >
                  STAND
@@ -331,7 +381,7 @@ const BlackjackGame: React.FC = () => {
                {playerHand.length === 2 && canBet(baseBet) && (
                    <button 
                     onClick={doubleDown} 
-                    disabled={gameState !== 'PLAYING'}
+                    disabled={gameState !== 'PLAYING' || animationLocked}
                     className="bg-yellow-500 hover:bg-yellow-400 text-black font-black py-4 px-10 rounded-2xl shadow-[0_5px_0_rgb(154,52,18)] active:translate-y-1 active:shadow-none transition-all"
                    >
                     DOUBLE

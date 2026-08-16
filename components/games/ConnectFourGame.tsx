@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { PlayMode } from '../../types';
 import GlassButton from '../ui/GlassButton';
 import { ConnectFourBoard3D } from './BoardGames3D';
@@ -30,6 +30,12 @@ const ConnectFourGame: React.FC<ConnectFourProps> = ({ playMode, playerNames }) 
   const [isDraw, setIsDraw] = useState(false);
   const [gameState, setGameState] = useState<GameState>('playing');
   const [isAnimating, setIsAnimating] = useState(false);
+  const moveTimerRef = useRef<number | null>(null);
+  const reduceMotionRef = useRef(window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+
+  useEffect(() => () => {
+    if (moveTimerRef.current) window.clearTimeout(moveTimerRef.current);
+  }, []);
 
 
   const checkWinner = (b: Cell[][]): [Player, [number, number][]] | null => {
@@ -75,7 +81,8 @@ const ConnectFourGame: React.FC<ConnectFourProps> = ({ playMode, playerNames }) 
       setPieces(prev => [...prev, newPiece]);
 
       // State update is now split: animation starts, then logic finalizes.
-      setTimeout(() => {
+      if (moveTimerRef.current) window.clearTimeout(moveTimerRef.current);
+      moveTimerRef.current = window.setTimeout(() => {
         const newBoard = board.map(r => [...r]);
         newBoard[targetRow][col] = player;
         setBoard(newBoard);
@@ -92,7 +99,8 @@ const ConnectFourGame: React.FC<ConnectFourProps> = ({ playMode, playerNames }) 
           setCurrentPlayer(player === '1' ? '2' : '1');
         }
         setIsAnimating(false);
-      }, 650); // Animation duration + buffer
+        moveTimerRef.current = null;
+      }, reduceMotionRef.current ? 0 : 650); // Disc drop duration + landing buffer
     }
   };
 
@@ -139,6 +147,9 @@ const ConnectFourGame: React.FC<ConnectFourProps> = ({ playMode, playerNames }) 
   }, [currentPlayer, gameState, playMode, board, isAnimating]);
 
   const handleReset = (startingPlayer: Player = '1') => {
+    if (moveTimerRef.current) window.clearTimeout(moveTimerRef.current);
+    moveTimerRef.current = null;
+    setIsAnimating(false);
     setBoard(Array(ROWS).fill(null).map(() => Array(COLS).fill(null)));
     setPieces([]);
     setCurrentPlayer(startingPlayer);

@@ -1,6 +1,6 @@
 // File: components/games/KenoGame.tsx
 // Version: 1.0.1
-import React, { useState, useEffect, useCallback, memo } from 'react';
+import React, { useState, useEffect, useCallback, memo, useRef } from 'react';
 import { useCoinSystem } from '../../context/CoinContext';
 import GlassButton from '../ui/GlassButton';
 import { KenoBoard3D } from './CasinoBoards3D';
@@ -80,6 +80,10 @@ const KenoGame: React.FC = () => {
   const [drawnNumbers, setDrawnNumbers] = useState<Set<number>>(new Set());
   const [feedback, setFeedback] = useState('Select up to 10 numbers and place your bet!');
   const [phase, setPhase] = useState<GamePhase>('betting');
+  const [isCharging, setIsCharging] = useState(false);
+  const roundRef = useRef(0);
+  const chargingRef = useRef(false);
+  const reduceMotionRef = useRef(window.matchMedia('(prefers-reduced-motion: reduce)').matches);
   const currencySymbol = currencyMode === 'fun' ? 'FC' : 'RC';
 
   const isDrawing = phase === 'drawing';
@@ -113,6 +117,7 @@ const KenoGame: React.FC = () => {
   };
 
   const handleDraw = async () => {
+    if (chargingRef.current || phase !== 'betting') return;
     if (selectedNumbers.size < 3) {
       setFeedback('You must pick at least 3 numbers.');
       return;
@@ -122,7 +127,14 @@ const KenoGame: React.FC = () => {
       return;
     }
     
+    chargingRef.current = true;
+    setIsCharging(true);
+    setFeedback('Confirming your Keno bet…');
+    const round = ++roundRef.current;
     const charged = await subtractCoins(bet, 'Keno Bet');
+    if (round !== roundRef.current) return;
+    chargingRef.current = false;
+    setIsCharging(false);
     if (!charged) {
       setFeedback('The bet was not charged, so the draw did not start.');
       return;
@@ -145,7 +157,7 @@ const KenoGame: React.FC = () => {
     for (let i = 0; i < DRAW_COUNT; i++) {
         await new Promise(res => {
             const start = performance.now();
-            const delay = 100;
+            const delay = reduceMotionRef.current ? 20 : 100;
             const step = (now: number) => {
                 if (now - start >= delay) {
                     res(true);
@@ -155,6 +167,7 @@ const KenoGame: React.FC = () => {
             };
             requestAnimationFrame(step);
         });
+        if (round !== roundRef.current) return;
         setDrawnNumbers(prev => new Set(prev).add(finalDrawArray[i]));
     }
     
@@ -164,6 +177,7 @@ const KenoGame: React.FC = () => {
     if (payoutMultiplier > 0) {
         const winnings = bet * payoutMultiplier;
         const credited = await addCoins(winnings, 'Keno Win');
+        if (round !== roundRef.current) return;
         setFeedback(credited
           ? `You matched ${matches} numbers and won ${winnings} ${currencySymbol}!`
           : `You matched ${matches}, but the payout was not confirmed.`);
@@ -174,11 +188,17 @@ const KenoGame: React.FC = () => {
   };
   
   const handlePlayAgain = () => {
+      roundRef.current += 1;
       setPhase('betting');
       setDrawnNumbers(new Set());
       // selectedNumbers is PERSISTENT now
       setFeedback('Pick more numbers or draw again!');
   }
+
+  useEffect(() => () => {
+      roundRef.current += 1;
+      chargingRef.current = false;
+  }, []);
 
   return (
     <div className="flex flex-col items-center gap-4 text-center p-2 md:p-4">
@@ -206,18 +226,18 @@ const KenoGame: React.FC = () => {
       <div className="flex flex-wrap items-center justify-center gap-2 md:gap-4">
         <div className="flex items-center gap-2 bg-gray-800/30 p-2 rounded-xl text-lg shadow-md">
           <label className="font-bold" style={{ color: 'var(--primary-text-color)' }}>Bet ({currencySymbol}):</label>
-          <button onClick={() => setBet(b => Math.max(1, b - 1))} disabled={isDrawing} className="bg-yellow-400 text-gray-800 rounded-md px-2 font-bold">-</button>
-          <input type="number" value={bet} onChange={e => setBet(Math.max(1, Number(e.target.value)))} disabled={isDrawing} className="w-20 text-center font-bold border-yellow-400/20 border rounded-md bg-gray-900 p-1" style={{ color: 'var(--primary-text-color)' }} />
-          <button onClick={() => setBet(b => Math.min(1000, b + 1))} disabled={isDrawing} className="bg-yellow-400 text-gray-800 rounded-md px-2 font-bold">+</button>
+          <button onClick={() => setBet(b => Math.max(1, b - 1))} disabled={isDrawing || isCharging} className="bg-yellow-400 text-gray-800 rounded-md px-2 font-bold">-</button>
+          <input type="number" value={bet} onChange={e => setBet(Math.max(1, Number(e.target.value)))} disabled={isDrawing || isCharging} className="w-20 text-center font-bold border-yellow-400/20 border rounded-md bg-gray-900 p-1" style={{ color: 'var(--primary-text-color)' }} />
+          <button onClick={() => setBet(b => Math.min(1000, b + 1))} disabled={isDrawing || isCharging} className="bg-yellow-400 text-gray-800 rounded-md px-2 font-bold">+</button>
         </div>
         <div className="flex gap-2">
-            <GlassButton onClick={handleQuickPick} disabled={isDrawing}>Quick Pick</GlassButton>
-            <GlassButton onClick={handleClear} disabled={isDrawing}>Clear</GlassButton>
+            <GlassButton onClick={handleQuickPick} disabled={isDrawing || isCharging}>Quick Pick</GlassButton>
+            <GlassButton onClick={handleClear} disabled={isDrawing || isCharging}>Clear</GlassButton>
         </div>
       </div>
       {phase !== 'results' ? (
-        <GlassButton onClick={handleDraw} disabled={isDrawing} className="w-full max-sm text-xl py-3">
-          {isDrawing ? `Drawing... (${drawnNumbers.size}/${DRAW_COUNT})` : `Draw (${selectedNumbers.size}/${MAX_PICK})`}
+        <GlassButton onClick={handleDraw} disabled={isDrawing || isCharging} className="w-full max-sm text-xl py-3">
+          {isCharging ? 'Confirming…' : isDrawing ? `Drawing... (${drawnNumbers.size}/${DRAW_COUNT})` : `Draw (${selectedNumbers.size}/${MAX_PICK})`}
         </GlassButton>
       ) : (
         <GlassButton onClick={handlePlayAgain} className="w-full max-w-sm text-xl py-3 !bg-green-600/80 hover:!bg-green-500/80 !text-white">
@@ -251,6 +271,7 @@ const KenoGame: React.FC = () => {
         .keno-drawing-grid {
             animation: grid-pulse 2s infinite ease-in-out;
         }
+        @media (prefers-reduced-motion: reduce) { .animate-keno-pop,.animate-keno-match,.keno-drawing-grid { animation:none; } }
       `}</style>
     </div>
   );

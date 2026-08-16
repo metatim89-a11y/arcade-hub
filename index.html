@@ -94,6 +94,10 @@
     from { transform: translateX(0); opacity: 1; }
     to { transform: translateX(-100%); opacity: 0; }
   }
+  @media (prefers-reduced-motion: reduce) {
+    .game-transition-in,
+    .game-transition-out { animation: none; }
+  }
 
   /* TicTacToe Styles */
   .tictactoe-grid-container {
