@@ -160,6 +160,16 @@ Convert every game's actual playable surface and pieces to interactive 3D. The e
 - Keno's phone canvas is reduced from 540px to 360px tall now that projected labels keep the complete 1–80 board readable.
 - Plinko's mobile hub uses tighter gaps, settings panels and action padding so the actual board appears much sooner without removing controls.
 
+## v0.0.26 — newest phone screenshot repairs
+
+- Slots no longer expose blank white drums during a spin: nine continuously wrapped symbol panels now remain camera-facing across every reel, with dark recessed drums behind them.
+- Compacted the phone Slots header, feature ribbon, reel stage, status and controls so gameplay appears sooner and the spin action stays easier to reach.
+- Reduced Crash's phone stage to 230px and moved the launch/cash-out action above the bet details on phones, keeping the critical live action visible directly beneath the multiplier.
+- Fixed Ocean Hunter's mobile HUD shorthand, which accidentally stretched its labels over the full playfield height; the HUD now stays as compact top-edge chips.
+- Increased Mancala's phone board from 126px to 180px with larger pit/store tap regions.
+- Replaced the horizontally scrolling phone game button strip with one compact native game picker; desktop keeps the full button navigation.
+- Deployment rule: increment `APP_VERSION`, `package.json`, `package-lock.json`, and `motd` for every deployed release.
+
 ## Planned conversion order
 
 1. Tic-Tac-Toe, Connect Four and Mancala board batch: complete and build-tested.

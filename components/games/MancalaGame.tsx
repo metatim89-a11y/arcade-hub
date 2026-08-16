@@ -453,8 +453,8 @@ const MancalaGame: React.FC<MancalaProps> = ({ playMode, playerNames }) => {
                 }
                 .mancala-pit.last-path,.mancala-store.last-path{outline:2px solid rgba(98,190,240,.25);outline-offset:-4px}.mancala-pit.preview-end,.mancala-store.preview-end{outline:3px solid #5ee0a0;outline-offset:-4px;box-shadow:inset 0 0 18px rgba(94,224,160,.55)}
                 @media(max-width: 900px) { .mancala-layout { grid-template-columns: 1fr 1fr; grid-template-areas: 'p2 p1' 'board board'; gap: 8px 12px; } .mancala-score { display: flex; align-items: center; justify-content: center; gap: 8px; } .mancala-score .text-4xl { font-size: 1.55rem; } }
-                @media(max-width: 760px) { .mancala-board { min-height: 150px; padding: 6px !important; border-width: 3px; } .mancala-board .mancala-pit { min-height: 54px; } .mancala-board .mancala-store { min-height: 116px; } .mancala-board .stone { width: 27%; height: 27%; } .flying-mancala-stone { width: 17px; height: 17px; } }
-                @media(max-width: 430px) { .mancala-board { min-height: 126px; } .mancala-board .mancala-pit { min-height: 43px; } .mancala-board .mancala-store { min-height: 94px; } .mancala-layout { gap: 5px; } .mancala-final-stats{grid-template-columns:1fr 1fr}.mancala-tutorial{font-size:10px} }
+                @media(max-width: 760px) { .mancala-board { min-height: 190px; padding: 6px !important; border-width: 3px; } .mancala-board .mancala-pit { min-height: 70px; } .mancala-board .mancala-store { min-height: 150px; } .mancala-board .stone { width: 27%; height: 27%; } .flying-mancala-stone { width: 17px; height: 17px; } }
+                @media(max-width: 430px) { .mancala-board { min-height: 180px; } .mancala-board .mancala-pit { min-height: 64px; } .mancala-board .mancala-store { min-height: 138px; } .mancala-layout { gap: 5px; } .mancala-final-stats{grid-template-columns:1fr 1fr}.mancala-tutorial{font-size:10px} }
             `}</style>
         </div>
     );

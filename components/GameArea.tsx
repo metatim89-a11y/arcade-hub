@@ -140,7 +140,20 @@ const GameArea: React.FC<GameAreaProps> = ({ games, selectedGame, onSelectGame, 
   return (
     <div className={`flex flex-col items-center w-full py-6 md:py-8 ${activeGameProps.game.id === 'fishing' ? 'px-0 sm:px-2' : 'px-4'}`}>
       {/* Game Navigation */}
-      <nav className="flex w-full max-w-7xl flex-nowrap justify-start gap-1.5 overflow-x-auto pb-1 mb-3 md:justify-center" aria-label="Choose a game">
+      <label className="game-picker-mobile mb-3 w-full max-w-md md:hidden">
+        <span>CHOOSE GAME</span>
+        <select
+          aria-label="Choose a game"
+          value={selectedGame.id}
+          onChange={(event) => {
+            const game = games.find((candidate) => candidate.id === event.target.value);
+            if (game) handleSelectGame(game);
+          }}
+        >
+          {games.map((game) => <option key={game.id} value={game.id}>{game.label}</option>)}
+        </select>
+      </label>
+      <nav className="hidden w-full max-w-7xl flex-wrap justify-center gap-1.5 pb-1 mb-3 md:flex" aria-label="Choose a game">
         {games.map((game) => (
           <button
             key={game.id}
@@ -213,6 +226,7 @@ const GameArea: React.FC<GameAreaProps> = ({ games, selectedGame, onSelectGame, 
         </div>
       </div>
       <style>{`
+        .game-picker-mobile{position:relative;display:grid;gap:4px}.game-picker-mobile span{padding-left:4px;color:#d5b544;font-size:8px;font-weight:950;letter-spacing:.18em}.game-picker-mobile select{width:100%;min-height:44px;padding:0 42px 0 14px;border:1px solid #8a7228;border-radius:12px;appearance:none;background:linear-gradient(145deg,#253040,#111822);box-shadow:0 8px 20px rgba(0,0,0,.28),inset 0 1px rgba(255,255,255,.08);color:#ffd84f;font-size:15px;font-weight:900}.game-picker-mobile:after{content:'▾';position:absolute;right:15px;bottom:10px;color:#ffd84f;pointer-events:none}@media(min-width:768px){.game-picker-mobile{display:none}}
         .game-engine-stage{isolation:isolate;perspective:1400px;transform-style:preserve-3d}
         .game-content-layer{border-radius:inherit;background:radial-gradient(circle at 50% -12%,color-mix(in srgb,var(--stage-accent) 18%,transparent),transparent 46%),linear-gradient(145deg,var(--stage-panel-from),var(--stage-panel-to));box-shadow:inset 0 1px color-mix(in srgb,var(--stage-accent) 18%,transparent)}
         .game-content-layer :where(.volt-slots,.wheel-game,.coin-pusher-game,.crash-game,.color-recall-game,.holdem-game,.online-table-game,.ocean-hunter){background:radial-gradient(circle at 50% -10%,color-mix(in srgb,var(--stage-accent) 14%,transparent),transparent 44%),linear-gradient(145deg,color-mix(in srgb,var(--stage-panel-from) 86%,transparent),color-mix(in srgb,var(--stage-panel-to) 88%,transparent))!important;border-color:color-mix(in srgb,var(--stage-accent) 42%,#394451)!important}
