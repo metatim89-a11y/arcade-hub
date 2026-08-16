@@ -143,6 +143,14 @@ Convert every game's actual playable surface and pieces to interactive 3D. The e
 - The neon floor, scrolling depth grid and physical world-edge rails follow the authoritative gameplay camera while maintaining direct pointer steering and boost controls.
 - Moved particle, text and food animation lifetimes out of the retired drawing path and into the game update loop so collisions, score and effects remain independent of rendering.
 
+## Twelfth graphics pass — Online Hold'em
+
+- Replaced the live online table's duplicated flat DOM cards/felt with the shared Three.js poker table, driven directly by realtime snapshot state.
+- Community cards, each seat's hole cards, hidden opponent backs and bet-chip stacks now deal as physical meshes while existing Supabase actions and version checks remain authoritative.
+- Added 3D active-player rings and dealer tokens to the shared renderer, synchronized with the server actor/dealer indices.
+- Made the shared poker camera pull back on narrow phone layouts so the complete table remains visible rather than cropping side seats.
+- Retained the online seat HUD, pot/message state, blind/all-in badges and fold/call/raise/all-in controls above the 3D surface.
+
 ## Planned conversion order
 
 1. Tic-Tac-Toe, Connect Four and Mancala board batch: complete and build-tested.

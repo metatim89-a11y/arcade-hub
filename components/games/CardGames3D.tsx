@@ -152,11 +152,11 @@ export const MemoryCards3D: React.FC<{ cards: MemoryCard[]; disabled: boolean; o
 };
 
 type PokerCard = { id: string; suit: string; rank: string };
-type PokerPlayer = { id: number; hand: PokerCard[]; isHuman: boolean; folded: boolean; bet: number };
+type PokerPlayer = { id: number | string; hand: PokerCard[]; isHuman: boolean; folded: boolean; bet: number };
 
-export const PokerTable3D: React.FC<{ players: PokerPlayer[]; community: PokerCard[]; showdown: boolean }> = ({ players, community, showdown }) => {
+export const PokerTable3D: React.FC<{ players: PokerPlayer[]; community: PokerCard[]; showdown: boolean; activeIndex?: number; dealerIndex?: number }> = ({ players, community, showdown, activeIndex = -1, dealerIndex = -1 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const stateRef = useRef({ players, community, showdown }); stateRef.current = { players, community, showdown };
+  const stateRef = useRef({ players, community, showdown, activeIndex, dealerIndex }); stateRef.current = { players, community, showdown, activeIndex, dealerIndex };
   useEffect(() => {
     const canvas = canvasRef.current; if (!canvas) return;
     let cancelled = false; let teardown = () => undefined;
@@ -189,11 +189,17 @@ export const PokerTable3D: React.FC<{ players: PokerPlayer[]; community: PokerCa
             const token = new THREE.Mesh(new THREE.CylinderGeometry(.15, .15, .055, 24), new THREE.MeshStandardMaterial({ color: chip % 2 ? 0xe44b5f : 0xf4d45c, metalness: .45, roughness: .28 }));
             token.position.set(baseX * .62 + (chip % 3) * .12, .05 + Math.floor(chip / 3) * .06, baseZ * .62); pieces.add(token);
           }
+          if (playerIndex === stateRef.current.activeIndex) {
+            const marker = new THREE.Mesh(new THREE.TorusGeometry(.72, .055, 10, 36), new THREE.MeshBasicMaterial({ color: 0xf4d45c, transparent: true, opacity: .78, depthWrite: false })); marker.rotation.x = Math.PI / 2; marker.position.set(baseX, .035, baseZ); marker.userData.activeMarker = true; pieces.add(marker);
+          }
+          if (playerIndex === stateRef.current.dealerIndex) {
+            const dealer = new THREE.Mesh(new THREE.CylinderGeometry(.2, .2, .07, 24), new THREE.MeshStandardMaterial({ color: 0xf8f3df, metalness: .38, roughness: .25, emissive: 0x7f6b28, emissiveIntensity: .18 })); dealer.position.set(baseX * .78 + .34, .08, baseZ * .78 + .18); dealer.userData.dealer = true; pieces.add(dealer);
+          }
         });
       };
-      const observer = new ResizeObserver(() => { const rect = canvas.getBoundingClientRect(); if (!rect.width || !rect.height) return; renderer.setSize(rect.width, rect.height, false); camera.aspect = rect.width / rect.height; camera.updateProjectionMatrix(); }); observer.observe(canvas);
+      const observer = new ResizeObserver(() => { const rect = canvas.getBoundingClientRect(); if (!rect.width || !rect.height) return; renderer.setSize(rect.width, rect.height, false); camera.aspect = rect.width / rect.height; const distanceScale = Math.max(1, .92 / camera.aspect); camera.position.set(0, 10.7 * distanceScale, 4.2 * distanceScale); camera.lookAt(0, 0, 0); camera.updateProjectionMatrix(); }); observer.observe(canvas);
       let frame = 0;
-      const animate = (now: number) => { const next = JSON.stringify(stateRef.current); if (next !== signature) { signature = next; rebuild(); } pieces.children.forEach((piece) => { if (piece.userData.targetY === undefined) return; const progress = Math.min(1, Math.max(0, (now - Number(piece.userData.birth)) / 420)); const eased = 1 - Math.pow(1 - progress, 3); piece.position.y = 2.7 * (1 - eased) + Number(piece.userData.targetY); piece.rotation.z = (1 - eased) * .22; }); renderer.render(scene, camera); frame = requestAnimationFrame(animate); };
+      const animate = (now: number) => { const next = JSON.stringify(stateRef.current); if (next !== signature) { signature = next; rebuild(); } pieces.children.forEach((piece) => { if (piece.userData.activeMarker) { piece.rotation.z = now * .0012; (piece.material as InstanceType<typeof THREE.MeshBasicMaterial>).opacity = .55 + Math.sin(now * .008) * .25; return; } if (piece.userData.dealer) { piece.rotation.y = now * .001; return; } if (piece.userData.targetY === undefined) return; const progress = Math.min(1, Math.max(0, (now - Number(piece.userData.birth)) / 420)); const eased = 1 - Math.pow(1 - progress, 3); piece.position.y = 2.7 * (1 - eased) + Number(piece.userData.targetY); piece.rotation.z = (1 - eased) * .22; }); renderer.render(scene, camera); frame = requestAnimationFrame(animate); };
       frame = requestAnimationFrame(animate);
       teardown = () => { cancelAnimationFrame(frame); observer.disconnect(); dispose(scene); renderer.dispose(); };
     });
