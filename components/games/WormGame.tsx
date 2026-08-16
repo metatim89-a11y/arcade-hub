@@ -2,18 +2,19 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { PlayMode } from '../../types';
 import GlassButton from '../ui/GlassButton';
+import WormArena3D from './WormArena3D';
 
 interface WormGameProps {
   playMode: PlayMode;
   playerNames: { player1: string; player2: string };
 }
 
-interface Point {
+export interface Point {
   x: number;
   y: number;
 }
 
-interface Worm {
+export interface Worm {
   id: number;
   name: string;
   color: string;
@@ -36,7 +37,7 @@ interface Worm {
   };
 }
 
-interface Food {
+export interface Food {
   id: number;
   x: number;
   y: number;
@@ -46,7 +47,7 @@ interface Food {
   pulse: number; // For animation
 }
 
-interface Particle {
+export interface Particle {
   id: number;
   x: number;
   y: number;
@@ -57,7 +58,7 @@ interface Particle {
   size: number;
 }
 
-interface FloatingText {
+export interface FloatingText {
   id: number;
   x: number;
   y: number;
@@ -246,7 +247,7 @@ const WormGame: React.FC<WormGameProps> = ({ playMode, playerNames }) => {
     };
   }, []);
 
-  const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
+  const handleMouseMove = (e: React.PointerEvent<HTMLCanvasElement>) => {
     const rect = canvasRef.current?.getBoundingClientRect();
     if (!rect) return;
     gameState.current.mouse.x = e.clientX - rect.left;
@@ -556,10 +557,17 @@ const WormGame: React.FC<WormGameProps> = ({ playMode, playerNames }) => {
       state.camera.x = Math.max(-50, Math.min(state.camera.x, WORLD_SIZE + 50 - VIEWPORT_WIDTH));
       state.camera.y = Math.max(-50, Math.min(state.camera.y, WORLD_SIZE + 50 - VIEWPORT_HEIGHT));
 
-      draw(state);
+      state.foods.forEach(food => { food.pulse += .1; });
+      state.particles.forEach(particle => {
+        if (particle.vx === 0 && particle.vy === 0) particle.life -= .02;
+        else { particle.x += particle.vx; particle.y += particle.vy; particle.life -= .03; }
+      });
+      state.particles = state.particles.filter(particle => particle.life > 0);
+      state.texts.forEach(text => { text.y -= 1; text.life -= .02; });
+      state.texts = state.texts.filter(text => text.life > 0);
       
       const sortedScores = [...state.worms].sort((a, b) => b.score - a.score).slice(0, 5);
-      setScores(sortedScores.map(w => ({ name: w.name, score: w.score, color: w.color })));
+      if (state.frameCount % 10 === 0) setScores(sortedScores.map(w => ({ name: w.name, score: w.score, color: w.color })));
 
       animationFrameId = requestAnimationFrame(update);
     };
@@ -739,17 +747,7 @@ const WormGame: React.FC<WormGameProps> = ({ playMode, playerNames }) => {
 
   return (
     <div className="relative w-full h-full flex items-center justify-center bg-gray-900 rounded-xl overflow-hidden shadow-2xl border border-gray-700">
-      <canvas 
-        ref={canvasRef}
-        width={VIEWPORT_WIDTH}
-        height={VIEWPORT_HEIGHT}
-        className="w-full h-full object-contain bg-gray-900 cursor-crosshair"
-        onMouseMove={handleMouseMove}
-        onMouseDown={handleMouseDown}
-        onMouseUp={handleMouseUp}
-        onTouchStart={handleMouseDown}
-        onTouchEnd={handleMouseUp}
-      />
+      <WormArena3D stateRef={gameState} canvasRef={canvasRef} viewportWidth={VIEWPORT_WIDTH} viewportHeight={VIEWPORT_HEIGHT} worldSize={WORLD_SIZE} onPointerMove={handleMouseMove} onPointerDown={handleMouseDown} onPointerUp={handleMouseUp} />
       
       <div className="absolute top-4 right-4 bg-black/60 p-3 rounded-lg backdrop-blur-md pointer-events-none min-w-[180px] border border-white/10 z-10">
          <h3 className="text-yellow-400 font-bold border-b border-white/20 pb-1 mb-2 text-sm uppercase tracking-wider">Leaderboard</h3>

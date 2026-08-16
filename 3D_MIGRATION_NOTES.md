@@ -135,6 +135,14 @@ Convert every game's actual playable surface and pieces to interactive 3D. The e
 - Pulled the Spin Wheel camera back far enough to keep its complete modeled rim and pointer inside the circular cabinet at every supported size.
 - Keno number positions are now projected from each live 3D chip into a synchronized high-contrast HTML label layer, guaranteeing readable 1–80 values even on devices that fail WebGL canvas textures.
 
+## Eleventh graphics pass — Worm arena
+
+- Worm gameplay now drives a true Three.js top-view arena instead of calling the old Canvas2D drawing loop.
+- Worm heads, eyes and body segments are physical lit meshes with smooth state interpolation, taper, swim motion, boost glow and invulnerability feedback.
+- Food is rendered as pulsing/emissive 3D orbs and large dodecahedron pickups; crashes use 3D shards and expanding shockwave rings.
+- The neon floor, scrolling depth grid and physical world-edge rails follow the authoritative gameplay camera while maintaining direct pointer steering and boost controls.
+- Moved particle, text and food animation lifetimes out of the retired drawing path and into the game update loop so collisions, score and effects remain independent of rendering.
+
 ## Planned conversion order
 
 1. Tic-Tac-Toe, Connect Four and Mancala board batch: complete and build-tested.
