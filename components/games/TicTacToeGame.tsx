@@ -90,6 +90,23 @@ const TicTacToeGame: React.FC<TicTacToeGameProps> = ({ playMode, playerNames }) 
           onCellClick={handleClick}
         />
       </div>
+      <details className="w-full max-w-[460px] rounded-lg border border-cyan-300/20 bg-black/20 p-2 text-left text-xs text-cyan-100">
+        <summary className="cursor-pointer font-bold">Keyboard-friendly board controls</summary>
+        <div className="mt-2 grid grid-cols-3 gap-1">
+          {board.map((mark, index) => (
+            <button
+              key={index}
+              type="button"
+              onClick={() => handleClick(index)}
+              disabled={Boolean(mark) || gameState === 'gameOver' || (playMode === 'vsComputer' && !xIsNext)}
+              className="min-h-11 rounded-md border border-cyan-300/30 bg-cyan-950/70 font-black disabled:opacity-55"
+              aria-label={`Row ${Math.floor(index / 3) + 1}, column ${(index % 3) + 1}${mark ? `, ${mark}` : ', empty'}`}
+            >
+              {mark ?? '·'}
+            </button>
+          ))}
+        </div>
+      </details>
       
       <div className="mt-6 min-h-[80px] flex flex-col items-center justify-center">
         {gameState === 'gameOver' ? (

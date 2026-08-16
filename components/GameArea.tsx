@@ -1,8 +1,7 @@
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { Suspense, useState, useEffect, useRef } from 'react';
 import { Game, GameMode, PlayMode } from '../types';
 import { useCoinSystem } from '../context/CoinContext';
-import GameAtmosphere3D from './GameAtmosphere3D';
 import { recordSiteEvent } from '../lib/analytics';
 
 
@@ -32,15 +31,16 @@ const GameOptionsSelector: React.FC<{
   
   if (mode === GameMode.Adult) {
      return (
-      <div className="flex gap-2 p-1 bg-gray-900/50 rounded-lg">
+      <div className="currency-picker flex flex-wrap justify-center gap-2 p-1 bg-gray-900/50 rounded-lg">
         <button onClick={() => setCurrencyMode('fun')} className={`${buttonClass} ${currencyMode === 'fun' ? 'bg-yellow-400 text-gray-900' : 'bg-gray-700 text-yellow-400 hover:bg-gray-600'}`}>
-          Play with Fun Coins
+          FUN COINS
         </button>
-        <button onClick={() => setCurrencyMode('real')} className={`${buttonClass} ${currencyMode === 'real' ? 'bg-green-500 text-gray-900' : 'bg-gray-700 text-green-400 hover:bg-gray-600'}`}>
-          Play with Virtual RC
+        <button disabled title="Virtual RC wagering is locked until each game uses verified server settlement." className={`${buttonClass} bg-gray-800 text-green-300 opacity-70 cursor-not-allowed`}>
+          🔒 VIRTUAL RC
         </button>
+        <small className="basis-full text-center text-[9px] font-bold tracking-wide text-green-300/80">SERVER-VERIFIED RC SETTLEMENT IN PROGRESS</small>
       </div>
-    );
+     );
   }
 
   return null;
@@ -64,7 +64,9 @@ const GameArea: React.FC<GameAreaProps> = ({ games, selectedGame, onSelectGame, 
   const [activeGameProps, setActiveGameProps] = useState(gameProps);
   const [previousGameProps, setPreviousGameProps] = useState<typeof gameProps | null>(null);
   const transitionTimeoutRef = useRef<number | null>(null);
+  const stageRef = useRef<HTMLDivElement>(null);
   const isInitialMount = useRef(true);
+  const [isFullscreen, setIsFullscreen] = useState(false);
   
   useEffect(() => {
     if (isInitialMount.current) {
@@ -78,6 +80,12 @@ const GameArea: React.FC<GameAreaProps> = ({ games, selectedGame, onSelectGame, 
     if (newKey !== oldKey) {
         if (transitionTimeoutRef.current) {
             clearTimeout(transitionTimeoutRef.current);
+        }
+
+        if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+            setPreviousGameProps(null);
+            setActiveGameProps({ game: selectedGame, playMode, currencyMode, mode, playerNames });
+            return;
         }
 
         setPreviousGameProps(activeGameProps);
@@ -100,6 +108,26 @@ const GameArea: React.FC<GameAreaProps> = ({ games, selectedGame, onSelectGame, 
     };
   }, []);
 
+  useEffect(() => {
+    const handleFullscreenChange = () => setIsFullscreen(document.fullscreenElement === stageRef.current);
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
+  }, []);
+
+  useEffect(() => {
+    const stage = stageRef.current;
+    if (!stage) return;
+    const labelCanvases = () => stage.querySelectorAll('canvas').forEach((canvas, index) => {
+        canvas.tabIndex = 0;
+        canvas.setAttribute('role', 'img');
+        canvas.setAttribute('aria-label', `${activeGameProps.game.label} interactive game surface${index ? ` ${index + 1}` : ''}. Use the controls around the game surface to play.`);
+      });
+    labelCanvases();
+    const observer = new MutationObserver(labelCanvases);
+    observer.observe(stage, { childList: true, subtree: true });
+    return () => observer.disconnect();
+  }, [activeGameProps.game.id, activeGameProps.game.label]);
+
   const handleSelectGame = (game: Game) => {
     onSelectGame(game);
     setFeedback('');
@@ -107,14 +135,22 @@ const GameArea: React.FC<GameAreaProps> = ({ games, selectedGame, onSelectGame, 
 
   const shareGame = async () => {
     const url = `${window.location.origin}${window.location.pathname}?game=${encodeURIComponent(selectedGame.id)}`;
-    const shareData = { title: `${selectedGame.label} · Arcade Hub`, text: `Play ${selectedGame.label} at Arcade Hub`, url };
     try {
-      if (navigator.share) await navigator.share(shareData);
+      if (navigator.share) await navigator.share({ title: `${selectedGame.label} · Arcade Hub`, text: `Play ${selectedGame.label} at Arcade Hub`, url });
       else await navigator.clipboard.writeText(url);
       void recordSiteEvent('share_clicked', selectedGame.id);
       setFeedback(navigator.share ? 'Shared!' : 'Game link copied!');
     } catch {
       setFeedback('Share cancelled');
+    }
+  };
+
+  const toggleFullscreen = async () => {
+    try {
+      if (document.fullscreenElement) await document.exitFullscreen();
+      else await stageRef.current?.requestFullscreen();
+    } catch {
+      setFeedback('Full screen is not available in this browser.');
     }
   };
   
@@ -194,9 +230,17 @@ const GameArea: React.FC<GameAreaProps> = ({ games, selectedGame, onSelectGame, 
           setPlayMode={setPlayMode}
         />
       </div>
+
+      <div className="game-stage-tools w-full mb-2">
+        <span aria-live="polite">{feedback}</span>
+        <button type="button" onClick={toggleFullscreen} aria-pressed={isFullscreen}>
+          {isFullscreen ? 'EXIT FULL SCREEN' : 'FULL SCREEN'}
+        </button>
+      </div>
       
       {/* Game Canvas */}
       <div 
+        ref={stageRef}
         data-game={activeGameProps.game.id}
         className={`game-engine-stage w-full ${gameAreaSizeClass} min-h-[420px] rounded-3xl mb-4 ${activeNeedsNaturalHeight ? 'overflow-visible' : 'overflow-hidden'} transition-colors duration-500 relative ${themeClasses}`}
         style={equippedAesthetic ? {
@@ -205,7 +249,6 @@ const GameArea: React.FC<GameAreaProps> = ({ games, selectedGame, onSelectGame, 
           boxShadow: `0 0 34px ${equippedAesthetic.accentColor}66, inset 0 0 28px ${equippedAesthetic.accentColor}18`,
         } : undefined}
       >
-        <GameAtmosphere3D gameId={activeGameProps.game.id} />
         {equippedAesthetic && (
           <div className="absolute right-3 top-3 z-20 rounded-full border bg-black/70 px-3 py-1 text-[10px] font-black uppercase tracking-widest" style={{ borderColor: equippedAesthetic.accentColor, color: equippedAesthetic.accentColor }}>
             {equippedAesthetic.name}
@@ -219,10 +262,12 @@ const GameArea: React.FC<GameAreaProps> = ({ games, selectedGame, onSelectGame, 
                 paddingInline: 'var(--game-area-padding-x)',
               }}
             >
-                <PreviousGameComponent
-                    key={previousGameProps.game.id + (previousGameProps.mode === GameMode.Under18 ? previousGameProps.playMode : previousGameProps.currencyMode)}
-                    {...previousGameProps}
-                />
+                <Suspense fallback={null}>
+                  <PreviousGameComponent
+                      key={previousGameProps.game.id + (previousGameProps.mode === GameMode.Under18 ? previousGameProps.playMode : previousGameProps.currencyMode)}
+                      {...previousGameProps}
+                  />
+                </Suspense>
             </div>
         )}
 
@@ -236,31 +281,35 @@ const GameArea: React.FC<GameAreaProps> = ({ games, selectedGame, onSelectGame, 
             '--stage-panel-to': stagePanelTo,
           } as React.CSSProperties}
         >
-            <ActiveGameComponent 
-                key={activeGameProps.game.id + (activeGameProps.mode === GameMode.Under18 ? activeGameProps.playMode : activeGameProps.currencyMode)} 
-                {...activeGameProps}
-            />
+            <Suspense fallback={<div className="game-loading" role="status">Loading {activeGameProps.game.label}…</div>}>
+              <ActiveGameComponent
+                  key={activeGameProps.game.id + (activeGameProps.mode === GameMode.Under18 ? activeGameProps.playMode : activeGameProps.currencyMode)}
+                  {...activeGameProps}
+              />
+            </Suspense>
         </div>
       </div>
       <style>{`
         .game-picker-row{display:flex;align-items:center;justify-content:center;gap:8px}.game-picker-mobile{position:relative;display:grid;gap:4px}.game-picker-mobile span{padding-left:4px;color:#d5b544;font-size:8px;font-weight:950;letter-spacing:.18em}.game-picker-mobile select{width:100%;min-height:44px;padding:0 42px 0 14px;border:1px solid #8a7228;border-radius:12px;appearance:none;background:linear-gradient(145deg,#253040,#111822);box-shadow:0 8px 20px rgba(0,0,0,.28),inset 0 1px rgba(255,255,255,.08);color:#ffd84f;font-size:15px;font-weight:900}.game-picker-mobile:after{content:'▾';position:absolute;right:15px;bottom:10px;color:#ffd84f;pointer-events:none}.game-share-button{align-self:flex-end;min-height:40px;padding:0 13px;border:1px solid #4c7190;border-radius:10px;background:#13283a;color:#bfeaff;font-size:11px;font-weight:900;white-space:nowrap;cursor:pointer}.game-share-button:hover{border-color:#ffd84f;color:#ffe37b}@media(min-width:768px){.game-picker-mobile{display:none}}@media(max-width:767px){.game-picker-row{align-items:stretch}.game-share-button{align-self:end;min-height:44px;padding-inline:10px;font-size:10px}.game-picker-mobile{flex:1}}
+        .game-stage-tools{display:flex;justify-content:flex-end;align-items:center;gap:10px;max-width:var(--stage-max,80rem)}.game-stage-tools span{margin-right:auto;color:#f3c85b;font-size:11px}.game-stage-tools button{padding:7px 11px;border:1px solid #526477;border-radius:8px;background:#182432;color:#d7e5ee;font-size:10px;font-weight:900;letter-spacing:.08em}.game-loading{display:grid;min-height:420px;place-items:center;color:#f3ca58;font-weight:900;letter-spacing:.08em}
         .game-engine-stage{isolation:isolate;perspective:1400px;transform-style:preserve-3d}
+        .game-engine-stage:fullscreen{width:100vw!important;max-width:none!important;height:100dvh!important;min-height:100dvh!important;margin:0!important;overflow:auto!important;border-radius:0!important;background:#070b10!important}.game-engine-stage:fullscreen .game-content-layer{min-height:100dvh;padding-bottom:calc(76px + env(safe-area-inset-bottom))}
         .game-content-layer{border-radius:inherit;background:radial-gradient(circle at 50% -12%,color-mix(in srgb,var(--stage-accent) 18%,transparent),transparent 46%),linear-gradient(145deg,var(--stage-panel-from),var(--stage-panel-to));box-shadow:inset 0 1px color-mix(in srgb,var(--stage-accent) 18%,transparent)}
         .game-content-layer :where(.volt-slots,.wheel-game,.coin-pusher-game,.crash-game,.color-recall-game,.holdem-game,.online-table-game,.ocean-hunter){background:radial-gradient(circle at 50% -10%,color-mix(in srgb,var(--stage-accent) 14%,transparent),transparent 44%),linear-gradient(145deg,color-mix(in srgb,var(--stage-panel-from) 86%,transparent),color-mix(in srgb,var(--stage-panel-to) 88%,transparent))!important;border-color:color-mix(in srgb,var(--stage-accent) 42%,#394451)!important}
         .game-engine-stage:after{content:'';position:absolute;z-index:2;inset:0;pointer-events:none;border-radius:inherit;background:radial-gradient(circle at 50% 0%,rgba(115,224,255,.08),transparent 42%),linear-gradient(115deg,transparent 25%,rgba(255,255,255,.025) 42%,transparent 58%);mix-blend-mode:screen;animation:engine-light-sweep 9s ease-in-out infinite}
-        .game-engine-stage canvas{contain:strict;transform:translateZ(0);backface-visibility:hidden;will-change:transform,filter;filter:saturate(1.12) contrast(1.035);transition:filter .45s cubic-bezier(.2,.75,.25,1)}
-        .game-content-layer :where(.poker-table,.online-felt,.volt-machine,.coin-pusher-machine,.mancala-board,.crash-stage,.wheel-glass,.color-recall-stage){transform:translateZ(0);backface-visibility:hidden;will-change:transform,filter;transition:border-color .35s ease,box-shadow .45s ease,background-color .45s ease}
+        .game-engine-stage canvas{contain:strict;transform:translateZ(0);backface-visibility:hidden;filter:saturate(1.12) contrast(1.035);transition:filter .45s cubic-bezier(.2,.75,.25,1);outline:none}.game-engine-stage canvas:focus-visible{outline:3px solid #ffe06a;outline-offset:-3px}
+        .game-content-layer :where(.poker-table,.online-felt,.volt-machine,.coin-pusher-machine,.mancala-board,.crash-stage,.wheel-glass,.color-recall-stage){transform:translateZ(0);backface-visibility:hidden;transition:border-color .35s ease,box-shadow .45s ease,background-color .45s ease}
         .game-engine-stage :where(button,[role='button']){transform-style:preserve-3d;transition:transform .18s ease,filter .18s ease,box-shadow .18s ease}
         .game-engine-stage :where(button,[role='button']):not(:disabled):active{transform:translateY(2px) rotateX(-4deg) scale(.98)}
         .game-engine-stage :where(.holdem-card-slot,.card-front,.card-back,.reel-deck,.vault-grid,.stone-stack-icon){transform-style:preserve-3d;backface-visibility:hidden}
-        .game-engine-stage :where(.poker-table,.volt-machine,.coin-pusher-machine,.wheel-glass,.color-wheel){filter:drop-shadow(0 18px 28px rgba(0,0,0,.34)) drop-shadow(0 0 16px rgba(88,214,255,.08));animation:engine-stage-breathe 5s ease-in-out infinite}
+        .game-engine-stage :where(.poker-table,.volt-machine,.coin-pusher-machine,.wheel-glass,.color-wheel){filter:drop-shadow(0 18px 28px rgba(0,0,0,.34)) drop-shadow(0 0 16px rgba(88,214,255,.08))}
         .game-engine-stage[data-game='blackjack']>div>div,.game-engine-stage[data-game='poker']>div>div{transform-style:preserve-3d}
         .game-engine-stage[data-game='slots'] .volt-machine{transform:rotateX(1.5deg);transform-origin:50% 100%}
         .game-engine-stage[data-game='connect4'] [class*='rounded-full'],.game-engine-stage[data-game='keno'] button{filter:drop-shadow(0 6px 7px rgba(0,0,0,.34))}
         .game-engine-stage[data-game='mancala'] .stone-stack-icon{filter:drop-shadow(0 5px 5px rgba(0,0,0,.45));animation:engine-token-float 2.8s ease-in-out infinite}
         @keyframes engine-light-sweep{0%,100%{background-position:-40vw 0;opacity:.65}50%{background-position:40vw 0;opacity:1}}
-        @keyframes engine-stage-breathe{50%{filter:drop-shadow(0 21px 34px rgba(0,0,0,.4)) drop-shadow(0 0 24px rgba(88,214,255,.15))}}
         @keyframes engine-token-float{50%{transform:translateZ(10px) translateY(-2px)}}
+        @media(max-width:767px){.game-engine-stage{min-height:min(760px,calc(100dvh - 138px));border-radius:16px!important}.game-content-layer{padding-bottom:calc(12px + env(safe-area-inset-bottom))!important}.game-engine-stage:after{display:none}.game-engine-stage canvas{filter:saturate(1.06) contrast(1.02)}.game-content-layer :where(.canonical-controls,.volt-controls,.crash-panel,.ocean-controls,.keno-actions,.plinko-controls,.coin-pusher-controls){position:sticky;z-index:35;bottom:calc(6px + env(safe-area-inset-bottom));border-radius:12px;background:rgba(5,12,18,.93)!important;box-shadow:0 -8px 24px rgba(0,0,0,.48);backdrop-filter:blur(12px)}.game-stage-tools{padding-inline:2px}.game-stage-tools button{min-height:40px}.game-engine-stage:fullscreen :where(.canonical-controls,.volt-controls,.crash-panel,.ocean-controls,.keno-actions,.plinko-controls,.coin-pusher-controls){bottom:env(safe-area-inset-bottom)}}
         @media(prefers-reduced-motion:reduce){.game-engine-stage:after,.game-engine-stage *{scroll-behavior:auto!important}.game-engine-stage :where(.poker-table,.volt-machine,.coin-pusher-machine,.wheel-glass,.color-wheel,.stone-stack-icon,.online-seat,.poker-seat,.holdem-card){animation:none!important;transition-duration:.01ms!important}}
       `}</style>
     </div>

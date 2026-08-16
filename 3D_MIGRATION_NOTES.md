@@ -176,6 +176,7 @@ Convert every game's actual playable surface and pieces to interactive 3D. The e
 - Game URLs now support direct links such as `?game=plinko`; the selected game is restored on load and the document title follows it.
 - Added a one-tap mobile share/copy control beside game selection.
 - Added privacy-minimal `session_start`, `referral_visit`, and `share_clicked` analytics events plus a nullable campaign source; existing analytics remains anonymous unless a signed-in user explicitly supplies their ID.
+- This growth release is v0.0.29 because v0.0.28 performance/security commits landed remotely during the build; all remote work was preserved.
 
 ## Planned conversion order
 

@@ -28,6 +28,7 @@ const SpinWheelGame: React.FC = () => {
     const currencySymbol = currencyMode === 'fun' ? 'FC' : 'RC';
     const animationFrameId = useRef<number | null>(null);
     const rotationRef = useRef(rotation);
+    const reduceMotionRef = useRef(window.matchMedia('(prefers-reduced-motion: reduce)').matches);
     rotationRef.current = rotation;
 
     const segmentAngle = 2 * Math.PI / SEGMENTS.length;
@@ -174,8 +175,8 @@ const SpinWheelGame: React.FC = () => {
         }
         setFeedback('Spinning…');
 
-        const spinDuration = 5000 + Math.random() * 3000; // 5-8 seconds
-        const randomSpins = 8 + Math.random() * 8; // 8-16 full spins
+        const spinDuration = reduceMotionRef.current ? 850 : 5000 + Math.random() * 3000;
+        const randomSpins = reduceMotionRef.current ? 1 : 8 + Math.random() * 8;
         
         const currentAngle = rotation % (2 * Math.PI);
         const randomAngle = Math.random() * 2 * Math.PI;

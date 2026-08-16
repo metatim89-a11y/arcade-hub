@@ -34,6 +34,7 @@ const SlotsMachine3D: React.FC<{
     let cancelled = false; let teardown = () => undefined;
     void import('three').then((THREE) => {
       if (cancelled) return;
+      const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
       const renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true, powerPreference: 'high-performance' });
       renderer.setPixelRatio(Math.min(devicePixelRatio, 1.55)); renderer.outputColorSpace = THREE.SRGBColorSpace; renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.25; renderer.shadowMap.enabled = true;
       const scene = new THREE.Scene(); const camera = new THREE.PerspectiveCamera(37, 1, .1, 40); camera.position.set(0, .45, 12); camera.lookAt(0, 0, 0);
@@ -119,11 +120,11 @@ const SlotsMachine3D: React.FC<{
           reelPhase[reelIndex] += reelVelocity[reelIndex] * delta * .34;
           drums[reelIndex].rotation.x += delta * (reelVelocity[reelIndex] + .18);
           const landingAge = (now - landingAt[reelIndex]) / 1000;
-          reelGroups[reelIndex].position.y = landingAge >= 0 && landingAge < .65 ? Math.sin(landingAge * Math.PI * 8) * Math.exp(-landingAge * 7) * .2 : 0;
+          reelGroups[reelIndex].position.y = !reduceMotion && landingAge >= 0 && landingAge < .65 ? Math.sin(landingAge * Math.PI * 8) * Math.exp(-landingAge * 7) * .2 : 0;
           symbolMeshes.forEach((mesh, key) => {
             if (!key.startsWith(`${reelIndex}-`)) return;
             const row = Number(mesh.userData.row); const primary = Number(mesh.userData.copy) === 0; const winning = primary && live.winningPositions.includes(`${reelIndex}-${row}`);
-            const materials = mesh.material as InstanceType<typeof THREE.MeshStandardMaterial>[]; const face = materials[2]; face.emissive.setHex(winning ? 0xffc928 : 0x000000); face.emissiveIntensity = winning ? .75 + Math.sin(now * .012) * .25 : 0;
+            const materials = mesh.material as InstanceType<typeof THREE.MeshStandardMaterial>[]; const face = materials[2]; face.emissive.setHex(winning ? 0xffc928 : 0x000000); face.emissiveIntensity = winning ? (reduceMotion ? .9 : .75 + Math.sin(now * .012) * .25) : 0;
             if (reel.spinning) {
               const cycle = ((Number(mesh.userData.slot) + reelPhase[reelIndex]) % 9 + 9) % 9;
               const lane = cycle > 4.5 ? cycle - 9 : cycle;
@@ -132,25 +133,25 @@ const SlotsMachine3D: React.FC<{
               mesh.rotation.x = THREE.MathUtils.clamp(y * .075, -.22, .22); mesh.scale.set(1, .98, 1); mesh.visible = Math.abs(y) < 2.72; materials.forEach((material) => { material.opacity = 1; material.transparent = false; });
             } else {
               mesh.visible = primary;
-              if (primary) { mesh.position.y += ((1.68 - row * 1.68) - mesh.position.y) * settle; mesh.position.z += (1.42 - mesh.position.z) * settle; mesh.rotation.x *= 1 - settle; mesh.scale.setScalar(winning ? 1 + Math.sin(now * .01) * .045 : 1); materials.forEach((material) => { material.opacity = 1; material.transparent = false; }); }
+              if (primary) { mesh.position.y += ((1.68 - row * 1.68) - mesh.position.y) * settle; mesh.position.z += (1.42 - mesh.position.z) * settle; mesh.rotation.x *= 1 - settle; mesh.scale.setScalar(winning && !reduceMotion ? 1 + Math.sin(now * .01) * .045 : 1); materials.forEach((material) => { material.opacity = 1; material.transparent = false; }); }
             }
           });
         });
         const themeColor = live.theme === 'power' ? 0xffb31f : live.theme === 'free' ? 0x38e6c4 : 0xec50ff;
         pink.color.setHex(themeColor); (marquee.material as InstanceType<typeof THREE.MeshStandardMaterial>).emissive.setHex(themeColor);
-        lights.forEach((bulb, index) => { const material = bulb.material as InstanceType<typeof THREE.MeshStandardMaterial>; material.color.setHex(themeColor); material.emissive.setHex(themeColor); material.emissiveIntensity = (live.anticipation ? 2.2 : 1.05) + Math.sin(now * (live.anticipation ? .02 : .006) + index) * .65; });
-        paylines.forEach((line, row) => { const material = line.material as InstanceType<typeof THREE.MeshBasicMaterial>; const active = live.winningPositions.some((position) => position.endsWith(`-${row}`)); material.color.setHex(themeColor); material.opacity = active ? .42 + Math.sin(now * .018 + row) * .3 : live.anticipation ? .08 + Math.sin(now * .012 + row) * .05 : 0; line.scale.x = active ? .98 + Math.sin(now * .01) * .02 : 1; });
+        lights.forEach((bulb, index) => { const material = bulb.material as InstanceType<typeof THREE.MeshStandardMaterial>; material.color.setHex(themeColor); material.emissive.setHex(themeColor); material.emissiveIntensity = reduceMotion ? (live.anticipation ? 2.2 : 1.05) : (live.anticipation ? 2.2 : 1.05) + Math.sin(now * (live.anticipation ? .02 : .006) + index) * .65; });
+        paylines.forEach((line, row) => { const material = line.material as InstanceType<typeof THREE.MeshBasicMaterial>; const active = live.winningPositions.some((position) => position.endsWith(`-${row}`)); material.color.setHex(themeColor); material.opacity = active ? (reduceMotion ? .65 : .42 + Math.sin(now * .018 + row) * .3) : live.anticipation ? .08 + (reduceMotion ? 0 : Math.sin(now * .012 + row) * .05) : 0; line.scale.x = active && !reduceMotion ? .98 + Math.sin(now * .01) * .02 : 1; });
         const pullProgress = Math.max(0, Math.min(1, (pullUntil - now) / 520)); lever.rotation.z = -Math.sin(pullProgress * Math.PI) * .72;
-        spinPad.scale.setScalar(live.disabled ? .88 : 1 + Math.sin(now * .004) * .035);
-        (spinPad.material as InstanceType<typeof THREE.MeshStandardMaterial>).emissiveIntensity = live.disabled ? .08 : .42 + Math.sin(now * .006) * .16;
+        spinPad.scale.setScalar(live.disabled ? .88 : reduceMotion ? 1 : 1 + Math.sin(now * .004) * .035);
+        (spinPad.material as InstanceType<typeof THREE.MeshStandardMaterial>).emissiveIntensity = live.disabled ? .08 : reduceMotion ? .5 : .42 + Math.sin(now * .006) * .16;
         winCoins.forEach((coin, index) => {
-          const age = (now - winBurstAt) / 1000 - index * .025; coin.visible = Boolean(winSignature) && age > 0 && age < 1.45;
+          const age = (now - winBurstAt) / 1000 - index * .025; coin.visible = !reduceMotion && Boolean(winSignature) && age > 0 && age < 1.45;
           if (!coin.visible) return;
           const lane = (index % 9) - 4; coin.position.set(lane * .72, -2.5 + age * 6.1 - age * age * 3.4, 2 + Math.sin(index * 2.3) * .45); coin.rotation.x += .15; coin.rotation.y += .2;
         });
-        machine.rotation.y += (pointerTarget.x * .045 + Math.sin(now * .00025) * .012 - machine.rotation.y) * smooth;
-        machine.rotation.x += (-pointerTarget.y * .018 - machine.rotation.x) * smooth;
-        machine.position.x = spinningCount ? Math.sin(now * .055) * .018 * spinningCount : 0;
+        machine.rotation.y += ((reduceMotion ? 0 : pointerTarget.x * .045 + Math.sin(now * .00025) * .012) - machine.rotation.y) * smooth;
+        machine.rotation.x += ((reduceMotion ? 0 : -pointerTarget.y * .018) - machine.rotation.x) * smooth;
+        machine.position.x = spinningCount && !reduceMotion ? Math.sin(now * .055) * .018 * spinningCount : 0;
         camera.position.z += ((live.anticipation ? viewportCameraZ - .65 : viewportCameraZ) - camera.position.z) * smooth; camera.lookAt(0, 0, 0);
         renderer.render(scene, camera); frame = requestAnimationFrame(animate);
       };

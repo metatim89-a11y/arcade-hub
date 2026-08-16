@@ -51,22 +51,29 @@ const GlobalChat: React.FC = () => {
         return (
             <button 
                 onClick={() => setIsOpen(true)}
-                className="fixed bottom-6 right-6 z-50 bg-yellow-500 text-black font-bold p-4 rounded-full shadow-2xl hover:scale-110 transition-transform flex items-center gap-2 border-2 border-yellow-400"
+                className="global-chat-launcher fixed z-50 bg-yellow-500 text-black font-bold rounded-full shadow-2xl hover:scale-105 transition-transform flex items-center justify-center gap-2 border-2 border-yellow-300"
+                aria-label="Open global chat"
+                title="Open global chat"
             >
-                💬 <span className="hidden md:inline">Global Chat</span>
+                <span aria-hidden="true">💬</span><span className="hidden md:inline">Global Chat</span>
+                <style>{`
+                    .global-chat-launcher{right:max(12px,env(safe-area-inset-right));bottom:max(12px,env(safe-area-inset-bottom));min-width:48px;height:48px;padding:0 14px;opacity:.9}
+                    @media(max-width:640px){.global-chat-launcher{min-width:42px;width:42px;height:42px;padding:0;opacity:.68}.global-chat-launcher:focus-visible,.global-chat-launcher:hover{opacity:1}}
+                    body:has(.game-engine-stage:fullscreen) .global-chat-launcher{display:none}
+                `}</style>
             </button>
         );
     }
 
     return (
-        <div className="fixed bottom-6 right-6 z-50 w-80 h-96 bg-gray-900/95 backdrop-blur-lg border-2 border-yellow-400/30 rounded-2xl shadow-2xl flex flex-col overflow-hidden animate-in slide-in-from-bottom-5">
+        <div role="dialog" aria-label="Global chat" className="global-chat-panel fixed z-50 w-80 h-96 bg-gray-900/95 backdrop-blur-lg border-2 border-yellow-400/30 rounded-2xl shadow-2xl flex flex-col overflow-hidden animate-in slide-in-from-bottom-5">
             {/* Header */}
             <div className="bg-yellow-500/10 p-3 border-b border-yellow-400/20 flex justify-between items-center">
                 <span className="text-yellow-400 font-bold flex items-center gap-2">
                     <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
                     Global Chat
                 </span>
-                <button onClick={() => setIsOpen(false)} className="text-gray-400 hover:text-white">✕</button>
+                <button onClick={() => setIsOpen(false)} className="text-gray-400 hover:text-white" aria-label="Close global chat">✕</button>
             </div>
 
             {/* Messages */}
@@ -92,11 +99,13 @@ const GlobalChat: React.FC = () => {
                     onChange={(e) => setInputText(e.target.value)}
                     onKeyDown={(e) => e.key === 'Enter' && handleSend()}
                     placeholder="Type a message..."
+                    aria-label="Chat message"
                     className="flex-grow bg-white/5 border border-white/10 rounded-lg px-3 py-1 text-sm focus:outline-none focus:border-yellow-400/50"
                 />
                 <button 
                     onClick={handleSend}
                     className="bg-yellow-500 text-black p-2 rounded-lg hover:bg-yellow-400 transition-colors"
+                    aria-label="Send message"
                 >
                     ✈️
                 </button>
@@ -106,6 +115,8 @@ const GlobalChat: React.FC = () => {
                 .custom-scrollbar::-webkit-scrollbar { width: 4px; }
                 .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
                 .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(234, 179, 8, 0.3); border-radius: 10px; }
+                .global-chat-panel{right:max(12px,env(safe-area-inset-right));bottom:max(12px,env(safe-area-inset-bottom))}
+                @media(max-width:640px){.global-chat-panel{left:10px;right:10px;bottom:max(10px,env(safe-area-inset-bottom));width:auto;max-height:min(70dvh,430px)}}
             `}</style>
         </div>
     );

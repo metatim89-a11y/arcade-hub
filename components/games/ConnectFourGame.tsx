@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { PlayMode } from '../../types';
 import GlassButton from '../ui/GlassButton';
 import { ConnectFourBoard3D } from './BoardGames3D';
@@ -30,6 +30,12 @@ const ConnectFourGame: React.FC<ConnectFourProps> = ({ playMode, playerNames }) 
   const [isDraw, setIsDraw] = useState(false);
   const [gameState, setGameState] = useState<GameState>('playing');
   const [isAnimating, setIsAnimating] = useState(false);
+  const moveTimerRef = useRef<number | null>(null);
+  const reduceMotionRef = useRef(window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+
+  useEffect(() => () => {
+    if (moveTimerRef.current) window.clearTimeout(moveTimerRef.current);
+  }, []);
 
 
   const checkWinner = (b: Cell[][]): [Player, [number, number][]] | null => {
@@ -75,7 +81,8 @@ const ConnectFourGame: React.FC<ConnectFourProps> = ({ playMode, playerNames }) 
       setPieces(prev => [...prev, newPiece]);
 
       // State update is now split: animation starts, then logic finalizes.
-      setTimeout(() => {
+      if (moveTimerRef.current) window.clearTimeout(moveTimerRef.current);
+      moveTimerRef.current = window.setTimeout(() => {
         const newBoard = board.map(r => [...r]);
         newBoard[targetRow][col] = player;
         setBoard(newBoard);
@@ -92,7 +99,8 @@ const ConnectFourGame: React.FC<ConnectFourProps> = ({ playMode, playerNames }) 
           setCurrentPlayer(player === '1' ? '2' : '1');
         }
         setIsAnimating(false);
-      }, 650); // Animation duration + buffer
+        moveTimerRef.current = null;
+      }, reduceMotionRef.current ? 0 : 650); // Disc drop duration + landing buffer
     }
   };
 
@@ -139,6 +147,9 @@ const ConnectFourGame: React.FC<ConnectFourProps> = ({ playMode, playerNames }) 
   }, [currentPlayer, gameState, playMode, board, isAnimating]);
 
   const handleReset = (startingPlayer: Player = '1') => {
+    if (moveTimerRef.current) window.clearTimeout(moveTimerRef.current);
+    moveTimerRef.current = null;
+    setIsAnimating(false);
     setBoard(Array(ROWS).fill(null).map(() => Array(COLS).fill(null)));
     setPieces([]);
     setCurrentPlayer(startingPlayer);
@@ -173,6 +184,23 @@ const ConnectFourGame: React.FC<ConnectFourProps> = ({ playMode, playerNames }) 
           onColumnClick={handlePlayerClick}
         />
       </div>
+      <details className="w-full max-w-[720px] rounded-lg border border-blue-300/20 bg-black/20 p-2 text-left text-xs text-blue-100">
+        <summary className="cursor-pointer font-bold">Keyboard-friendly column controls</summary>
+        <div className="mt-2 grid grid-cols-7 gap-1">
+          {Array.from({ length: COLS }, (_, column) => (
+            <button
+              key={column}
+              type="button"
+              onClick={() => handlePlayerClick(column)}
+              disabled={isAnimating || gameState !== 'playing' || Boolean(board[0][column]) || (playMode === 'vsComputer' && currentPlayer === '2')}
+              className="min-h-10 rounded-md border border-blue-300/30 bg-blue-950/70 font-black disabled:opacity-35"
+              aria-label={`Drop a piece in column ${column + 1}`}
+            >
+              {column + 1}
+            </button>
+          ))}
+        </div>
+      </details>
       {gameState === 'gameOver' ? (
         <div className="flex flex-col items-center gap-3 text-white text-center animate-pop-in">
           {winner && <p className="text-sm opacity-80">{winner === '1' ? p1Name : p2Name} chooses who starts next:</p>}

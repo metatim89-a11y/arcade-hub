@@ -1,7 +1,8 @@
 import React, { useEffect, useRef } from 'react';
 import type { Mesh, Object3D } from 'three';
+import { classifyCardMotion, getBlackjackDealDelay } from '../../lib/animationCues';
 
-type PlayingCard = { suit: string; rank: string; isHidden?: boolean };
+type PlayingCard = { id?: string; suit: string; rank: string; isHidden?: boolean };
 type MemoryCard = { id: number; symbol: string; isFlipped: boolean; isMatched: boolean };
 
 const cardCanvas = (rank: string, suit: string, hidden = false) => {
@@ -55,10 +56,10 @@ const dispose = (root: Object3D) => root.traverse((child) => {
   materials.forEach((material) => { material.map?.dispose(); material.dispose(); });
 });
 
-export const BlackjackTable3D: React.FC<{ dealerHand: PlayingCard[]; playerHand: PlayingCard[] }> = ({ dealerHand, playerHand }) => {
+export const BlackjackTable3D: React.FC<{ dealerHand: PlayingCard[]; playerHand: PlayingCard[]; roundId?: number }> = ({ dealerHand, playerHand, roundId = 0 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const stateRef = useRef({ dealerHand, playerHand });
-  stateRef.current = { dealerHand, playerHand };
+  const stateRef = useRef({ dealerHand, playerHand, roundId });
+  stateRef.current = { dealerHand, playerHand, roundId };
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -66,6 +67,7 @@ export const BlackjackTable3D: React.FC<{ dealerHand: PlayingCard[]; playerHand:
     let teardown = () => undefined;
     void import('three').then((THREE) => {
       if (cancelled) return;
+      const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
       const renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true });
       renderer.setPixelRatio(Math.min(devicePixelRatio, 1.6)); renderer.outputColorSpace = THREE.SRGBColorSpace;
       renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.2; renderer.shadowMap.enabled = true;
@@ -78,29 +80,62 @@ export const BlackjackTable3D: React.FC<{ dealerHand: PlayingCard[]; playerHand:
       const rail = new THREE.Mesh(new THREE.TorusGeometry(4.9, .28, 14, 64), new THREE.MeshStandardMaterial({ color: 0x512d18, roughness: .3, metalness: .25 }));
       rail.rotation.x = Math.PI / 2; rail.scale.y = .68; rail.position.y = -.04; scene.add(rail);
       const cardRoot = new THREE.Group(); scene.add(cardRoot);
+      let previousCardStates = new Map<string, 'hidden' | 'visible'>();
+      let previousRoundId = -1;
       let signature = '';
       const rebuild = (now: number) => {
         dispose(cardRoot); cardRoot.clear();
-        const addHand = (hand: PlayingCard[], z: number) => hand.forEach((card, index) => {
+        if (previousRoundId !== stateRef.current.roundId) {
+          previousCardStates.clear();
+          previousRoundId = stateRef.current.roundId;
+        }
+        const nextCardStates = new Map<string, 'hidden' | 'visible'>();
+        const openingDeal = previousCardStates.size === 0 && stateRef.current.dealerHand.length + stateRef.current.playerHand.length >= 4;
+        const addHand = (hand: PlayingCard[], lane: 'dealer' | 'player', z: number) => hand.forEach((card, index) => {
+          const cardKey = card.id ?? `${lane}-${index}-${card.rank}-${card.suit}`;
+          const displayState = card.isHidden ? 'hidden' : 'visible';
+          const motion = reduceMotion ? 'none' : classifyCardMotion(previousCardStates.get(cardKey), displayState);
+          nextCardStates.set(cardKey, displayState);
           const face = new THREE.CanvasTexture(cardCanvas(card.rank, card.suit, !!card.isHidden)); face.colorSpace = THREE.SRGBColorSpace;
           const back = new THREE.CanvasTexture(cardCanvas('', '', true)); back.colorSpace = THREE.SRGBColorSpace;
           const edge = new THREE.MeshStandardMaterial({ color: 0xd7d1bf, roughness: .5 });
           const top = new THREE.MeshStandardMaterial({ map: face, roughness: .42 });
           const bottom = new THREE.MeshStandardMaterial({ map: back, roughness: .45 });
           const mesh = new THREE.Mesh(new THREE.BoxGeometry(1.2, .075, 1.68), [edge, edge, top, bottom, edge, edge]);
-          mesh.position.set((index - (hand.length - 1) / 2) * .88, 2.8 + index * .08, z + index * .08);
+          const targetY = .12 + index * .018;
+          const dealDelay = getBlackjackDealDelay(lane, index, openingDeal);
+          mesh.position.set((index - (hand.length - 1) / 2) * .88, motion === 'deal' ? 2.8 + index * .08 : motion === 'reveal' ? targetY + .28 : targetY, z + index * .08);
           mesh.rotation.y = (index - (hand.length - 1) / 2) * -.055;
-          mesh.userData.targetY = .12 + index * .018; mesh.userData.birth = now + index * 90; mesh.castShadow = true;
+          mesh.userData.targetY = targetY;
+          mesh.userData.motion = motion;
+          mesh.userData.birth = now + dealDelay;
+          if (motion === 'reveal') mesh.scale.x = .12;
+          mesh.castShadow = true;
           cardRoot.add(mesh);
         });
-        addHand(stateRef.current.dealerHand, -1.65); addHand(stateRef.current.playerHand, 1.45);
+        addHand(stateRef.current.dealerHand, 'dealer', -1.65); addHand(stateRef.current.playerHand, 'player', 1.45);
+        previousCardStates = nextCardStates;
       };
       const observer = new ResizeObserver(() => { const rect = canvas.getBoundingClientRect(); if (!rect.width || !rect.height) return; renderer.setSize(rect.width, rect.height, false); camera.aspect = rect.width / rect.height; camera.updateProjectionMatrix(); });
       observer.observe(canvas);
       let frame = 0;
       const animate = (now: number) => {
         const next = JSON.stringify(stateRef.current); if (next !== signature) { signature = next; rebuild(now); }
-        cardRoot.children.forEach((card) => { const age = Math.max(0, now - Number(card.userData.birth)); const progress = Math.min(1, age / 520); const eased = 1 - Math.pow(1 - progress, 3); card.position.y = 2.8 * (1 - eased) + Number(card.userData.targetY); card.rotation.z = (1 - eased) * .22; });
+        cardRoot.children.forEach((card) => {
+          const motion = String(card.userData.motion);
+          if (motion === 'none') return;
+          const age = Math.max(0, now - Number(card.userData.birth));
+          const progress = Math.min(1, age / (motion === 'deal' ? 520 : 360));
+          const eased = 1 - Math.pow(1 - progress, 3);
+          if (motion === 'deal') {
+            card.position.y = 2.8 * (1 - eased) + Number(card.userData.targetY);
+            card.rotation.z = (1 - eased) * .22;
+          } else {
+            card.position.y = Number(card.userData.targetY) + (1 - eased) * .28;
+            card.scale.x = .12 + eased * .88;
+          }
+          if (progress === 1) card.userData.motion = 'none';
+        });
         renderer.render(scene, camera); frame = requestAnimationFrame(animate);
       };
       frame = requestAnimationFrame(animate);
@@ -119,6 +154,7 @@ export const MemoryCards3D: React.FC<{ cards: MemoryCard[]; disabled: boolean; o
     let cancelled = false; let teardown = () => undefined;
     void import('three').then((THREE) => {
       if (cancelled) return;
+      const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
       const renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true }); renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5)); renderer.outputColorSpace = THREE.SRGBColorSpace; renderer.shadowMap.enabled = true;
       const scene = new THREE.Scene(); const camera = new THREE.PerspectiveCamera(43, 1, .1, 55); camera.up.set(0, 0, -1); camera.position.set(0, 12, 0); camera.lookAt(0, 0, 0);
       scene.add(new THREE.HemisphereLight(0xdbeeff, 0x11101d, 2.5)); const light = new THREE.DirectionalLight(0xffffff, 4.5); light.position.set(-4, 8, 5); light.castShadow = true; scene.add(light);
@@ -127,12 +163,12 @@ export const MemoryCards3D: React.FC<{ cards: MemoryCard[]; disabled: boolean; o
       const rebuild = () => {
         meshes.forEach((mesh) => { scene.remove(mesh); dispose(mesh); }); meshes.clear();
         stateRef.current.cards.forEach((card, index) => {
-          const state = `${card.isFlipped}:${card.isMatched}`; const changed = previousStates.has(card.id) && previousStates.get(card.id) !== state; previousStates.set(card.id, state);
+          const state = `${card.isFlipped}:${card.isMatched}`; const changed = !reduceMotion && previousStates.has(card.id) && previousStates.get(card.id) !== state; previousStates.set(card.id, state);
           const texture = new THREE.CanvasTexture(memoryCardCanvas(card.symbol, card.isFlipped, card.isMatched)); texture.colorSpace = THREE.SRGBColorSpace;
           const edge = new THREE.MeshStandardMaterial({ color: card.isMatched ? 0x4af0a0 : card.isFlipped ? 0x8abbd4 : 0x4a73a7, roughness: .27, metalness: .48 });
           const face = new THREE.MeshStandardMaterial({ map: texture, roughness: .26, metalness: .08, emissive: card.isMatched ? 0x28c968 : 0x0b1c38, emissiveIntensity: card.isMatched ? .72 : .16 });
           const mesh = new THREE.Mesh(new THREE.BoxGeometry(1.42, .1, 1.72), [edge, edge, face, edge, edge, edge]);
-          mesh.position.set((index % 4 - 1.5) * 1.72, card.isMatched ? -.08 : .06, (Math.floor(index / 4) - 1.5) * 1.72); mesh.userData.id = card.id; mesh.userData.matched = card.isMatched; mesh.userData.flipBirth = changed ? performance.now() : 0; mesh.rotation.z = changed ? Math.PI : 0; mesh.castShadow = true;
+          mesh.position.set((index % 4 - 1.5) * 1.72, card.isMatched ? -.08 : .06, (Math.floor(index / 4) - 1.5) * 1.72); mesh.userData.id = card.id; mesh.userData.matched = card.isMatched; mesh.userData.flipBirth = changed ? performance.now() : 0; mesh.rotation.z = changed ? -.08 : 0; mesh.scale.x = changed ? .08 : 1; mesh.castShadow = true;
           if (card.isMatched) { const halo = new THREE.Mesh(new THREE.RingGeometry(.58, .9, 32), new THREE.MeshBasicMaterial({ color: 0x51f1a5, transparent: true, opacity: .36, side: THREE.DoubleSide, depthWrite: false })); halo.rotation.x = -Math.PI / 2; halo.position.y = -.09; mesh.add(halo); }
           scene.add(mesh); meshes.set(card.id, mesh);
         });
@@ -142,7 +178,7 @@ export const MemoryCards3D: React.FC<{ cards: MemoryCard[]; disabled: boolean; o
       canvas.style.touchAction = 'none'; canvas.addEventListener('pointermove', pick); canvas.addEventListener('pointerdown', click);
       const observer = new ResizeObserver(() => { const rect = canvas.getBoundingClientRect(); if (!rect.width || !rect.height) return; renderer.setSize(rect.width, rect.height, false); camera.aspect = rect.width / rect.height; const requiredHeight = Math.max(8.2, 8.2 / camera.aspect); camera.position.y = requiredHeight / (2 * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2))); camera.updateProjectionMatrix(); }); observer.observe(canvas);
       let frame = 0; let last = performance.now();
-      const animate = (now: number) => { const delta = Math.min(.04, (now - last) / 1000); last = now; const smooth = 1 - Math.exp(-8.5 * delta); const next = JSON.stringify(stateRef.current.cards); if (next !== signature) { signature = next; rebuild(); } meshes.forEach((mesh, id) => { const active = id === hovered && !stateRef.current.disabled; mesh.position.y += ((mesh.userData.matched ? -.08 : active ? .22 : .06) - mesh.position.y) * smooth; const flipAge = Number(mesh.userData.flipBirth) ? Math.min(1, (now - Number(mesh.userData.flipBirth)) / 430) : 1; mesh.rotation.z = Math.PI * Math.pow(1 - flipAge, 3); if (mesh.userData.matched) { mesh.rotation.y = Math.sin(now * .003 + id) * .05; const halo = mesh.children[0] as Mesh | undefined; if (halo) { halo.rotation.z = now * .0015 + id; (halo.material as InstanceType<typeof THREE.MeshBasicMaterial>).opacity = .25 + Math.sin(now * .008 + id) * .12; } } }); renderer.render(scene, camera); frame = requestAnimationFrame(animate); };
+      const animate = (now: number) => { const delta = Math.min(.04, (now - last) / 1000); last = now; const smooth = reduceMotion ? 1 : 1 - Math.exp(-8.5 * delta); const next = JSON.stringify(stateRef.current.cards); if (next !== signature) { signature = next; rebuild(); } meshes.forEach((mesh, id) => { const active = id === hovered && !stateRef.current.disabled; mesh.position.y += ((mesh.userData.matched ? -.08 : active ? .22 : .06) - mesh.position.y) * smooth; const flipAge = Number(mesh.userData.flipBirth) ? Math.min(1, (now - Number(mesh.userData.flipBirth)) / 360) : 1; const flipEase = 1 - Math.pow(1 - flipAge, 3); mesh.scale.x = .08 + flipEase * .92; mesh.rotation.z = -.08 * (1 - flipEase); if (mesh.userData.matched && !reduceMotion) { mesh.rotation.y = Math.sin(now * .003 + id) * .05; const halo = mesh.children[0] as Mesh | undefined; if (halo) { halo.rotation.z = now * .0015 + id; (halo.material as InstanceType<typeof THREE.MeshBasicMaterial>).opacity = .25 + Math.sin(now * .008 + id) * .12; } } }); renderer.render(scene, camera); frame = requestAnimationFrame(animate); };
       frame = requestAnimationFrame(animate);
       teardown = () => { cancelAnimationFrame(frame); observer.disconnect(); canvas.removeEventListener('pointermove', pick); canvas.removeEventListener('pointerdown', click); dispose(scene); renderer.dispose(); };
     });
@@ -154,28 +190,50 @@ export const MemoryCards3D: React.FC<{ cards: MemoryCard[]; disabled: boolean; o
 type PokerCard = { id: string; suit: string; rank: string };
 type PokerPlayer = { id: number | string; hand: PokerCard[]; isHuman: boolean; folded: boolean; bet: number };
 
-export const PokerTable3D: React.FC<{ players: PokerPlayer[]; community: PokerCard[]; showdown: boolean; activeIndex?: number; dealerIndex?: number }> = ({ players, community, showdown, activeIndex = -1, dealerIndex = -1 }) => {
+export const PokerTable3D: React.FC<{ players: PokerPlayer[]; community: PokerCard[]; showdown: boolean; activeIndex?: number; dealerIndex?: number; handId?: number }> = ({ players, community, showdown, activeIndex = -1, dealerIndex = -1, handId = 0 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const stateRef = useRef({ players, community, showdown, activeIndex, dealerIndex }); stateRef.current = { players, community, showdown, activeIndex, dealerIndex };
+  const stateRef = useRef({ players, community, showdown, activeIndex, dealerIndex, handId }); stateRef.current = { players, community, showdown, activeIndex, dealerIndex, handId };
   useEffect(() => {
     const canvas = canvasRef.current; if (!canvas) return;
     let cancelled = false; let teardown = () => undefined;
     void import('three').then((THREE) => {
       if (cancelled) return;
+      const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
       const renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true }); renderer.setPixelRatio(Math.min(devicePixelRatio, 1.45)); renderer.outputColorSpace = THREE.SRGBColorSpace; renderer.shadowMap.enabled = true;
       const scene = new THREE.Scene(); const camera = new THREE.PerspectiveCamera(38, 1, .1, 50); camera.position.set(0, 10.7, 4.2); camera.lookAt(0, 0, 0);
       scene.add(new THREE.HemisphereLight(0xe2f8e8, 0x090d0b, 2.4)); const key = new THREE.DirectionalLight(0xffecc4, 4.8); key.position.set(-5, 9, 5); key.castShadow = true; scene.add(key);
       const felt = new THREE.Mesh(new THREE.CylinderGeometry(5.5, 5.65, .5, 64), new THREE.MeshStandardMaterial({ color: 0x075c37, roughness: .58, metalness: .06 })); felt.scale.z = .72; felt.position.y = -.32; felt.receiveShadow = true; scene.add(felt);
       const rail = new THREE.Mesh(new THREE.TorusGeometry(5.25, .34, 14, 64), new THREE.MeshStandardMaterial({ color: 0x5a341c, roughness: .31, metalness: .28 })); rail.rotation.x = Math.PI / 2; rail.scale.y = .72; rail.position.y = -.02; scene.add(rail);
       const pieces = new THREE.Group(); scene.add(pieces); let signature = '';
-      const makeCard = (card: PokerCard, hidden: boolean, x: number, z: number, rotation: number, delay: number) => {
+      let previousCardStates = new Map<string, 'hidden' | 'visible'>();
+      let previousHandId = -1;
+      let nextCardStates = new Map<string, 'hidden' | 'visible'>();
+      let dealSequence = 0;
+      const makeCard = (card: PokerCard, hidden: boolean, x: number, z: number, rotation: number) => {
+        const displayState = hidden ? 'hidden' : 'visible';
+        const motion = reduceMotion ? 'none' : classifyCardMotion(previousCardStates.get(card.id), displayState);
+        const delay = motion === 'deal' ? dealSequence++ * 70 : 0;
+        nextCardStates.set(card.id, displayState);
         const texture = new THREE.CanvasTexture(cardCanvas(card.rank, card.suit, hidden)); texture.colorSpace = THREE.SRGBColorSpace;
         const edge = new THREE.MeshStandardMaterial({ color: 0xd8d4ca, roughness: .42 }); const face = new THREE.MeshStandardMaterial({ map: texture, roughness: .38 });
-        const mesh = new THREE.Mesh(new THREE.BoxGeometry(.78, .07, 1.1), [edge, edge, face, edge, edge, edge]); mesh.position.set(x, 2.7 + delay * .001, z); mesh.rotation.y = rotation; mesh.userData.targetY = .09; mesh.userData.birth = performance.now() + delay; mesh.castShadow = true; pieces.add(mesh);
+        const mesh = new THREE.Mesh(new THREE.BoxGeometry(.78, .07, 1.1), [edge, edge, face, edge, edge, edge]);
+        mesh.position.set(x, motion === 'deal' ? 2.7 + delay * .001 : motion === 'reveal' ? .35 : .09, z);
+        mesh.rotation.y = rotation;
+        mesh.userData.targetY = .09;
+        mesh.userData.motion = motion;
+        mesh.userData.birth = performance.now() + delay;
+        if (motion === 'reveal') mesh.scale.x = .12;
+        mesh.castShadow = true; pieces.add(mesh);
       };
       const rebuild = () => {
         dispose(pieces); pieces.clear();
-        stateRef.current.community.forEach((card, index) => makeCard(card, false, (index - 2) * .9, 0, 0, index * 70));
+        if (previousHandId !== stateRef.current.handId) {
+          previousCardStates.clear();
+          previousHandId = stateRef.current.handId;
+        }
+        nextCardStates = new Map<string, 'hidden' | 'visible'>();
+        dealSequence = 0;
+        stateRef.current.community.forEach((card, index) => makeCard(card, false, (index - 2) * .9, 0, 0));
         const seats: Array<[number, number, number]> = [[0, 3.15, 0], [-4.25, 0, Math.PI / 2], [0, -3.15, Math.PI], [4.25, 0, -Math.PI / 2]];
         stateRef.current.players.forEach((player, playerIndex) => {
           const [baseX, baseZ, rotation] = seats[playerIndex] ?? seats[0];
@@ -183,7 +241,7 @@ export const PokerTable3D: React.FC<{ players: PokerPlayer[]; community: PokerCa
             const horizontal = playerIndex === 1 || playerIndex === 3;
             const x = baseX + (horizontal ? 0 : (cardIndex - .5) * .56);
             const z = baseZ + (horizontal ? (cardIndex - .5) * .56 : 0);
-            makeCard(card, !(stateRef.current.showdown || player.isHuman) || player.folded, x, z, rotation, playerIndex * 110 + cardIndex * 70);
+            makeCard(card, !(stateRef.current.showdown || player.isHuman) || player.folded, x, z, rotation);
           });
           for (let chip = 0; chip < Math.min(8, Math.ceil(player.bet / 20)); chip += 1) {
             const token = new THREE.Mesh(new THREE.CylinderGeometry(.15, .15, .055, 24), new THREE.MeshStandardMaterial({ color: chip % 2 ? 0xe44b5f : 0xf4d45c, metalness: .45, roughness: .28 }));
@@ -196,10 +254,11 @@ export const PokerTable3D: React.FC<{ players: PokerPlayer[]; community: PokerCa
             const dealer = new THREE.Mesh(new THREE.CylinderGeometry(.2, .2, .07, 24), new THREE.MeshStandardMaterial({ color: 0xf8f3df, metalness: .38, roughness: .25, emissive: 0x7f6b28, emissiveIntensity: .18 })); dealer.position.set(baseX * .78 + .34, .08, baseZ * .78 + .18); dealer.userData.dealer = true; pieces.add(dealer);
           }
         });
+        previousCardStates = nextCardStates;
       };
       const observer = new ResizeObserver(() => { const rect = canvas.getBoundingClientRect(); if (!rect.width || !rect.height) return; renderer.setSize(rect.width, rect.height, false); camera.aspect = rect.width / rect.height; const distanceScale = Math.max(1, .92 / camera.aspect); camera.position.set(0, 10.7 * distanceScale, 4.2 * distanceScale); camera.lookAt(0, 0, 0); camera.updateProjectionMatrix(); }); observer.observe(canvas);
       let frame = 0;
-      const animate = (now: number) => { const next = JSON.stringify(stateRef.current); if (next !== signature) { signature = next; rebuild(); } pieces.children.forEach((piece) => { if (piece.userData.activeMarker) { piece.rotation.z = now * .0012; (piece.material as InstanceType<typeof THREE.MeshBasicMaterial>).opacity = .55 + Math.sin(now * .008) * .25; return; } if (piece.userData.dealer) { piece.rotation.y = now * .001; return; } if (piece.userData.targetY === undefined) return; const progress = Math.min(1, Math.max(0, (now - Number(piece.userData.birth)) / 420)); const eased = 1 - Math.pow(1 - progress, 3); piece.position.y = 2.7 * (1 - eased) + Number(piece.userData.targetY); piece.rotation.z = (1 - eased) * .22; }); renderer.render(scene, camera); frame = requestAnimationFrame(animate); };
+      const animate = (now: number) => { const next = JSON.stringify(stateRef.current); if (next !== signature) { signature = next; rebuild(); } pieces.children.forEach((piece) => { if (piece.userData.activeMarker) { piece.rotation.z = now * .0012; (piece.material as InstanceType<typeof THREE.MeshBasicMaterial>).opacity = .55 + Math.sin(now * .008) * .25; return; } if (piece.userData.dealer) { piece.rotation.y = now * .001; return; } if (piece.userData.targetY === undefined) return; const motion = String(piece.userData.motion); if (motion === 'none') return; const progress = Math.min(1, Math.max(0, (now - Number(piece.userData.birth)) / (motion === 'deal' ? 420 : 340))); const eased = 1 - Math.pow(1 - progress, 3); if (motion === 'deal') { piece.position.y = 2.7 * (1 - eased) + Number(piece.userData.targetY); piece.rotation.z = (1 - eased) * .22; } else { piece.position.y = Number(piece.userData.targetY) + (1 - eased) * .26; piece.scale.x = .12 + eased * .88; } if (progress === 1) piece.userData.motion = 'none'; }); renderer.render(scene, camera); frame = requestAnimationFrame(animate); };
       frame = requestAnimationFrame(animate);
       teardown = () => { cancelAnimationFrame(frame); observer.disconnect(); dispose(scene); renderer.dispose(); };
     });
