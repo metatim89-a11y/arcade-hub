@@ -35,9 +35,15 @@ const Header: React.FC<HeaderProps> = ({ mode, setMode, simple = false, onProfil
       </span>
   );
   const disclaimer = (
-      <div className="w-full rounded-lg border border-amber-300/35 bg-black/35 px-3 py-1.5 text-center text-[9px] font-bold uppercase tracking-wide text-amber-100 md:text-[10px]">
-          🚧 Site building in progress · Arcade Hub does not pay out real money · All coins and RC are virtual with no cash value · Monthly cash-prize tournaments will be announced with separate official rules and eligibility requirements
-      </div>
+      <>
+        <details className="mobile-legal-notice w-full rounded-lg border border-amber-300/35 bg-black/35 px-3 py-2 text-[10px] text-amber-100 md:hidden">
+          <summary className="cursor-pointer text-center font-black uppercase tracking-wide">Virtual play & tournament notice</summary>
+          <p className="mt-2 text-center font-semibold leading-relaxed">Arcade Hub does not pay out real money. Coins and RC are virtual with no cash value. Cash-prize tournaments use separate official rules and eligibility requirements.</p>
+        </details>
+        <div className="hidden w-full rounded-lg border border-amber-300/35 bg-black/35 px-3 py-1.5 text-center text-[10px] font-bold uppercase tracking-wide text-amber-100 md:block">
+            🚧 Site building in progress · Arcade Hub does not pay out real money · All coins and RC are virtual with no cash value · Monthly cash-prize tournaments will be announced with separate official rules and eligibility requirements
+        </div>
+      </>
   );
 
   const buttonClasses = "text-sm md:text-base border-none py-2 px-4 rounded-lg bg-gray-800 text-yellow-400 cursor-pointer shadow-md transition-colors duration-200";
@@ -57,7 +63,7 @@ const Header: React.FC<HeaderProps> = ({ mode, setMode, simple = false, onProfil
   }
 
   return (
-    <header className="relative flex flex-col gap-2.5 p-3 pt-6 md:px-5 md:py-4 md:pt-6 bg-gradient-to-r from-[#a87c4f] to-[#7e3c3c] shadow-lg border-b-2 border-yellow-400/20 w-full">
+    <header className="relative flex flex-col gap-2 p-2.5 pt-5 md:px-5 md:py-4 md:pt-6 bg-gradient-to-r from-[#a87c4f] to-[#7e3c3c] shadow-lg border-b-2 border-yellow-400/20 w-full">
       {versionButton}
       
       {/* Top Row: Title and User Controls */}

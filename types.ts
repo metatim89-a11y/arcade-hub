@@ -9,7 +9,7 @@ export enum GameMode {
 export interface Game {
   id: string;
   label: string;
-  component: React.ComponentType<any>; // Allow games to receive props
+  component: React.ComponentType<any> | React.LazyExoticComponent<React.ComponentType<any>>;
 }
 
 export type PlayMode = 'vsPlayer' | 'vsComputer';

@@ -1,23 +1,25 @@
 
-// constants.tsx v0.0.26 - Game Registry
+// constants.tsx v0.0.27 - Lazy Game Registry
+import React from 'react';
 import { Game } from './types';
-import KenoGame from './components/games/KenoGame';
-import PlinkoGame from './components/games/PlinkoGame';
-import WormGame from './components/games/WormGame';
-import ConnectFourGame from './components/games/ConnectFourGame';
-import FishingGame from './components/games/FishingGame';
-import RubiksCubeGame from './components/games/RubiksCubeGame';
-import CrashGame from './components/games/CrashGame';
-import SlotsGame from './components/games/SlotsGame';
-import MancalaGame from './components/games/MancalaGame';
-import BlackjackGame from './components/games/BlackjackGame';
-import TexasHoldemLobby from './components/games/TexasHoldemLobby';
-import SpinWheelGame from './components/games/SpinWheelGame';
-import CoinPusherGame from './components/games/CoinPusherGame';
-import RPSCardGame from './components/games/RPSCardGame';
-import TicTacToeGame from './components/games/TicTacToeGame';
 
-export const APP_VERSION = '0.0.26';
+const KenoGame = React.lazy(() => import('./components/games/KenoGame'));
+const PlinkoGame = React.lazy(() => import('./components/games/PlinkoGame'));
+const WormGame = React.lazy(() => import('./components/games/WormGame'));
+const ConnectFourGame = React.lazy(() => import('./components/games/ConnectFourGame'));
+const FishingGame = React.lazy(() => import('./components/games/FishingGame'));
+const ColorRecallGame = React.lazy(() => import('./components/games/ColorRecallGame'));
+const CrashGame = React.lazy(() => import('./components/games/CrashGame'));
+const SlotsGame = React.lazy(() => import('./components/games/SlotsGame'));
+const MancalaGame = React.lazy(() => import('./components/games/MancalaGame'));
+const BlackjackGame = React.lazy(() => import('./components/games/BlackjackGame'));
+const TexasHoldemLobby = React.lazy(() => import('./components/games/TexasHoldemLobby'));
+const SpinWheelGame = React.lazy(() => import('./components/games/SpinWheelGame'));
+const CoinPusherGame = React.lazy(() => import('./components/games/CoinPusherGame'));
+const RPSCardGame = React.lazy(() => import('./components/games/RPSCardGame'));
+const TicTacToeGame = React.lazy(() => import('./components/games/TicTacToeGame'));
+
+export const APP_VERSION = '0.0.27';
 
 export const ADULT_GAMES: Game[] = [
     { id: 'wheel', label: 'Spin Wheel', component: SpinWheelGame },
@@ -34,7 +36,7 @@ export const ADULT_GAMES: Game[] = [
 export const UNDER18_GAMES: Game[] = [
     { id: 'worm', label: 'Worm.io', component: WormGame },
     { id: 'connect4', label: 'Connect Four', component: ConnectFourGame },
-    { id: 'rubikscube', label: 'Color Recall', component: RubiksCubeGame },
+    { id: 'rubikscube', label: 'Color Recall', component: ColorRecallGame },
     { id: 'mancala', label: 'Mancala', component: MancalaGame },
     { id: 'rps', label: 'RPS Cards', component: RPSCardGame },
     { id: 'tictactoe', label: 'Tic Tac Toe', component: TicTacToeGame },

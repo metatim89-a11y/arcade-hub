@@ -186,6 +186,22 @@ const KenoGame: React.FC = () => {
       <div className={`h-[480px] w-full max-w-[840px] overflow-hidden rounded-3xl shadow-[0_28px_70px_rgba(0,0,0,.48)] max-sm:h-[360px] ${phase === 'drawing' ? 'keno-drawing-grid' : ''}`}>
         <KenoBoard3D selected={selectedNumbers} drawn={drawnNumbers} phase={phase} onNumberClick={toggleNumber} />
       </div>
+      <details className="w-full max-w-[840px] rounded-lg border border-yellow-300/20 bg-black/20 p-2 text-left text-xs text-yellow-100">
+        <summary className="cursor-pointer font-bold">Keyboard-friendly number grid</summary>
+        <div className="mt-2 grid grid-cols-8 gap-1 sm:grid-cols-10">
+          {Array.from({ length: 80 }, (_, index) => index + 1).map((number) => (
+            <KenoNumber
+              key={number}
+              num={number}
+              isSelected={selectedNumbers.has(number)}
+              isDrawn={drawnNumbers.has(number)}
+              phase={phase}
+              onClick={toggleNumber}
+              disabled={phase !== 'betting'}
+            />
+          ))}
+        </div>
+      </details>
       <div className="bg-black/20 p-3 rounded-lg text-center w-full min-h-[40px] flex items-center justify-center text-yellow-300 font-semibold">{feedback}</div>
       <div className="flex flex-wrap items-center justify-center gap-2 md:gap-4">
         <div className="flex items-center gap-2 bg-gray-800/30 p-2 rounded-xl text-lg shadow-md">

@@ -415,6 +415,28 @@ const MancalaGame: React.FC<MancalaProps> = ({ playMode, playerNames }) => {
                 </div>
             </div>
 
+            <details className="justify-self-center w-full max-w-2xl rounded-xl border border-amber-700/70 bg-black/35 p-3">
+                <summary className="cursor-pointer font-bold text-yellow-300">Accessible pit controls</summary>
+                <p className="my-2 text-sm text-amber-100/80">Choose a pit on the active player's side.</p>
+                <div className="grid grid-cols-3 gap-2 sm:grid-cols-6" role="group" aria-label={`${currentPlayer === 1 ? p1Name : p2Name} pits`}>
+                    {(currentPlayer === 1 ? [0, 1, 2, 3, 4, 5] : [7, 8, 9, 10, 11, 12]).map((pitIndex, position) => {
+                        const isCpuTurn = playMode === 'vsComputer' && currentPlayer === 2;
+                        return (
+                            <button
+                                key={pitIndex}
+                                type="button"
+                                onClick={() => handlePitClick(pitIndex)}
+                                disabled={gameOver || isCpuTurn || pits[pitIndex] === 0}
+                                aria-label={`Pit ${position + 1}, ${pits[pitIndex]} stones`}
+                                className="min-h-11 rounded-lg border border-amber-700 bg-amber-950/70 px-2 font-bold text-yellow-100 enabled:hover:border-yellow-300 enabled:focus-visible:border-yellow-300 disabled:opacity-50"
+                            >
+                                <span aria-hidden="true">{position + 1}: {pits[pitIndex]}</span>
+                            </button>
+                        );
+                    })}
+                </div>
+            </details>
+
             {/* Bottom: Reset Button */}
             <button onClick={() => handleReset()} className="justify-self-center bg-yellow-500 text-gray-900 font-bold py-2 px-6 rounded-lg hover:bg-yellow-400 transition-colors"> Reset Game </button>
 

@@ -143,6 +143,29 @@ const RPSCardGame: React.FC<RPSCardGameProps> = ({ playMode }) => {
             <div className="h-[580px] w-full max-w-[720px] overflow-hidden rounded-3xl shadow-[0_28px_70px_rgba(0,0,0,.48)] max-sm:h-[500px]">
                 <MemoryCards3D cards={board} disabled={gameOver || isChecking || (playMode === 'vsComputer' && currentPlayer === 2)} onCardClick={(id) => handleCardClick(id)} />
             </div>
+            <details className="w-full max-w-[720px] rounded-xl border border-slate-600 bg-slate-950/70 p-3">
+                <summary className="cursor-pointer font-bold text-yellow-300">Accessible card controls</summary>
+                <p className="my-2 text-sm text-slate-300">Choose cards with a keyboard or screen reader. Revealed symbols stay private until a card is turned over.</p>
+                <div className="grid grid-cols-4 gap-2" role="group" aria-label="Memory cards">
+                    {board.map((card) => {
+                        const isCpuTurn = playMode === 'vsComputer' && currentPlayer === 2;
+                        const unavailable = gameOver || isChecking || isCpuTurn || card.isFlipped || flippedCards.length >= 2;
+                        const state = card.isMatched ? `matched ${card.symbol}` : card.isFlipped ? `revealed ${card.symbol}` : 'hidden';
+                        return (
+                            <button
+                                key={card.id}
+                                type="button"
+                                onClick={() => handleCardClick(card.id)}
+                                disabled={unavailable}
+                                aria-label={`Card ${card.id + 1}, ${state}`}
+                                className="min-h-11 rounded-lg border border-slate-500 bg-slate-800 font-bold text-white enabled:hover:border-yellow-300 enabled:focus-visible:border-yellow-300 disabled:opacity-50"
+                            >
+                                {card.isFlipped || card.isMatched ? card.symbol : card.id + 1}
+                            </button>
+                        );
+                    })}
+                </div>
+            </details>
             {gameOver && <GlassButton onClick={handleReset} className="mt-4 text-xl py-3">Play Again</GlassButton>}
 
             <style>{`

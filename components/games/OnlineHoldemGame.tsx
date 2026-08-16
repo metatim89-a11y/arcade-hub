@@ -1,10 +1,11 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { getSupabase } from '../../lib/supabase';
 import { PokerTable3D } from './CardGames3D';
+import { resolveBlindPositions } from '../../lib/holdemPositions';
 
 type Card = { r: number; s: string } | null;
 type Player = { id: string; name: string; seat: number; stack: number; bet: number; total: number; folded: boolean; allIn: boolean; hand: Card[]; bot: boolean };
-type GameState = { phase: string; board: Card[]; players: Player[]; dealer: number; actor: number; currentBet: number; pot: number; message: string; hand: number; smallBlind: number; bigBlind: number; buyIn: number };
+type GameState = { phase: string; board: Card[]; players: Player[]; dealer: number; actor: number; currentBet: number; pot: number; message: string; hand: number; smallBlind: number; bigBlind: number; smallBlindSeat?: number; bigBlindSeat?: number; buyIn: number };
 
 const ranks: Record<number, string> = { 11: 'J', 12: 'Q', 13: 'K', 14: 'A' };
 const suits: Record<string, string> = { S: '♠', H: '♥', D: '♦', C: '♣' };
@@ -16,18 +17,30 @@ const OnlineHoldemGame: React.FC<{ tableId: string; userId: string; onLeave: () 
   const [error, setError] = useState('');
   const [animating, setAnimating] = useState(false);
   const previousRef = useRef<{ hand: number; board: number; actor: number } | null>(null);
+  const versionRef = useRef(0);
+  const refreshTimerRef = useRef<number | null>(null);
 
   const load = useCallback(async () => {
     const { data, error } = await getSupabase().functions.invoke('holdem-game', { body: { tableId, action: 'state' } });
     if (error || data?.error) throw new Error(data?.error || error?.message);
-    setState(data.state); setVersion(data.version);
+    const nextVersion = Number(data.version ?? 0);
+    if (nextVersion < versionRef.current) return;
+    setState(data.state); setVersion(nextVersion); versionRef.current = nextVersion;
   }, [tableId]);
 
   useEffect(() => {
     void load().catch((loadError) => setError(loadError.message));
     const db = getSupabase();
-    const channel = db.channel(`holdem-game-${tableId}`).on('postgres_changes', { event: '*', schema: 'public', table: 'holdem_game_snapshots', filter: `table_id=eq.${tableId}` }, () => void load()).subscribe();
-    return () => { void db.removeChannel(channel); };
+    const channel = db.channel(`holdem-game-${tableId}`).on('postgres_changes', { event: '*', schema: 'public', table: 'holdem_game_snapshots', filter: `table_id=eq.${tableId}` }, (payload) => {
+      const nextVersion = Number((payload.new as { version?: number } | null)?.version ?? 0);
+      if (nextVersion && nextVersion <= versionRef.current) return;
+      if (refreshTimerRef.current) window.clearTimeout(refreshTimerRef.current);
+      refreshTimerRef.current = window.setTimeout(() => void load(), 45);
+    }).subscribe();
+    return () => {
+      if (refreshTimerRef.current) window.clearTimeout(refreshTimerRef.current);
+      void db.removeChannel(channel);
+    };
   }, [load, tableId]);
 
   useEffect(() => {
@@ -47,7 +60,9 @@ const OnlineHoldemGame: React.FC<{ tableId: string; userId: string; onLeave: () 
     try {
       const { data, error } = await getSupabase().functions.invoke('holdem-game', { body: { tableId, action, raiseTo, expectedVersion: version } });
       if (error || data?.error) throw new Error(data?.error || error?.message);
-      setState(data.state); setVersion(data.version);
+      const nextVersion = Number(data.version ?? 0);
+      if (nextVersion < versionRef.current) return;
+      setState(data.state); setVersion(nextVersion); versionRef.current = nextVersion;
     } catch (actionError) {
       setError(actionError instanceof Error ? actionError.message : 'Action failed');
       void load();
@@ -60,9 +75,7 @@ const OnlineHoldemGame: React.FC<{ tableId: string; userId: string; onLeave: () 
   const actor = state.players[state.actor];
   const myTurn = actor?.id === userId;
   const call = Math.max(0, state.currentBet - (me?.bet || 0));
-  const funded = state.players.filter((player) => !player.folded);
-  const sbIndex = funded.length === 2 ? state.dealer : (state.dealer + 1) % state.players.length;
-  const bbIndex = (sbIndex + 1) % state.players.length;
+  const { smallBlindSeat: sbIndex, bigBlindSeat: bbIndex } = resolveBlindPositions(state.players, state.dealer, state.smallBlindSeat, state.bigBlindSeat);
   const tablePlayers = state.players.map((player) => ({
     id: player.id,
     hand: player.hand.map((card, index) => ({ id: `${state.hand}-${player.id}-${index}`, rank: card ? ranks[card.r] || String(card.r) : '', suit: card ? suits[card.s] || card.s : '' })),

@@ -14,7 +14,7 @@ const PADS: { name: string; key: string; tone: number }[] = [
 const randomPad = (): PadIndex => Math.floor(Math.random() * PADS.length) as PadIndex;
 const sequenceSpeed = (length: number) => Math.max(300, 720 - (length - 1) * 24);
 
-const RubiksCubeGame: React.FC = () => {
+const ColorRecallGame: React.FC = () => {
   const [phase, setPhase] = useState<GamePhase>('IDLE');
   const [sequence, setSequence] = useState<PadIndex[]>([]);
   const [inputIndex, setInputIndex] = useState(0);
@@ -196,4 +196,4 @@ const RubiksCubeGame: React.FC = () => {
   );
 };
 
-export default RubiksCubeGame;
+export default ColorRecallGame;

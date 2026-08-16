@@ -173,6 +173,23 @@ const ConnectFourGame: React.FC<ConnectFourProps> = ({ playMode, playerNames }) 
           onColumnClick={handlePlayerClick}
         />
       </div>
+      <details className="w-full max-w-[720px] rounded-lg border border-blue-300/20 bg-black/20 p-2 text-left text-xs text-blue-100">
+        <summary className="cursor-pointer font-bold">Keyboard-friendly column controls</summary>
+        <div className="mt-2 grid grid-cols-7 gap-1">
+          {Array.from({ length: COLS }, (_, column) => (
+            <button
+              key={column}
+              type="button"
+              onClick={() => handlePlayerClick(column)}
+              disabled={isAnimating || gameState !== 'playing' || Boolean(board[0][column]) || (playMode === 'vsComputer' && currentPlayer === '2')}
+              className="min-h-10 rounded-md border border-blue-300/30 bg-blue-950/70 font-black disabled:opacity-35"
+              aria-label={`Drop a piece in column ${column + 1}`}
+            >
+              {column + 1}
+            </button>
+          ))}
+        </div>
+      </details>
       {gameState === 'gameOver' ? (
         <div className="flex flex-col items-center gap-3 text-white text-center animate-pop-in">
           {winner && <p className="text-sm opacity-80">{winner === '1' ? p1Name : p2Name} chooses who starts next:</p>}
