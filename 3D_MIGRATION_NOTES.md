@@ -151,6 +151,15 @@ Convert every game's actual playable surface and pieces to interactive 3D. The e
 - Made the shared poker camera pull back on narrow phone layouts so the complete table remains visible rather than cropping side seats.
 - Retained the online seat HUD, pot/message state, blind/all-in badges and fold/call/raise/all-in controls above the 3D surface.
 
+## Thirteenth graphics pass — phone screenshot repairs
+
+- Used the user's live Android screenshots as the framing reference instead of relying only on desktop layout assumptions.
+- Rebuilt Slots drums with nine continuous textured symbol tiles per reel, keeping faces visible around the rotating arc; all five reels now fit narrow cameras and the phone stage is shorter.
+- Ocean Hunter's camera now frames the 19-unit gameplay world closely and its backdrop fills the complete view, removing the large empty side panels and making targets substantially larger.
+- Coin Pusher switches to a near top-down camera and shorter shelf aspect on phones, prioritizing the coin field instead of empty cabinet depth.
+- Keno's phone canvas is reduced from 540px to 360px tall now that projected labels keep the complete 1–80 board readable.
+- Plinko's mobile hub uses tighter gaps, settings panels and action padding so the actual board appears much sooner without removing controls.
+
 ## Planned conversion order
 
 1. Tic-Tac-Toe, Connect Four and Mancala board batch: complete and build-tested.

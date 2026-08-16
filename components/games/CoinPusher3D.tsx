@@ -29,7 +29,7 @@ const CoinPusher3D: React.FC<{ frame: Frame; bumpersActive: boolean; aimPercent:
       const aim = new THREE.Mesh(new THREE.CylinderGeometry(.045, .045, 1.2, 10), new THREE.MeshBasicMaterial({ color: 0x67d6ff, transparent: true, opacity: .78 })); aim.position.y = 1.2; cabinet.add(aim);
       const coinMeshes = new Map<number, Mesh>(); const bumperMeshes: Mesh[] = [];
       [[82, 318], [160, 346], [238, 318], [112, 376], [208, 376]].forEach(([x, y]) => { const bumper = new THREE.Mesh(new THREE.CylinderGeometry(.34, .42, .32, 24), new THREE.MeshStandardMaterial({ color: 0x66dfff, emissive: 0x1d9fc9, emissiveIntensity: .75, metalness: .55, roughness: .18 })); bumper.position.set((x / 320 - .5) * 7, .13, (y / 420 - .5) * 8.8); bumper.visible = false; cabinet.add(bumper); bumperMeshes.push(bumper); });
-      const observer = new ResizeObserver(() => { const rect = canvas.getBoundingClientRect(); if (!rect.width || !rect.height) return; renderer.setSize(rect.width, rect.height, false); camera.aspect = rect.width / rect.height; camera.updateProjectionMatrix(); }); observer.observe(canvas);
+      const observer = new ResizeObserver(() => { const rect = canvas.getBoundingClientRect(); if (!rect.width || !rect.height) return; renderer.setSize(rect.width, rect.height, false); camera.aspect = rect.width / rect.height; if (rect.width < 520) { camera.position.set(0, 11.8, 4.2); camera.lookAt(0, 0, .55); } else { camera.position.set(0, 8.6, 8.2); camera.lookAt(0, 0, .6); } camera.updateProjectionMatrix(); }); observer.observe(canvas);
       let frameId = 0; let last = performance.now();
       const animate = (now: number) => {
         const delta = Math.min(.04, (now - last) / 1000); last = now; const smooth = 1 - Math.exp(-18 * delta);

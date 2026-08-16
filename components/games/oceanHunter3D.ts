@@ -327,7 +327,7 @@ export class OceanHunter3DRenderer {
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     this.scene.background = new THREE.Color(0x031a2a);
     this.scene.fog = new THREE.FogExp2(0x03263b, .038);
-    this.camera.position.set(0, 0, 23.5);
+    this.camera.position.set(0, 0, 14.2);
 
     this.scene.add(new THREE.HemisphereLight(0x84eaff, 0x031018, 2.4));
     const key = new THREE.DirectionalLight(0xc8f6ff, 3.3);
@@ -381,7 +381,7 @@ export class OceanHunter3DRenderer {
     loader.load(backgroundUrl, texture => {
       if (this.disposed) { texture.dispose(); return; }
       texture.colorSpace = THREE.SRGBColorSpace;
-      const backdrop = mesh(new THREE.PlaneGeometry(25, 14.6), new THREE.MeshBasicMaterial({ map: texture, color: 0x8bc9dc }));
+      const backdrop = mesh(new THREE.PlaneGeometry(35, 20.5), new THREE.MeshBasicMaterial({ map: texture, color: 0x8bc9dc }));
       backdrop.position.z = -8;
       this.background = backdrop;
       this.scene.add(backdrop);

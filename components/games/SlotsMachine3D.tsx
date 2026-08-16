@@ -86,15 +86,18 @@ const SlotsMachine3D: React.FC<{
         stateRef.current.reels.forEach((reel, reelIndex) => {
           const final = reel.symbols.slice(-3);
           final.forEach((symbol, row) => {
-            const texture = new THREE.CanvasTexture(symbolCanvas(symbol)); texture.colorSpace = THREE.SRGBColorSpace;
-            const material = new THREE.MeshStandardMaterial({ map: texture, roughness: .38, emissive: 0x000000 });
-            const card = new THREE.Mesh(new THREE.BoxGeometry(1.5, 1.62, .12), material);
-            card.position.set(0, 1.68 - row * 1.68, 1.42); card.userData.row = row; card.castShadow = true;
-            reelGroups[reelIndex].add(card); symbolMeshes.set(`${reelIndex}-${row}`, card);
+            for (let copy = -1; copy <= 1; copy += 1) {
+              const texture = new THREE.CanvasTexture(symbolCanvas(symbol)); texture.colorSpace = THREE.SRGBColorSpace;
+              const face = new THREE.MeshStandardMaterial({ map: texture, roughness: .3, metalness: .04, emissive: 0x000000 });
+              const edge = new THREE.MeshStandardMaterial({ color: 0xa9a3af, roughness: .3, metalness: .2 });
+              const card = new THREE.Mesh(new THREE.BoxGeometry(1.5, 1.5, .11), [edge, edge, face, face, face, face]);
+              card.position.set(0, 1.68 - row * 1.68, 1.42); card.userData.row = row; card.userData.copy = copy; card.userData.slot = row + copy * 3; card.castShadow = true;
+              reelGroups[reelIndex].add(card); symbolMeshes.set(`${reelIndex}-${row}-${copy}`, card);
+            }
           });
         });
       };
-      const observer = new ResizeObserver(() => { const rect = canvas.getBoundingClientRect(); if (!rect.width || !rect.height) return; renderer.setSize(rect.width, rect.height, false); camera.aspect = rect.width / rect.height; camera.updateProjectionMatrix(); }); observer.observe(canvas);
+      const observer = new ResizeObserver(() => { const rect = canvas.getBoundingClientRect(); if (!rect.width || !rect.height) return; renderer.setSize(rect.width, rect.height, false); camera.aspect = rect.width / rect.height; camera.position.z = Math.max(12, 16.6 / camera.aspect); camera.updateProjectionMatrix(); }); observer.observe(canvas);
       const raycaster = new THREE.Raycaster(); const pointer = new THREE.Vector2();
       const pick = (event: PointerEvent) => { const rect = canvas.getBoundingClientRect(); pointer.set(((event.clientX - rect.left) / rect.width) * 2 - 1, -((event.clientY - rect.top) / rect.height) * 2 + 1); pointerTarget.copy(pointer); raycaster.setFromCamera(pointer, camera); const hit = raycaster.intersectObjects([leverBall, spinPad], false)[0]; canvas.style.cursor = hit && !stateRef.current.disabled ? 'pointer' : 'default'; return hit; };
       const activate = (event: PointerEvent) => { const hit = pick(event); if (!hit || stateRef.current.disabled) return; pullUntil = performance.now() + 520; stateRef.current.onSpin(); };
@@ -118,16 +121,16 @@ const SlotsMachine3D: React.FC<{
           reelGroups[reelIndex].position.y = landingAge >= 0 && landingAge < .65 ? Math.sin(landingAge * Math.PI * 8) * Math.exp(-landingAge * 7) * .2 : 0;
           symbolMeshes.forEach((mesh, key) => {
             if (!key.startsWith(`${reelIndex}-`)) return;
-            const row = Number(mesh.userData.row); const winning = live.winningPositions.includes(`${reelIndex}-${row}`);
-            const material = mesh.material as InstanceType<typeof THREE.MeshStandardMaterial>; material.emissive.setHex(winning ? 0xffc928 : 0x000000); material.emissiveIntensity = winning ? .75 + Math.sin(now * .012) * .25 : 0;
+            const row = Number(mesh.userData.row); const primary = Number(mesh.userData.copy) === 0; const winning = primary && live.winningPositions.includes(`${reelIndex}-${row}`);
+            const materials = mesh.material as InstanceType<typeof THREE.MeshStandardMaterial>[]; const face = materials[2]; face.emissive.setHex(winning ? 0xffc928 : 0x000000); face.emissiveIntensity = winning ? .75 + Math.sin(now * .012) * .25 : 0;
             if (reel.spinning) {
-              const cycle = ((row + reelPhase[reelIndex]) % 3 + 3) % 3;
-              const angle = (cycle - 1) * .79;
+              const cycle = ((Number(mesh.userData.slot) + reelPhase[reelIndex]) % 9 + 9) % 9;
+              const angle = (cycle - 4) * (Math.PI * 2 / 9);
               mesh.position.y = -Math.sin(angle) * 2.32; mesh.position.z = Math.cos(angle) * 1.45;
-              mesh.rotation.x = angle; mesh.scale.set(1, .88 + Math.min(.08, reelVelocity[reelIndex] * .003), 1); material.opacity = .76 + Math.min(.16, reelVelocity[reelIndex] * .006); material.transparent = true;
+              mesh.rotation.x = angle * .42; mesh.scale.set(1, .91, 1); mesh.visible = Math.cos(angle) > -.42; materials.forEach((material) => { material.opacity = .9; material.transparent = true; });
             } else {
-              mesh.position.y += ((1.68 - row * 1.68) - mesh.position.y) * settle; mesh.position.z += (1.42 - mesh.position.z) * settle;
-              mesh.rotation.x *= 1 - settle; mesh.scale.setScalar(winning ? 1 + Math.sin(now * .01) * .045 : 1); material.opacity = 1; material.transparent = false;
+              mesh.visible = primary;
+              if (primary) { mesh.position.y += ((1.68 - row * 1.68) - mesh.position.y) * settle; mesh.position.z += (1.42 - mesh.position.z) * settle; mesh.rotation.x *= 1 - settle; mesh.scale.setScalar(winning ? 1 + Math.sin(now * .01) * .045 : 1); materials.forEach((material) => { material.opacity = 1; material.transparent = false; }); }
             }
           });
         });

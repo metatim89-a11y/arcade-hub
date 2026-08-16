@@ -183,7 +183,7 @@ const KenoGame: React.FC = () => {
   return (
     <div className="flex flex-col items-center gap-4 text-center p-2 md:p-4">
       <div><h2 className="text-3xl font-bold" style={{ color: 'var(--primary-text-color)' }}>Keno</h2><small className="text-gray-400">90% RTP · payout changes with picks</small></div>
-      <div className={`h-[620px] w-full max-w-[840px] overflow-hidden rounded-3xl shadow-[0_28px_70px_rgba(0,0,0,.48)] max-sm:h-[540px] ${phase === 'drawing' ? 'keno-drawing-grid' : ''}`}>
+      <div className={`h-[480px] w-full max-w-[840px] overflow-hidden rounded-3xl shadow-[0_28px_70px_rgba(0,0,0,.48)] max-sm:h-[360px] ${phase === 'drawing' ? 'keno-drawing-grid' : ''}`}>
         <KenoBoard3D selected={selectedNumbers} drawn={drawnNumbers} phase={phase} onNumberClick={toggleNumber} />
       </div>
       <div className="bg-black/20 p-3 rounded-lg text-center w-full min-h-[40px] flex items-center justify-center text-yellow-300 font-semibold">{feedback}</div>
