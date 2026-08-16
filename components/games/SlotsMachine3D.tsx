@@ -57,6 +57,13 @@ const SlotsMachine3D: React.FC<{
         const axle = new THREE.Mesh(new THREE.CylinderGeometry(.14, .14, 1.65, 18), gold); axle.rotation.z = Math.PI / 2; group.add(axle);
       }
       const glass = new THREE.Mesh(new THREE.BoxGeometry(8.78, 5.45, .035), new THREE.MeshPhysicalMaterial({ color: 0xb98cff, transparent: true, opacity: .1, transmission: .45, roughness: .08, metalness: .08 })); glass.position.z = 1.58; machine.add(glass);
+      const paylines: Mesh[] = [];
+      [1.68, 0, -1.68].forEach((y) => {
+        const line = new THREE.Mesh(new THREE.BoxGeometry(8.45, .035, .035), new THREE.MeshBasicMaterial({ color: 0xffdf62, transparent: true, opacity: 0, depthTest: false }));
+        line.position.set(0, y, 1.64); line.renderOrder = 20; machine.add(line); paylines.push(line);
+      });
+      const tray = new THREE.Mesh(new THREE.BoxGeometry(5.2, .46, 1.25), new THREE.MeshStandardMaterial({ color: 0x0a0710, metalness: .65, roughness: .22 }));
+      tray.position.set(-.55, -3.7, .72); tray.rotation.x = -.16; machine.add(tray);
       const marqueeTexture = new THREE.CanvasTexture(symbolCanvas('⚡')); marqueeTexture.colorSpace = THREE.SRGBColorSpace;
       const marquee = new THREE.Mesh(new THREE.BoxGeometry(3.1, .72, .2), new THREE.MeshStandardMaterial({ map: marqueeTexture, emissive: 0x9d2bd1, emissiveIntensity: .32 })); marquee.position.set(0, 3.65, .2); machine.add(marquee);
       const lever = new THREE.Group(); lever.position.set(5.05, .65, .05); machine.add(lever);
@@ -73,6 +80,7 @@ const SlotsMachine3D: React.FC<{
         const coin = new THREE.Mesh(new THREE.CylinderGeometry(.12, .12, .035, 16), gold); coin.rotation.x = Math.PI / 2; coin.visible = false; machine.add(coin); winCoins.push(coin);
       }
       const symbolMeshes = new Map<string, Mesh>(); let signature = ''; let pullUntil = 0; let winBurstAt = 0; let previousWinSignature = ''; const pointerTarget = new THREE.Vector2();
+      const reelVelocity = Array(5).fill(0) as number[]; const reelPhase = Array(5).fill(0) as number[]; const wasSpinning = Array(5).fill(false) as boolean[]; const landingAt = Array(5).fill(0) as number[];
       const rebuildSymbols = () => {
         symbolMeshes.forEach((mesh) => { mesh.parent?.remove(mesh); dispose(mesh); }); symbolMeshes.clear();
         stateRef.current.reels.forEach((reel, reelIndex) => {
@@ -94,22 +102,29 @@ const SlotsMachine3D: React.FC<{
       let frame = 0; let last = performance.now();
       const animate = (now: number) => {
         const delta = Math.min(.04, (now - last) / 1000); last = now; const smooth = 1 - Math.exp(-8 * delta); const settle = 1 - Math.exp(-16 * delta);
-        const live = stateRef.current; const next = live.reels.map((reel) => `${reel.symbols.slice(-3).join('')}:${reel.spinning}`).join('|'); if (next !== signature) { signature = next; rebuildSymbols(); }
+        const live = stateRef.current; const next = live.reels.map((reel) => reel.symbols.slice(-3).join('')).join('|'); if (next !== signature) { signature = next; rebuildSymbols(); }
         const winSignature = live.winningPositions.join('|');
         if (winSignature && winSignature !== previousWinSignature) winBurstAt = now;
         previousWinSignature = winSignature;
         const spinningCount = live.reels.filter((reel) => reel.spinning).length;
         live.reels.forEach((reel, reelIndex) => {
-          drums[reelIndex].rotation.x += delta * (reel.spinning ? 19.2 + reelIndex * 1.08 : .24);
+          if (wasSpinning[reelIndex] && !reel.spinning) landingAt[reelIndex] = now;
+          wasSpinning[reelIndex] = reel.spinning;
+          const speedTarget = reel.spinning ? 22 + reelIndex * 1.25 : 0;
+          reelVelocity[reelIndex] += (speedTarget - reelVelocity[reelIndex]) * (1 - Math.exp(-(reel.spinning ? 5.5 : 11) * delta));
+          reelPhase[reelIndex] += reelVelocity[reelIndex] * delta * .34;
+          drums[reelIndex].rotation.x += delta * (reelVelocity[reelIndex] + .18);
+          const landingAge = (now - landingAt[reelIndex]) / 1000;
+          reelGroups[reelIndex].position.y = landingAge >= 0 && landingAge < .65 ? Math.sin(landingAge * Math.PI * 8) * Math.exp(-landingAge * 7) * .2 : 0;
           symbolMeshes.forEach((mesh, key) => {
             if (!key.startsWith(`${reelIndex}-`)) return;
             const row = Number(mesh.userData.row); const winning = live.winningPositions.includes(`${reelIndex}-${row}`);
             const material = mesh.material as InstanceType<typeof THREE.MeshStandardMaterial>; material.emissive.setHex(winning ? 0xffc928 : 0x000000); material.emissiveIntensity = winning ? .75 + Math.sin(now * .012) * .25 : 0;
             if (reel.spinning) {
-              const cycle = ((row + now * (.0068 + reelIndex * .00015)) % 3 + 3) % 3;
+              const cycle = ((row + reelPhase[reelIndex]) % 3 + 3) % 3;
               const angle = (cycle - 1) * .79;
               mesh.position.y = -Math.sin(angle) * 2.32; mesh.position.z = Math.cos(angle) * 1.45;
-              mesh.rotation.x = angle; mesh.scale.set(1, .9, 1); material.opacity = .82; material.transparent = true;
+              mesh.rotation.x = angle; mesh.scale.set(1, .88 + Math.min(.08, reelVelocity[reelIndex] * .003), 1); material.opacity = .76 + Math.min(.16, reelVelocity[reelIndex] * .006); material.transparent = true;
             } else {
               mesh.position.y += ((1.68 - row * 1.68) - mesh.position.y) * settle; mesh.position.z += (1.42 - mesh.position.z) * settle;
               mesh.rotation.x *= 1 - settle; mesh.scale.setScalar(winning ? 1 + Math.sin(now * .01) * .045 : 1); material.opacity = 1; material.transparent = false;
@@ -119,6 +134,7 @@ const SlotsMachine3D: React.FC<{
         const themeColor = live.theme === 'power' ? 0xffb31f : live.theme === 'free' ? 0x38e6c4 : 0xec50ff;
         pink.color.setHex(themeColor); (marquee.material as InstanceType<typeof THREE.MeshStandardMaterial>).emissive.setHex(themeColor);
         lights.forEach((bulb, index) => { const material = bulb.material as InstanceType<typeof THREE.MeshStandardMaterial>; material.color.setHex(themeColor); material.emissive.setHex(themeColor); material.emissiveIntensity = (live.anticipation ? 2.2 : 1.05) + Math.sin(now * (live.anticipation ? .02 : .006) + index) * .65; });
+        paylines.forEach((line, row) => { const material = line.material as InstanceType<typeof THREE.MeshBasicMaterial>; const active = live.winningPositions.some((position) => position.endsWith(`-${row}`)); material.color.setHex(themeColor); material.opacity = active ? .42 + Math.sin(now * .018 + row) * .3 : live.anticipation ? .08 + Math.sin(now * .012 + row) * .05 : 0; line.scale.x = active ? .98 + Math.sin(now * .01) * .02 : 1; });
         const pullProgress = Math.max(0, Math.min(1, (pullUntil - now) / 520)); lever.rotation.z = -Math.sin(pullProgress * Math.PI) * .72;
         spinPad.scale.setScalar(live.disabled ? .88 : 1 + Math.sin(now * .004) * .035);
         (spinPad.material as InstanceType<typeof THREE.MeshStandardMaterial>).emissiveIntensity = live.disabled ? .08 : .42 + Math.sin(now * .006) * .16;

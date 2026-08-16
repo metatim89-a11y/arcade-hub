@@ -125,6 +125,16 @@ Convert every game's actual playable surface and pieces to interactive 3D. The e
 - Made Plinko physics time-based across variable refresh rates, initialized new 3D balls at their authoritative coordinates, and tightened frame-rate-independent interpolation to eliminate catch-up jumps.
 - Replaced Keno's camera-facing sprites with explicit top-facing number planes at a forced render order so 1–80 remain visible above every chip across mobile WebGL implementations.
 
+## Tenth graphics pass — Slots and Ocean Hunter
+
+- Slots reels now keep independent eased velocities and rotation phases, avoiding mesh rebuilds as each reel stops and adding a damped physical landing bounce per reel.
+- Added state-driven 3D payline beams, a modeled payout tray, speed-responsive symbol curvature/opacity, and retained the existing interactive lever and cabinet spin control.
+- Ocean Hunter now includes animated floor caustics and suspended particulate layers for stronger water depth.
+- Weapon meshes now vary by type, align to their actual trajectory, and drive physical cannon recoil when fired.
+- Creature bodies have subtle swim-volume motion and pulsing target locks, while the camera eases toward the human player's locked target without changing aim or hit logic.
+- Pulled the Spin Wheel camera back far enough to keep its complete modeled rim and pointer inside the circular cabinet at every supported size.
+- Keno number positions are now projected from each live 3D chip into a synchronized high-contrast HTML label layer, guaranteeing readable 1–80 values even on devices that fail WebGL canvas textures.
+
 ## Planned conversion order
 
 1. Tic-Tac-Toe, Connect Four and Mancala board batch: complete and build-tested.

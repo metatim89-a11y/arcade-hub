@@ -29,7 +29,7 @@ const SpinWheel3D: React.FC<{
     void import('three').then((THREE) => {
       if (cancelled) return;
       const renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true }); renderer.setPixelRatio(Math.min(devicePixelRatio, 1.65)); renderer.outputColorSpace = THREE.SRGBColorSpace; renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.25; renderer.shadowMap.enabled = true;
-      const scene = new THREE.Scene(); const camera = new THREE.PerspectiveCamera(36, 1, .1, 40); camera.position.set(0, .15, 12); camera.lookAt(0, 0, 0);
+      const scene = new THREE.Scene(); const camera = new THREE.PerspectiveCamera(36, 1, .1, 40); camera.position.set(0, .15, 15.6); camera.lookAt(0, 0, 0);
       scene.add(new THREE.HemisphereLight(0xffefc9, 0x0b0b13, 2.5)); const key = new THREE.DirectionalLight(0xffffff, 5); key.position.set(-5, 7, 8); key.castShadow = true; scene.add(key);
       const wheel = new THREE.Group(); scene.add(wheel); const sliceAngle = Math.PI * 2 / segments.length;
       const wedges: Mesh[] = [];

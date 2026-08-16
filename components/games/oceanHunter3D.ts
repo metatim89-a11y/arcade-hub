@@ -310,6 +310,9 @@ export class OceanHunter3DRenderer {
   private background: THREE.Mesh | null = null;
   private seaPlants: THREE.Group[] = [];
   private bubbles: THREE.Mesh[] = [];
+  private caustics: THREE.Mesh[] = [];
+  private suspendedMotes: THREE.Mesh[] = [];
+  private cameraFocus = new THREE.Vector3();
   private lastRenderTime = 0;
   private disposed = false;
 
@@ -358,6 +361,16 @@ export class OceanHunter3DRenderer {
       const bubble = mesh(new THREE.SphereGeometry(.035 + index % 5 * .013, 10, 7), bubbleMaterial);
       bubble.position.set(-9 + (index * 4.17) % 18, -6 + (index * 2.37) % 12, -5 + index % 7 * .72);
       bubble.userData.speed = .38 + index % 6 * .08; bubble.userData.phase = index * .83; this.scene.add(bubble); this.bubbles.push(bubble);
+    }
+    const causticMaterial = new THREE.MeshBasicMaterial({ color: 0x6ce7ef, transparent: true, opacity: .09, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide });
+    for (let index = 0; index < 15; index += 1) {
+      const ring = mesh(new THREE.RingGeometry(.18 + index % 3 * .08, .27 + index % 3 * .11, 20), causticMaterial.clone());
+      ring.rotation.x = -Math.PI / 2.35; ring.position.set(-11 + (index * 3.31) % 22, -6.82 + index % 2 * .04, -2.3 - index % 5 * .55); ring.scale.set(2.2 + index % 4, .7 + index % 3 * .2, 1); ring.userData.phase = index * .61; this.scene.add(ring); this.caustics.push(ring);
+    }
+    const moteGeometry = new THREE.IcosahedronGeometry(.018, 0);
+    const moteMaterial = new THREE.MeshBasicMaterial({ color: 0xb8f4ff, transparent: true, opacity: .34, depthWrite: false });
+    for (let index = 0; index < 72; index += 1) {
+      const mote = mesh(moteGeometry, moteMaterial.clone()); mote.position.set(-10 + (index * 4.73) % 20, -5.8 + (index * 2.17) % 11.6, -5 + index % 11 * .62); mote.userData.phase = index * 1.37; mote.userData.speed = .08 + index % 7 * .025; this.scene.add(mote); this.suspendedMotes.push(mote);
     }
     for (let index = 0; index < 3; index += 1) {
       const ray = mesh(new THREE.ConeGeometry(2.1 + index * .5, 16, 4, 1, true), new THREE.MeshBasicMaterial({ color: 0x75ddff, transparent: true, opacity: .028, depthWrite: false, side: THREE.DoubleSide }));
@@ -421,6 +434,9 @@ export class OceanHunter3DRenderer {
       const targetPitch = Math.sin(fish.age * 1.7 + fish.phase) * .045 + THREE.MathUtils.clamp(depthVelocity * 18, -.32, .32);
       rig.body.rotation.x += (targetPitch - rig.body.rotation.x) * turnSmooth;
       rig.body.position.y += (Math.sin(fish.age * 2.4 + fish.phase) * .08 - rig.body.position.y) * smooth;
+      const swimPulse = 1 + Math.sin(fish.age * 3.1 + fish.phase) * .018;
+      rig.body.scale.y += (swimPulse - rig.body.scale.y) * smooth;
+      rig.body.scale.z += ((2 - swimPulse) - rig.body.scale.z) * smooth;
       rig.animated.forEach((part, index) => {
         part.rotation.y = Math.sin(fish.age * (fish.behavior === 'dart' ? 10 : 6.4) + fish.phase + index * .55) * (.22 + index % 3 * .055);
         if (fish.emoji === '🪼' || fish.emoji === '🦑' || fish.emoji === '🐙') part.rotation.z = Math.sin(fish.age * 3.5 + index) * .16;
@@ -431,7 +447,7 @@ export class OceanHunter3DRenderer {
       rig.healthFill.scale.x = Math.max(.01, fish.currentHp / fish.hp);
       rig.healthFill.position.x = -.71 * (1 - rig.healthFill.scale.x);
       rig.targetRing.visible = [...frame.targets.values()].includes(fish.id);
-      if (rig.targetRing.visible) rig.targetRing.rotation.z = frame.time * .0016;
+      if (rig.targetRing.visible) { rig.targetRing.rotation.z = frame.time * .0016; rig.targetRing.scale.setScalar(1 + Math.sin(frame.time * .009) * .1); }
       const flashing = frame.time < fish.flashUntil;
       rig.root.traverse(value => {
         const item = value as THREE.Mesh;
@@ -450,11 +466,15 @@ export class OceanHunter3DRenderer {
       let value = this.bullets.get(bullet.id);
       if (!value) {
         const color = bullet.weapon === 'Freeze' ? 0xa9f3ff : bullet.weapon === 'Piercing' ? 0xff79ec : colorOf(bullet.color).getHex();
-        value = mesh(new THREE.SphereGeometry(bullet.weapon === 'Torpedo' ? .13 : .09, 12, 8), material(color, .18, .35, color));
+        value = mesh(bullet.weapon === 'Torpedo' ? new THREE.CapsuleGeometry(.09, .36, 5, 10) : new THREE.SphereGeometry(.09, 14, 9), material(color, .12, .4, color));
+        value.scale.set(bullet.weapon === 'Piercing' ? 2.7 : 1.6, bullet.weapon === 'Torpedo' ? 1.35 : 1, 1);
         value.position.copy(this.worldPoint(bullet.x, bullet.y, 1.18));
         this.bullets.set(bullet.id, value); this.scene.add(value);
+        const cannon = this.cannons.get(bullet.ownerId); if (cannon) cannon.userData.recoil = 1;
       }
       value.position.lerp(this.worldPoint(bullet.x, bullet.y, 1.18), smooth);
+      const bulletAngle = Math.atan2(-(bullet.y - bullet.previousY), bullet.x - bullet.previousX);
+      value.rotation.z = bullet.weapon === 'Torpedo' ? bulletAngle - Math.PI / 2 : bulletAngle;
     }
   }
 
@@ -497,6 +517,8 @@ export class OceanHunter3DRenderer {
       const aim = target || frame.aims.get(hunter.id) || { x: GAME_WIDTH / 2, y: GAME_HEIGHT / 2 };
       const targetRotation = Math.atan2(origin.y - aim.y, aim.x - origin.x);
       cannon.rotation.z += Math.atan2(Math.sin(targetRotation - cannon.rotation.z), Math.cos(targetRotation - cannon.rotation.z)) * smooth;
+      cannon.userData.recoil = Number(cannon.userData.recoil || 0) * (1 - smooth * .82);
+      const barrel = cannon.children[1]; if (barrel) barrel.position.x += ((.42 - Number(cannon.userData.recoil) * .2) - barrel.position.x) * smooth;
     }
   }
 
@@ -513,11 +535,17 @@ export class OceanHunter3DRenderer {
     this.renderer.toneMappingExposure = darkness ? .58 : frame.environment === 'Current' ? 1.24 : 1.05;
     this.seaPlants.forEach((plant) => { plant.rotation.z = Math.sin(frame.time * .001 * Number(plant.userData.speed) + Number(plant.userData.phase)) * .13; });
     this.bubbles.forEach((bubble) => { bubble.position.y += Number(bubble.userData.speed) * delta; bubble.position.x += Math.sin(frame.time * .0012 + Number(bubble.userData.phase)) * delta * .05; if (bubble.position.y > 6.6) bubble.position.y = -6.4; });
+    this.caustics.forEach((ring, index) => { ring.rotation.z += delta * (.08 + index % 3 * .025); ring.scale.x = 2.5 + index % 4 + Math.sin(frame.time * .0008 + Number(ring.userData.phase)) * .5; (ring.material as THREE.MeshBasicMaterial).opacity = (darkness ? .025 : .06) + Math.sin(frame.time * .0014 + index) * .025; });
+    this.suspendedMotes.forEach((mote) => { mote.position.y += Number(mote.userData.speed) * delta; mote.position.x += Math.sin(frame.time * .00065 + Number(mote.userData.phase)) * delta * .025; if (mote.position.y > 6.2) mote.position.y = -6.1; });
     const shakeX = Math.sin(frame.time * .081) * frame.shake * .0022; const shakeY = Math.cos(frame.time * .073) * frame.shake * .0018;
-    this.camera.position.x += (Math.sin(frame.time * .00012) * .16 + shakeX - this.camera.position.x) * turnSmooth;
-    this.camera.position.y += (Math.cos(frame.time * .00015) * .1 + shakeY - this.camera.position.y) * turnSmooth;
+    const trackedIds = frame.hunters.filter(hunter => hunter.isHuman).map(hunter => frame.targets.get(hunter.id)).filter((id): id is number => Boolean(id));
+    const tracked = trackedIds.length ? frame.fish.find(fish => fish.id === trackedIds[0]) : undefined;
+    const desiredFocus = tracked ? this.worldPoint(tracked.x, tracked.y, tracked.depth).multiplyScalar(.1) : new THREE.Vector3();
+    this.cameraFocus.lerp(desiredFocus, 1 - Math.exp(-2.6 * delta));
+    this.camera.position.x += (this.cameraFocus.x + Math.sin(frame.time * .00012) * .16 + shakeX - this.camera.position.x) * turnSmooth;
+    this.camera.position.y += (this.cameraFocus.y + Math.cos(frame.time * .00015) * .1 + shakeY - this.camera.position.y) * turnSmooth;
     if (this.background) { this.background.position.x = this.camera.position.x * .14; this.background.position.y = this.camera.position.y * .12; }
-    this.camera.lookAt(0, 0, 0);
+    this.camera.lookAt(this.cameraFocus.x * .55, this.cameraFocus.y * .55, 0);
     this.renderer.render(this.scene, this.camera);
   }
 

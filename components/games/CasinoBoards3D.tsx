@@ -100,7 +100,7 @@ export const KenoBoard3D: React.FC<{
   phase: 'betting' | 'drawing' | 'results';
   onNumberClick: (number: number) => void;
 }> = ({ selected, drawn, phase, onNumberClick }) => {
-  const canvasRef = useRef<HTMLCanvasElement>(null); const stateRef = useRef({ selected, drawn, phase, onNumberClick }); stateRef.current = { selected, drawn, phase, onNumberClick };
+  const canvasRef = useRef<HTMLCanvasElement>(null); const labelRefs = useRef<Array<HTMLSpanElement | null>>([]); const stateRef = useRef({ selected, drawn, phase, onNumberClick }); stateRef.current = { selected, drawn, phase, onNumberClick };
   useEffect(() => {
     const canvas = canvasRef.current; if (!canvas) return;
     let cancelled = false; let teardown = () => undefined;
@@ -112,10 +112,9 @@ export const KenoBoard3D: React.FC<{
       const base = new THREE.Mesh(new THREE.BoxGeometry(10.7, .38, 8.7), new THREE.MeshStandardMaterial({ color: 0x131b32, metalness: .52, roughness: .3 })); base.position.y = -.3; base.receiveShadow = true; scene.add(base);
       const meshes: Mesh[] = []; const raycaster = new THREE.Raycaster(); const pointer = new THREE.Vector2(); let hovered = -1;
       for (let index = 0; index < 80; index += 1) {
-        const number = index + 1; const texture = new THREE.CanvasTexture(labelCanvas(String(number), '#172238')); texture.colorSpace = THREE.SRGBColorSpace;
+        const number = index + 1;
         const material = new THREE.MeshStandardMaterial({ color: 0x34445f, metalness: .32, roughness: .25, emissive: 0x000000 });
         const chip = new THREE.Mesh(new THREE.CylinderGeometry(.44, .44, .15, 32), material); chip.position.set((index % 10 - 4.5) * 1.02, .02, (Math.floor(index / 10) - 3.5) * 1.02); chip.userData.number = number; chip.castShadow = true;
-        const label = new THREE.Mesh(new THREE.PlaneGeometry(.72, .38), new THREE.MeshBasicMaterial({ map: texture, depthTest: false, depthWrite: false, transparent: false, toneMapped: false })); label.rotation.x = -Math.PI / 2; label.position.set(0, .105, 0); label.renderOrder = 100; chip.add(label);
         scene.add(chip); meshes.push(chip);
       }
       const pick = (event: PointerEvent) => { const rect = canvas.getBoundingClientRect(); pointer.set(((event.clientX - rect.left) / rect.width) * 2 - 1, -((event.clientY - rect.top) / rect.height) * 2 + 1); raycaster.setFromCamera(pointer, camera); const hit = raycaster.intersectObjects(meshes, false)[0]; hovered = hit ? Number(hit.object.userData.number) : -1; canvas.style.cursor = hovered > 0 && stateRef.current.phase === 'betting' ? 'pointer' : 'default'; };
@@ -123,11 +122,12 @@ export const KenoBoard3D: React.FC<{
       canvas.style.touchAction = 'none'; canvas.addEventListener('pointermove', pick); canvas.addEventListener('pointerdown', click);
       const observer = new ResizeObserver(() => { const rect = canvas.getBoundingClientRect(); if (!rect.width || !rect.height) return; renderer.setSize(rect.width, rect.height, false); camera.aspect = rect.width / rect.height; const requiredHeight = Math.max(9.3, 11.3 / camera.aspect); camera.position.y = requiredHeight / (2 * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2))); camera.updateProjectionMatrix(); }); observer.observe(canvas);
       let frame = 0; let last = performance.now();
-      const animate = (now: number) => { const delta = Math.min(.04, (now - last) / 1000); last = now; const smooth = 1 - Math.exp(-10.5 * delta); const live = stateRef.current; meshes.forEach((chip) => { const number = Number(chip.userData.number); const selected = live.selected.has(number); const drawn = live.drawn.has(number); const match = selected && drawn; const material = chip.material as InstanceType<typeof THREE.MeshStandardMaterial>; const color = match ? 0x22d785 : drawn ? 0xf1ad27 : selected ? 0x3488ef : hovered === number ? 0x536984 : 0x000000; material.emissive.setHex(color); material.emissiveIntensity = match ? .85 + Math.sin(now * .01) * .25 : color ? .42 : 0; const targetY = match ? .28 + Math.sin(now * .012 + number) * .06 : selected || drawn || hovered === number ? .18 : .02; chip.position.y += (targetY - chip.position.y) * smooth; chip.scale.setScalar(match ? 1.06 : 1); }); renderer.render(scene, camera); frame = requestAnimationFrame(animate); };
+      const projected = new THREE.Vector3();
+      const animate = (now: number) => { const delta = Math.min(.04, (now - last) / 1000); last = now; const smooth = 1 - Math.exp(-10.5 * delta); const live = stateRef.current; meshes.forEach((chip, index) => { const number = Number(chip.userData.number); const selected = live.selected.has(number); const drawn = live.drawn.has(number); const match = selected && drawn; const material = chip.material as InstanceType<typeof THREE.MeshStandardMaterial>; const color = match ? 0x22d785 : drawn ? 0xf1ad27 : selected ? 0x3488ef : hovered === number ? 0x536984 : 0x000000; material.emissive.setHex(color); material.emissiveIntensity = match ? .85 + Math.sin(now * .01) * .25 : color ? .42 : 0; const targetY = match ? .28 + Math.sin(now * .012 + number) * .06 : selected || drawn || hovered === number ? .18 : .02; chip.position.y += (targetY - chip.position.y) * smooth; chip.scale.setScalar(match ? 1.06 : 1); const label = labelRefs.current[index]; if (label) { chip.getWorldPosition(projected); projected.project(camera); label.style.left = `${(projected.x + 1) * 50}%`; label.style.top = `${(-projected.y + 1) * 50}%`; label.style.opacity = '1'; } }); renderer.render(scene, camera); frame = requestAnimationFrame(animate); };
       frame = requestAnimationFrame(animate);
       teardown = () => { cancelAnimationFrame(frame); observer.disconnect(); canvas.removeEventListener('pointermove', pick); canvas.removeEventListener('pointerdown', click); dispose(scene); renderer.dispose(); };
     });
     return () => { cancelled = true; teardown(); };
   }, []);
-  return <canvas ref={canvasRef} className="h-full w-full touch-manipulation" aria-label="Interactive 3D Keno number board" />;
+  return <div className="relative h-full w-full"><canvas ref={canvasRef} className="absolute inset-0 h-full w-full touch-manipulation" aria-label="Interactive 3D Keno number board" /><div className="pointer-events-none absolute inset-0" aria-hidden="true">{Array.from({ length: 80 }, (_, index) => { const number = index + 1; const match = selected.has(number) && drawn.has(number); return <span key={number} ref={(element) => { labelRefs.current[index] = element; }} className="absolute grid -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full font-black text-white" style={{ width: 'clamp(20px,5.2vw,40px)', height: 'clamp(20px,5.2vw,40px)', opacity: 0, fontSize: 'clamp(10px,2vw,16px)', color: match ? '#d9fff0' : drawn.has(number) ? '#fff0bc' : selected.has(number) ? '#e4f2ff' : '#ffffff', textShadow: '0 1px 3px #000,0 0 5px #000' }}>{number}</span>; })}</div></div>;
 };
