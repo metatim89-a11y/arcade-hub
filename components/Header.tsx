@@ -35,7 +35,7 @@ const Header: React.FC<HeaderProps> = ({ mode, setMode, simple = false, onProfil
       </span>
   );
   const disclaimer = (
-      <div className="w-full rounded-lg border border-amber-300/35 bg-black/35 px-3 py-2 text-center text-[10px] font-bold uppercase tracking-wide text-amber-100 md:text-xs">
+      <div className="w-full rounded-lg border border-amber-300/35 bg-black/35 px-3 py-1.5 text-center text-[9px] font-bold uppercase tracking-wide text-amber-100 md:text-[10px]">
           🚧 Site building in progress · Arcade Hub does not pay out real money · All coins and RC are virtual with no cash value · Monthly cash-prize tournaments will be announced with separate official rules and eligibility requirements
       </div>
   );
@@ -57,13 +57,13 @@ const Header: React.FC<HeaderProps> = ({ mode, setMode, simple = false, onProfil
   }
 
   return (
-    <header className="relative flex flex-col gap-4 p-4 pt-7 md:p-6 md:pt-7 bg-gradient-to-r from-[#a87c4f] to-[#7e3c3c] shadow-lg border-b-2 border-yellow-400/20 w-full">
+    <header className="relative flex flex-col gap-2.5 p-3 pt-6 md:px-5 md:py-4 md:pt-6 bg-gradient-to-r from-[#a87c4f] to-[#7e3c3c] shadow-lg border-b-2 border-yellow-400/20 w-full">
       {versionButton}
       
       {/* Top Row: Title and User Controls */}
-      <div className="flex flex-wrap justify-between items-center w-full gap-4">
-        <div className="flex items-center gap-4 cursor-pointer" onClick={onHomeClick}>
-            <h1 className="text-2xl md:text-3xl tracking-wider text-yellow-400 [text-shadow:0_2px_8px_rgba(182,137,45,0.26),0_0_2px_#fff] font-bold">
+      <div className="flex flex-wrap justify-between items-center w-full gap-2.5">
+        <div className="flex items-center gap-2.5 cursor-pointer" onClick={onHomeClick}>
+            <h1 className="text-xl md:text-2xl tracking-wider text-yellow-400 [text-shadow:0_2px_8px_rgba(182,137,45,0.26),0_0_2px_#fff] font-bold">
             🎲 Game Arcade Hub
             </h1>
             <span className="hidden md:inline-block text-sm bg-black/20 text-white rounded-full px-3 py-1">
@@ -72,7 +72,7 @@ const Header: React.FC<HeaderProps> = ({ mode, setMode, simple = false, onProfil
         </div>
 
         {user && (
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2">
                 <button 
                     onClick={handleProfileClick}
                     className={`flex items-center gap-2 px-3 py-1.5 rounded-full transition-colors ${isProfileActive ? 'bg-yellow-400 text-black' : 'bg-black/30 text-white hover:bg-black/40'}`}

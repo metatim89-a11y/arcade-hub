@@ -110,6 +110,13 @@ Convert every game's actual playable surface and pieces to interactive 3D. The e
 - Mancala pits/stores were rebuilt as dark recessed wells with raised metallic wood rims and player-side guide rails; stones now read as pieces sitting inside carved spaces instead of pucks stacked on the board.
 - RPS Memory cards now have symbol-specific neon palettes, a premium patterned back, state-driven 3D flip animation, brighter edge materials and animated matched-card halos.
 
+## Eighth graphics pass — Plinko
+
+- Rebuilt the Plinko control hub as a page-palette-aware glass/metal console with clearer active controls, stronger depth and a larger cabinet presentation.
+- Upgraded the actual Three.js Plinko board with a modeled marquee, animated cabinet bulbs, larger metallic pegs, guide lines, deeper rails, bucket dividers and stronger theme lighting.
+- Ball positions now interpolate between physics frames, rotate in 3D while falling, and gently influence the cabinet camera without changing the authoritative Plinko physics or payouts.
+- Compacted both navigation layers: the site header uses less vertical padding/type size, and the game selector is now a single small horizontally scrollable row on phones instead of a large wrapped button wall.
+
 ## Planned conversion order
 
 1. Tic-Tac-Toe, Connect Four and Mancala board batch: complete and build-tested.

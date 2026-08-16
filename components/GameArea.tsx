@@ -140,12 +140,12 @@ const GameArea: React.FC<GameAreaProps> = ({ games, selectedGame, onSelectGame, 
   return (
     <div className={`flex flex-col items-center w-full py-6 md:py-8 ${activeGameProps.game.id === 'fishing' ? 'px-0 sm:px-2' : 'px-4'}`}>
       {/* Game Navigation */}
-      <nav className="flex justify-center gap-2 md:gap-4 mb-6 flex-wrap">
+      <nav className="flex w-full max-w-7xl flex-nowrap justify-start gap-1.5 overflow-x-auto pb-1 mb-3 md:justify-center" aria-label="Choose a game">
         {games.map((game) => (
           <button
             key={game.id}
             onClick={() => handleSelectGame(game)}
-            className={`text-base md:text-lg bg-gray-800 text-yellow-400 border-none py-2 px-5 md:py-2.5 md:px-7 rounded-2xl cursor-pointer shadow-md shadow-yellow-400/20 transition-all duration-200 ${
+            className={`shrink-0 text-xs md:text-sm bg-gray-800 text-yellow-400 border-none py-1.5 px-3 md:px-4 rounded-xl cursor-pointer shadow-md shadow-yellow-400/20 transition-all duration-200 ${
               selectedGame.id === game.id
                 ? 'bg-yellow-400 text-gray-800 shadow-lg shadow-yellow-400/40 scale-105'
                 : 'hover:bg-yellow-400/80 hover:text-gray-800 hover:shadow-lg hover:shadow-yellow-400/40'
@@ -157,7 +157,7 @@ const GameArea: React.FC<GameAreaProps> = ({ games, selectedGame, onSelectGame, 
       </nav>
       
       {/* Game Options */}
-      <div className="mb-6 h-auto min-h-[40px] flex flex-col items-center justify-center gap-4">
+      <div className="mb-4 h-auto min-h-[34px] flex flex-col items-center justify-center gap-2">
         <GameOptionsSelector
           mode={mode}
           playMode={playMode}
