@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { CurrencyMode } from '../../types';
 import { useCoinSystem } from '../../context/CoinContext';
+import CrashFlight3D from './CrashFlight3D';
 
 type GameState = 'IDLE' | 'COUNTDOWN' | 'FLYING' | 'CRASHED';
 
@@ -29,7 +30,6 @@ const generateCrashPoint = () => {
 
 const CrashGame: React.FC = () => {
   const { canBet, subtractCoins, addCoins, currencyMode, isProcessing } = useCoinSystem();
-  const canvasRef = useRef<HTMLCanvasElement>(null);
   const frameRef = useRef<number | null>(null);
   const countdownRef = useRef<number | null>(null);
   const shakeRef = useRef<number | null>(null);
@@ -43,14 +43,6 @@ const CrashGame: React.FC = () => {
   const roundRef = useRef<Round | null>(null);
   const autoEnabledRef = useRef(false);
   const autoTargetRef = useRef(2);
-  const starsRef = useRef(
-    Array.from({ length: 75 }, () => ({
-      x: Math.random(),
-      y: Math.random(),
-      size: 0.45 + Math.random() * 1.65,
-      speed: 0.3 + Math.random() * 0.9
-    }))
-  );
 
   const [gameState, setGameState] = useState<GameState>('IDLE');
   const [multiplier, setMultiplier] = useState(1);
@@ -75,125 +67,6 @@ const CrashGame: React.FC = () => {
     setGameState(next);
   }, []);
 
-  const drawScene = useCallback((current: number, phase: GameState, cashedOut: boolean) => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const context = canvas.getContext('2d');
-    if (!context) return;
-
-    const dpr = Math.max(1, window.devicePixelRatio || 1);
-    const width = canvas.width / dpr;
-    const height = canvas.height / dpr;
-    if (!width || !height) return;
-    context.setTransform(dpr, 0, 0, dpr, 0, 0);
-    context.clearRect(0, 0, width, height);
-
-    const sky = context.createLinearGradient(0, 0, 0, height);
-    sky.addColorStop(0, '#06121f');
-    sky.addColorStop(0.55, '#0b2032');
-    sky.addColorStop(1, '#102536');
-    context.fillStyle = sky;
-    context.fillRect(0, 0, width, height);
-
-    const elapsed = phase === 'FLYING' ? (performance.now() - startedAtRef.current) / 1000 : 0;
-    for (const star of starsRef.current) {
-      const shifted = ((star.x * width - elapsed * 18 * star.speed) % width + width) % width;
-      context.globalAlpha = 0.25 + star.speed * 0.45;
-      context.fillStyle = '#dff4ff';
-      context.beginPath();
-      context.arc(shifted, star.y * height * 0.82, star.size, 0, Math.PI * 2);
-      context.fill();
-    }
-    context.globalAlpha = 1;
-
-    const left = 30;
-    const bottom = height - 27;
-    const right = width - 30;
-    const top = 28;
-    context.strokeStyle = 'rgba(143, 190, 216, .1)';
-    context.lineWidth = 1;
-    for (let index = 0; index <= 5; index += 1) {
-      const y = top + ((bottom - top) / 5) * index;
-      context.beginPath();
-      context.moveTo(left, y);
-      context.lineTo(right, y);
-      context.stroke();
-    }
-
-    const flightProgress = Math.min(1, Math.log(Math.max(1, current)) / Math.log(12));
-    const rocketX = left + (right - left) * (0.12 + flightProgress * 0.76);
-    const rocketY = bottom - (bottom - top) * (0.1 + flightProgress * 0.76);
-    const accent = phase === 'CRASHED' ? '#ff5263' : cashedOut ? '#48dda6' : '#ffbd45';
-    const trail = context.createLinearGradient(left, bottom, rocketX, rocketY);
-    trail.addColorStop(0, 'rgba(255,189,69,0)');
-    trail.addColorStop(1, accent);
-    context.beginPath();
-    context.moveTo(left, bottom);
-    context.bezierCurveTo(width * 0.35, bottom, rocketX * 0.66, rocketY + 42, rocketX, rocketY);
-    context.strokeStyle = trail;
-    context.lineWidth = 5;
-    context.shadowBlur = 16;
-    context.shadowColor = accent;
-    context.stroke();
-    context.shadowBlur = 0;
-
-    if (phase === 'CRASHED') {
-      for (let ray = 0; ray < 12; ray += 1) {
-        const angle = (Math.PI * 2 * ray) / 12;
-        const inner = 7 + (ray % 2) * 4;
-        const outer = 25 + (ray % 3) * 6;
-        context.beginPath();
-        context.moveTo(rocketX + Math.cos(angle) * inner, rocketY + Math.sin(angle) * inner);
-        context.lineTo(rocketX + Math.cos(angle) * outer, rocketY + Math.sin(angle) * outer);
-        context.strokeStyle = ray % 2 ? '#ffbd45' : '#ff5263';
-        context.lineWidth = 3;
-        context.stroke();
-      }
-      context.fillStyle = '#fff2c5';
-      context.beginPath();
-      context.arc(rocketX, rocketY, 10, 0, Math.PI * 2);
-      context.fill();
-    } else {
-      context.save();
-      context.translate(rocketX, rocketY);
-      context.rotate(-0.72);
-      context.fillStyle = '#e9f4fa';
-      context.beginPath();
-      context.moveTo(18, 0);
-      context.lineTo(-9, -9);
-      context.lineTo(-5, 0);
-      context.lineTo(-9, 9);
-      context.closePath();
-      context.fill();
-      context.fillStyle = '#62c9f2';
-      context.beginPath();
-      context.arc(4, 0, 4, 0, Math.PI * 2);
-      context.fill();
-      context.fillStyle = accent;
-      context.beginPath();
-      context.moveTo(-7, -4);
-      context.lineTo(-20, 0);
-      context.lineTo(-7, 4);
-      context.closePath();
-      context.fill();
-      context.restore();
-    }
-  }, []);
-
-  const resizeCanvas = useCallback(() => {
-    const canvas = canvasRef.current;
-    const parent = canvas?.parentElement;
-    if (!canvas || !parent) return;
-    const width = Math.max(280, parent.clientWidth);
-    const height = Math.max(260, Math.min(380, width * 0.48));
-    const dpr = Math.max(1, window.devicePixelRatio || 1);
-    canvas.width = Math.floor(width * dpr);
-    canvas.height = Math.floor(height * dpr);
-    canvas.style.width = `${width}px`;
-    canvas.style.height = `${height}px`;
-    drawScene(multiplierRef.current, stateRef.current, cashoutLockedRef.current);
-  }, [drawScene]);
-
   const finishCrash = useCallback((crashPoint: number) => {
     if (stateRef.current !== 'FLYING') return;
     multiplierRef.current = crashPoint;
@@ -206,8 +79,7 @@ const CrashGame: React.FC = () => {
     setIsShaking(true);
     if (shakeRef.current) window.clearTimeout(shakeRef.current);
     shakeRef.current = window.setTimeout(() => mountedRef.current && setIsShaking(false), 420);
-    drawScene(crashPoint, 'CRASHED', cashoutLockedRef.current);
-  }, [drawScene, updateState]);
+  }, [updateState]);
 
   const cashOut = useCallback(async (requestedMultiplier?: number) => {
     const round = roundRef.current;
@@ -256,9 +128,8 @@ const CrashGame: React.FC = () => {
     }
 
     setMultiplier(current);
-    drawScene(current, 'FLYING', cashoutLockedRef.current);
     frameRef.current = requestAnimationFrame(runFlight);
-  }, [cashOut, drawScene, finishCrash]);
+  }, [cashOut, finishCrash]);
 
   const startGame = useCallback(async () => {
     if (startingRef.current || !controlsOpen || isProcessing) return;
@@ -294,8 +165,6 @@ const CrashGame: React.FC = () => {
     setCountdown(COUNTDOWN_SECONDS);
     updateState('COUNTDOWN');
     setMessage(`${cleanBet} ${currencySymbol} accepted. Stand by for launch.`);
-    drawScene(1, 'COUNTDOWN', false);
-
     let remaining = COUNTDOWN_SECONDS;
     countdownRef.current = window.setInterval(() => {
       remaining -= 1;
@@ -313,7 +182,7 @@ const CrashGame: React.FC = () => {
         setCountdown(remaining);
       }
     }, 1000);
-  }, [bet, canBet, controlsOpen, currencyMode, currencySymbol, drawScene, isProcessing, runFlight, subtractCoins, updateState]);
+  }, [bet, canBet, controlsOpen, currencyMode, currencySymbol, isProcessing, runFlight, subtractCoins, updateState]);
 
   useEffect(() => {
     autoEnabledRef.current = autoEnabled;
@@ -325,18 +194,13 @@ const CrashGame: React.FC = () => {
 
   useEffect(() => {
     mountedRef.current = true;
-    resizeCanvas();
-    const parent = canvasRef.current?.parentElement;
-    const observer = parent ? new ResizeObserver(resizeCanvas) : null;
-    if (parent) observer?.observe(parent);
     return () => {
       mountedRef.current = false;
-      observer?.disconnect();
       if (frameRef.current) cancelAnimationFrame(frameRef.current);
       if (countdownRef.current) window.clearInterval(countdownRef.current);
       if (shakeRef.current) window.clearTimeout(shakeRef.current);
     };
-  }, [resizeCanvas]);
+  }, []);
 
   const changeBet = (value: number) => setBet(Math.min(MAX_BET, Math.max(MIN_BET, Math.floor(value || MIN_BET))));
   const roundBet = roundRef.current?.bet ?? bet;
@@ -358,7 +222,7 @@ const CrashGame: React.FC = () => {
       </header>
 
       <div className={`crash-stage${isShaking ? ' shaking' : ''}`}>
-        <canvas ref={canvasRef} />
+        <CrashFlight3D multiplier={multiplier} phase={gameState} cashedOut={hasCashedOut} />
         <div className="crash-readout" aria-live="polite">
           {gameState === 'IDLE' && <small>READY FOR LAUNCH</small>}
           {gameState === 'COUNTDOWN' && <small>LAUNCHING IN</small>}
@@ -462,6 +326,7 @@ const CrashGame: React.FC = () => {
 
       <style>{`
         .crash-game{width:min(100%,900px);margin:0 auto;padding:18px;color:#e8f2f7;background:linear-gradient(155deg,#091521,#102334);border:1px solid #274158;border-radius:20px;box-shadow:0 24px 70px rgba(0,0,0,.38);user-select:none}.crash-header{display:flex;align-items:center;justify-content:space-between;gap:18px;margin-bottom:13px}.crash-kicker{color:#65c9ed;font-size:9px;font-weight:900;letter-spacing:.22em}.crash-header h2{margin:2px 0 0;font-size:29px;line-height:1;letter-spacing:.04em}.crash-history{display:flex;justify-content:flex-end;gap:6px;max-width:70%;overflow:hidden}.crash-history span{flex:0 0 auto;padding:5px 7px;border:1px solid;border-radius:6px;font-size:10px;font-weight:850}.crash-history .low{color:#ff7c87;border-color:rgba(255,82,99,.3);background:rgba(255,82,99,.1)}.crash-history .high{color:#58e0ac;border-color:rgba(72,221,166,.3);background:rgba(72,221,166,.1)}.crash-history .history-empty{color:#7890a2;border-color:#2a4052;background:#0b1823}.crash-stage{position:relative;width:100%;overflow:hidden;border:1px solid #29485f;border-radius:15px;background:#06121f;box-shadow:inset 0 0 45px rgba(0,0,0,.55)}.crash-stage canvas{display:block;max-width:100%}.crash-readout{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;pointer-events:none;text-shadow:0 3px 20px rgba(0,0,0,.8)}.crash-readout strong{color:#f7fbfd;font-size:clamp(48px,11vw,88px);font-weight:950;line-height:1;letter-spacing:-.06em;font-variant-numeric:tabular-nums}.crash-readout small{margin:5px 0;color:#91a9b9;font-size:10px;font-weight:900;letter-spacing:.2em}.crash-readout .crashed{color:#ff5969}.crash-readout .safe{color:#51dfa9}.crash-readout .unconfirmed{color:#ffbd62}.crash-message{display:flex;align-items:center;gap:9px;min-height:42px;margin:11px 0;padding:9px 12px;border:1px solid #29455a;border-radius:9px;background:#091722;color:#c1d3de;font-size:12px}.crash-message>span{width:7px;height:7px;flex:none;border-radius:50%;background:#58d9aa;box-shadow:0 0 0 4px rgba(88,217,170,.12)}.crash-message.warning{border-color:#725329;color:#ffd58a}.crash-message.warning>span{background:#ffb948;box-shadow:0 0 0 4px rgba(255,185,72,.12)}.crash-panel{display:grid;grid-template-columns:1.25fr .8fr 1fr;gap:12px;padding:13px;border:1px solid #284052;border-radius:13px;background:rgba(5,14,22,.55)}.crash-panel label{color:#8fa5b4;font-size:9px;font-weight:900;letter-spacing:.12em}.crash-panel label span{color:#e7bd55}.crash-bet-column,.crash-auto-column{display:flex;flex-direction:column;gap:7px}.crash-bet-input{display:grid;grid-template-columns:38px 1fr 38px;overflow:hidden;border:1px solid #304b60;border-radius:8px;background:#08141e}.crash-bet-input button,.crash-presets button{border:0;background:#172b3a;color:#c6d5df;font-weight:900;cursor:pointer}.crash-bet-input button:hover,.crash-presets button:hover{background:#22445a}.crash-bet-input input,.crash-auto-input input{min-width:0;border:0;outline:0;background:transparent;color:#f3f8fa;text-align:center;font-size:17px;font-weight:900}.crash-presets{display:grid;grid-template-columns:repeat(4,1fr);gap:4px}.crash-presets button{padding:4px;border-radius:5px;font-size:9px}.crash-switch{display:flex;align-items:center;gap:7px;cursor:pointer}.crash-switch input{position:absolute;opacity:0}.crash-switch>span{position:relative;width:28px;height:15px;border-radius:20px;background:#344a59;transition:.2s}.crash-switch>span:after{content:'';position:absolute;top:3px;left:3px;width:9px;height:9px;border-radius:50%;background:#91a3ae;transition:.2s}.crash-switch input:checked+span{background:#2b9c76}.crash-switch input:checked+span:after{left:16px;background:white}.crash-auto-input{display:grid;grid-template-columns:1fr 28px;flex:1;min-height:39px;border:1px solid #304b60;border-radius:8px;background:#08141e}.crash-auto-input span{display:grid;place-items:center;color:#7f96a5;font-weight:900}.crash-action-column{display:flex}.crash-action{width:100%;min-height:76px;border:0;border-radius:10px;box-shadow:0 5px 0;cursor:pointer;transition:transform .12s,filter .12s}.crash-action:hover:not(:disabled){filter:brightness(1.08)}.crash-action:active:not(:disabled){transform:translateY(4px);box-shadow:0 1px 0}.crash-action small,.crash-action strong{display:block}.crash-action small{font-size:9px;font-weight:950;letter-spacing:.13em}.crash-action strong{margin-top:3px;font-size:19px}.crash-action.launch{background:linear-gradient(#58dfa9,#24a978);box-shadow-color:#126242;color:#062519}.crash-action.cashout{background:linear-gradient(#ffd05f,#e79d24);box-shadow-color:#8b5313;color:#352307}.crash-action:disabled,.crash-panel button:disabled,.crash-panel input:disabled{opacity:.45;cursor:not-allowed}.crash-footer{display:flex;justify-content:center;gap:18px;padding-top:12px;color:#6f8798;font-size:9px;font-weight:800;letter-spacing:.06em}.shaking{animation:crash-shake .09s linear infinite}@keyframes crash-shake{0%,100%{transform:translate(0)}25%{transform:translate(-3px,2px)}50%{transform:translate(3px,-1px)}75%{transform:translate(-1px,-2px)}}@media(max-width:680px){.crash-game{padding:12px;border-radius:14px}.crash-header{align-items:flex-start}.crash-history{max-width:58%}.crash-panel{grid-template-columns:1fr 1fr}.crash-action-column{grid-column:1/-1}.crash-action{min-height:64px}.crash-footer{gap:8px;justify-content:space-between}.crash-footer span:nth-child(2){display:none}}@media(max-width:430px){.crash-history span:nth-last-child(n+5){display:none}.crash-panel{grid-template-columns:1fr}.crash-action-column{grid-column:auto}.crash-footer span:first-child{display:none}}
+        .crash-stage{height:clamp(300px,48vw,430px)}.crash-flight-canvas{display:block;width:100%;height:100%;max-width:none!important;touch-action:none}
       `}</style>
     </section>
   );

@@ -77,8 +77,9 @@ export const PlinkoBoard3D: React.FC<{
         balls.forEach((ball, id) => { if (!liveIds.has(id)) { boardRoot.remove(ball); dispose(ball); balls.delete(id); } });
         ballsRef.current.forEach((ball) => {
           let mesh = balls.get(ball.id);
-          if (!mesh) { const color = new THREE.Color(ball.color); mesh = new THREE.Mesh(new THREE.SphereGeometry(.16, 20, 14), new THREE.MeshPhysicalMaterial({ color, emissive: color, emissiveIntensity: .35, metalness: .42, roughness: .16, clearcoat: .8 })); mesh.castShadow = true; boardRoot.add(mesh); balls.set(ball.id, mesh); }
-          const targetX = (ball.x / width - .5) * 10; const targetY = (.5 - ball.y / height) * 8.5; mesh.position.x += (targetX - mesh.position.x) * smooth; mesh.position.y += (targetY - mesh.position.y) * smooth; mesh.position.z += (.42 - mesh.position.z) * smooth; mesh.rotation.x += delta * 3.4; mesh.rotation.y += delta * 2.1;
+          const targetX = (ball.x / width - .5) * 10; const targetY = (.5 - ball.y / height) * 8.5;
+          if (!mesh) { const color = new THREE.Color(ball.color); mesh = new THREE.Mesh(new THREE.SphereGeometry(.16, 24, 18), new THREE.MeshPhysicalMaterial({ color, emissive: color, emissiveIntensity: .35, metalness: .42, roughness: .14, clearcoat: 1 })); mesh.position.set(targetX, targetY, .42); mesh.castShadow = true; boardRoot.add(mesh); balls.set(ball.id, mesh); }
+          const ballSmooth = 1 - Math.exp(-26 * delta); mesh.position.x += (targetX - mesh.position.x) * ballSmooth; mesh.position.y += (targetY - mesh.position.y) * ballSmooth; mesh.position.z += (.42 - mesh.position.z) * ballSmooth; mesh.rotation.x += delta * 3.4; mesh.rotation.y += delta * 2.1;
         });
         pegs.forEach((peg, key) => { const [row, col] = key.split('-').map(Number); const glow = glowingPegRef.current.some((item) => item.r === row && item.c === col && item.life > 0); const material = peg.material as InstanceType<typeof THREE.MeshStandardMaterial>; material.emissive.setHex(glow ? 0xffffff : 0x000000); material.emissiveIntensity = glow ? 1.2 : 0; peg.scale.setScalar(glow ? 1.25 : 1); });
         cabinetLights.forEach((bulb, index) => { (bulb.material as InstanceType<typeof THREE.MeshStandardMaterial>).emissiveIntensity = .75 + Math.sin(now * .006 + index * .7) * .48; });
@@ -114,7 +115,7 @@ export const KenoBoard3D: React.FC<{
         const number = index + 1; const texture = new THREE.CanvasTexture(labelCanvas(String(number), '#172238')); texture.colorSpace = THREE.SRGBColorSpace;
         const material = new THREE.MeshStandardMaterial({ color: 0x34445f, metalness: .32, roughness: .25, emissive: 0x000000 });
         const chip = new THREE.Mesh(new THREE.CylinderGeometry(.44, .44, .15, 32), material); chip.position.set((index % 10 - 4.5) * 1.02, .02, (Math.floor(index / 10) - 3.5) * 1.02); chip.userData.number = number; chip.castShadow = true;
-        const label = new THREE.Sprite(new THREE.SpriteMaterial({ map: texture, depthTest: false, depthWrite: false })); label.position.set(0, .22, 0); label.scale.set(.7, .35, 1); label.renderOrder = 10; chip.add(label);
+        const label = new THREE.Mesh(new THREE.PlaneGeometry(.72, .38), new THREE.MeshBasicMaterial({ map: texture, depthTest: false, depthWrite: false, transparent: false, toneMapped: false })); label.rotation.x = -Math.PI / 2; label.position.set(0, .105, 0); label.renderOrder = 100; chip.add(label);
         scene.add(chip); meshes.push(chip);
       }
       const pick = (event: PointerEvent) => { const rect = canvas.getBoundingClientRect(); pointer.set(((event.clientX - rect.left) / rect.width) * 2 - 1, -((event.clientY - rect.top) / rect.height) * 2 + 1); raycaster.setFromCamera(pointer, camera); const hit = raycaster.intersectObjects(meshes, false)[0]; hovered = hit ? Number(hit.object.userData.number) : -1; canvas.style.cursor = hovered > 0 && stateRef.current.phase === 'betting' ? 'pointer' : 'default'; };

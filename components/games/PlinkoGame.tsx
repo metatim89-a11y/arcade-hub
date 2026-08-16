@@ -126,6 +126,7 @@ const PlinkoGame: React.FC = () => {
     const glowingBucketRef = useRef<{index: number, life: number}[]>([]);
     const audioRef = useRef<AudioContext | null>(null);
     const lastPingRef = useRef(0);
+    const physicsLastTimeRef = useRef(0);
 
     const ping = useCallback((frequency = 520) => {
         const AudioClass = window.AudioContext || (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
@@ -148,12 +149,14 @@ const PlinkoGame: React.FC = () => {
     const RESTITUTION = 0.5; // Bounciness
 
     // --- Game Loop ---
-    const updatePhysics = useCallback(() => {
+    const updatePhysics = useCallback((timestamp = performance.now()) => {
         const canvas = canvasRef.current;
         if (!canvas) return;
         const ctx = canvas.getContext('2d');
         if (!ctx) return;
 
+        const frameScale = physicsLastTimeRef.current ? Math.min(2, Math.max(.35, (timestamp - physicsLastTimeRef.current) / (1000 / 60))) : 1;
+        physicsLastTimeRef.current = timestamp;
         const width = canvas.width;
         const height = canvas.height;
         
@@ -254,10 +257,10 @@ const PlinkoGame: React.FC = () => {
         for (let i = ballsRef.current.length - 1; i >= 0; i--) {
             const ball = ballsRef.current[i];
             
-            const timeScale = isSlowMotion ? .36 : 1;
+            const timeScale = (isSlowMotion ? .36 : 1) * frameScale;
             ball.vy += GRAVITY * timeScale;
-            ball.vx *= AIR_RESISTANCE;
-            ball.vy *= AIR_RESISTANCE;
+            ball.vx *= Math.pow(AIR_RESISTANCE, frameScale);
+            ball.vy *= Math.pow(AIR_RESISTANCE, frameScale);
             
             ball.x += ball.vx * timeScale;
             ball.y += ball.vy * timeScale;
@@ -363,6 +366,7 @@ const PlinkoGame: React.FC = () => {
     }, [rows, multipliers, addCoins, isSlowMotion, ping, slowMotion]);
 
     useEffect(() => {
+        physicsLastTimeRef.current = 0;
         animationRef.current = requestAnimationFrame(updatePhysics);
         return () => {
             if (animationRef.current) cancelAnimationFrame(animationRef.current);

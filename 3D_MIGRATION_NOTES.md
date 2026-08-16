@@ -117,6 +117,14 @@ Convert every game's actual playable surface and pieces to interactive 3D. The e
 - Ball positions now interpolate between physics frames, rotate in 3D while falling, and gently influence the cabinet camera without changing the authoritative Plinko physics or payouts.
 - Compacted both navigation layers: the site header uses less vertical padding/type size, and the game selector is now a single small horizontally scrollable row on phones instead of a large wrapped button wall.
 
+## Ninth graphics pass — Crash and reported regressions
+
+- Replaced Crash's flat Canvas2D illustration with a state-driven Three.js flight scene: modeled rocket, fins, glass window, exhaust particles, curved live trail, moving starfield/perspective grid, and a 3D debris/shockwave crash sequence.
+- Kept Crash's existing bet, crash-point, cash-out and payout calculations authoritative; removed the obsolete 2D renderer and its resize lifecycle.
+- Reduced Spin Wheel again to a 290px desktop cap and 240px phone cap, with a tighter cabinet and controls.
+- Made Plinko physics time-based across variable refresh rates, initialized new 3D balls at their authoritative coordinates, and tightened frame-rate-independent interpolation to eliminate catch-up jumps.
+- Replaced Keno's camera-facing sprites with explicit top-facing number planes at a forced render order so 1–80 remain visible above every chip across mobile WebGL implementations.
+
 ## Planned conversion order
 
 1. Tic-Tac-Toe, Connect Four and Mancala board batch: complete and build-tested.
