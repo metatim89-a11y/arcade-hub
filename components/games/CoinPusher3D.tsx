@@ -30,17 +30,19 @@ const CoinPusher3D: React.FC<{ frame: Frame; bumpersActive: boolean; aimPercent:
       const coinMeshes = new Map<number, Mesh>(); const bumperMeshes: Mesh[] = [];
       [[82, 318], [160, 346], [238, 318], [112, 376], [208, 376]].forEach(([x, y]) => { const bumper = new THREE.Mesh(new THREE.CylinderGeometry(.34, .42, .32, 24), new THREE.MeshStandardMaterial({ color: 0x66dfff, emissive: 0x1d9fc9, emissiveIntensity: .75, metalness: .55, roughness: .18 })); bumper.position.set((x / 320 - .5) * 7, .13, (y / 420 - .5) * 8.8); bumper.visible = false; cabinet.add(bumper); bumperMeshes.push(bumper); });
       const observer = new ResizeObserver(() => { const rect = canvas.getBoundingClientRect(); if (!rect.width || !rect.height) return; renderer.setSize(rect.width, rect.height, false); camera.aspect = rect.width / rect.height; camera.updateProjectionMatrix(); }); observer.observe(canvas);
-      let frameId = 0;
+      let frameId = 0; let last = performance.now();
       const animate = (now: number) => {
+        const delta = Math.min(.04, (now - last) / 1000); last = now; const smooth = 1 - Math.exp(-18 * delta);
         const live = stateRef.current; const ids = new Set(live.frame.coins.map((coin) => coin.id));
         coinMeshes.forEach((coin, id) => { if (!ids.has(id)) { cabinet.remove(coin); dispose(coin); coinMeshes.delete(id); } });
         live.frame.coins.forEach((coin) => {
           let mesh = coinMeshes.get(coin.id);
           if (!mesh) { const texture = new THREE.CanvasTexture(coinTexture(coin.kind)); texture.colorSpace = THREE.SRGBColorSpace; const copper = coin.kind === 'penny'; const side = new THREE.MeshStandardMaterial({ color: copper ? 0x8a4b27 : 0x8f999e, metalness: .88, roughness: .2 }); const face = new THREE.MeshStandardMaterial({ map: texture, metalness: .55, roughness: .24, emissive: coin.playerCoin ? 0x168aca : 0x000000, emissiveIntensity: coin.playerCoin ? .5 : 0 }); mesh = new THREE.Mesh(new THREE.CylinderGeometry(coin.radius / 11 * .25, coin.radius / 11 * .25, .1, 28), [side, face, face]); mesh.castShadow = true; cabinet.add(mesh); coinMeshes.set(coin.id, mesh); }
-          mesh.position.set((coin.x / 320 - .5) * 7, .08 + (coin.playerCoin ? .05 : 0), (coin.y / 420 - .5) * 8.8); mesh.rotation.y = coin.angle * Math.PI / 180;
+          const targetX = (coin.x / 320 - .5) * 7; const targetY = .08 + (coin.playerCoin ? .05 : 0); const targetZ = (coin.y / 420 - .5) * 8.8;
+          mesh.position.x += (targetX - mesh.position.x) * smooth; mesh.position.y += (targetY - mesh.position.y) * smooth; mesh.position.z += (targetZ - mesh.position.z) * smooth; mesh.rotation.y += (coin.angle * Math.PI / 180 - mesh.rotation.y) * smooth;
         });
-        pusher.position.z = (live.frame.pusherY / 420 - .5) * 8.8;
-        aim.position.x = (live.aimPercent / 100 - .5) * 6.2; aim.position.z = -3.75; aim.material instanceof THREE.MeshBasicMaterial && (aim.material.opacity = .55 + Math.sin(now * .008) * .25);
+        pusher.position.z += (((live.frame.pusherY / 420 - .5) * 8.8) - pusher.position.z) * smooth;
+        aim.position.x += (((live.aimPercent / 100 - .5) * 6.2) - aim.position.x) * smooth; aim.position.z = -3.75; aim.material instanceof THREE.MeshBasicMaterial && (aim.material.opacity = .55 + Math.sin(now * .008) * .25);
         bumperMeshes.forEach((bumper, index) => { bumper.visible = live.bumpersActive; bumper.scale.setScalar(1 + Math.sin(now * .012 + index) * .08); });
         camera.position.x = Math.sin(now * .00022) * .08; camera.lookAt(0, 0, .6); renderer.render(scene, camera); frameId = requestAnimationFrame(animate);
       };

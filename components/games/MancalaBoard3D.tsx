@@ -73,15 +73,22 @@ const MancalaBoard3D: React.FC<MancalaBoard3DProps> = (props) => {
 
       const pitMeshes: Mesh[] = [];
       const hitMeshes: Mesh[] = [];
+      const rimMaterial = new THREE.MeshStandardMaterial({ color: 0xd89951, roughness: .29, metalness: .28 });
       for (let index = 0; index < 14; index += 1) {
         const [x, z] = positionForPit(index);
         const store = index === 6 || index === 13;
+        const rim = new THREE.Mesh(
+          store ? new THREE.CapsuleGeometry(.66, 1.48, 6, 24) : new THREE.TorusGeometry(.59, .09, 14, 38),
+          rimMaterial,
+        );
+        if (store) rim.rotation.x = Math.PI / 2; else rim.rotation.x = Math.PI / 2;
+        rim.position.set(x, store ? .015 : .13, z); rim.castShadow = true; boardRoot.add(rim);
         const pit = new THREE.Mesh(
-          store ? new THREE.CapsuleGeometry(.58, 1.35, 5, 18) : new THREE.CylinderGeometry(.52, .68, .32, 32),
-          new THREE.MeshStandardMaterial({ color: 0x2a130d, roughness: .58, metalness: .05, emissive: 0x000000 }),
+          store ? new THREE.CapsuleGeometry(.52, 1.3, 6, 22) : new THREE.CylinderGeometry(.49, .62, .15, 36),
+          new THREE.MeshStandardMaterial({ color: 0x160c0a, roughness: .72, metalness: .02, emissive: 0x000000 }),
         );
         if (store) pit.rotation.x = Math.PI / 2;
-        pit.position.set(x, .05, z);
+        pit.position.set(x, store ? .07 : .075, z);
         pit.receiveShadow = true;
         boardRoot.add(pit);
         pitMeshes[index] = pit;
@@ -94,6 +101,7 @@ const MancalaBoard3D: React.FC<MancalaBoard3DProps> = (props) => {
         boardRoot.add(hit);
         hitMeshes.push(hit);
       }
+      [[0, 1.7, 0x56aaf2], [0, -1.7, 0xf0b94e]].forEach(([x, z, color]) => { const rail = new THREE.Mesh(new THREE.BoxGeometry(6.9, .055, .075), new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: .35, metalness: .55, roughness: .22 })); rail.position.set(x, .11, z); boardRoot.add(rail); });
 
       const stonePalette = [0xe04459, 0x4ea8e8, 0x4ecb82, 0x9d67dc, 0xf2a43b, 0xf3e2c2, 0x40c8bd];
       const stoneGroups = new Map<number, { group: InstanceType<typeof THREE.Group>; count: number }>();
@@ -168,11 +176,12 @@ const MancalaBoard3D: React.FC<MancalaBoard3DProps> = (props) => {
         camera.updateProjectionMatrix();
       });
       observer.observe(canvas);
-      let frame = 0;
+      let frame = 0; let last = performance.now();
       const animate = (now: number) => {
+        const delta = Math.min(.04, (now - last) / 1000); last = now; const smooth = 1 - Math.exp(-9 * delta);
         const live = stateRef.current;
         const themeColor = live.theme === 'Midnight' ? 0x132b4c : live.theme === 'Jungle' ? 0x28572d : 0x7b3517;
-        boardMaterial.color.lerp(new THREE.Color(themeColor), .08);
+        boardMaterial.color.lerp(new THREE.Color(themeColor), smooth);
         live.pits.forEach((count, index) => {
           const stones = stoneGroups.get(index);
           if (!stones || stones.count !== count) rebuildStones(index, count, now);
@@ -188,10 +197,10 @@ const MancalaBoard3D: React.FC<MancalaBoard3DProps> = (props) => {
           const age = Math.min(1, (now - Number(group.userData.birth)) / 380);
           const bounce = 1 - Math.pow(1 - age, 3);
           group.children.forEach((stone, stoneIndex) => {
-            stone.position.y += ((.32 + Math.floor(stoneIndex / 10) * .14) - stone.position.y) * .14;
+            stone.position.y += ((.32 + Math.floor(stoneIndex / 10) * .14) - stone.position.y) * smooth;
             stone.scale.y = .72 * bounce;
             stone.scale.x = stone.scale.z = 1.15 * bounce;
-            stone.rotation.y += .002;
+            stone.rotation.y += delta * .12;
           });
         });
         boardRoot.rotation.y = -.035 + Math.sin(now * .00028) * .012;

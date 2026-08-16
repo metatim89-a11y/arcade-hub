@@ -164,7 +164,7 @@ const ConnectFourGame: React.FC<ConnectFourProps> = ({ playMode, playerNames }) 
         {status}
         {gameState === 'playing' && (<div className="w-6 h-6 rounded-full" style={{ backgroundColor: currentPlayer === '1' ? 'var(--connect4-p1-color)' : 'var(--connect4-p2-color)'}}></div>)}
       </div>
-      <div className="relative w-full max-w-[620px] aspect-[8/7] rounded-2xl overflow-hidden shadow-[0_24px_64px_rgba(0,0,0,.5)]">
+      <div className="relative w-full max-w-[720px] aspect-[8/7] rounded-2xl overflow-hidden shadow-[0_24px_64px_rgba(0,0,0,.5)]">
         <ConnectFourBoard3D
           pieces={pieces}
           winningLine={winningLine}

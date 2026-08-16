@@ -28,6 +28,26 @@ const cardCanvas = (rank: string, suit: string, hidden = false) => {
   return canvas;
 };
 
+const memoryCardCanvas = (symbol: string, flipped: boolean, matched: boolean) => {
+  const canvas = document.createElement('canvas'); canvas.width = 320; canvas.height = 388;
+  const context = canvas.getContext('2d')!;
+  if (!flipped) {
+    const gradient = context.createRadialGradient(160, 170, 12, 160, 194, 230); gradient.addColorStop(0, '#263e73'); gradient.addColorStop(.58, '#15264e'); gradient.addColorStop(1, '#080f24'); context.fillStyle = gradient; context.fillRect(0, 0, 320, 388);
+    context.strokeStyle = '#75c8ff'; context.lineWidth = 12; context.strokeRect(10, 10, 300, 368); context.strokeStyle = 'rgba(125,205,255,.28)'; context.lineWidth = 3;
+    for (let x = -380; x < 340; x += 32) { context.beginPath(); context.moveTo(x, 0); context.lineTo(x + 388, 388); context.stroke(); }
+    context.fillStyle = '#d9f4ff'; context.font = '900 64px sans-serif'; context.textAlign = 'center'; context.textBaseline = 'middle'; context.fillText('RPS', 160, 184); context.font = '700 22px sans-serif'; context.fillStyle = '#72cfff'; context.fillText('MEMORY ARENA', 160, 235);
+    return canvas;
+  }
+  const palettes: Record<string, [string, string, string]> = {
+    '✊': ['#ff7b58', '#8f2433', '#3c0d1c'], '✋': ['#66d6ff', '#236cb8', '#102552'], '✌️': ['#c58cff', '#673ca4', '#291445'], '💣': ['#ff5d7d', '#55243a', '#160d19'],
+    '💎': ['#6ff5ec', '#167f98', '#073549'], '👑': ['#ffe476', '#c28420', '#51300c'], '🔥': ['#ffb548', '#df4b1c', '#5b140c'], '💧': ['#72c9ff', '#286cd2', '#10275c']
+  };
+  const [bright, mid, dark] = palettes[symbol] ?? ['#b9e7ff', '#486c92', '#14233c']; const gradient = context.createRadialGradient(112, 88, 12, 160, 194, 245); gradient.addColorStop(0, bright); gradient.addColorStop(.48, mid); gradient.addColorStop(1, dark); context.fillStyle = gradient; context.fillRect(0, 0, 320, 388);
+  context.strokeStyle = matched ? '#a7ffd4' : bright; context.lineWidth = matched ? 18 : 12; context.strokeRect(10, 10, 300, 368); context.strokeStyle = 'rgba(255,255,255,.28)'; context.lineWidth = 3; context.strokeRect(27, 27, 266, 334);
+  context.shadowColor = bright; context.shadowBlur = 32; context.font = '150px serif'; context.textAlign = 'center'; context.textBaseline = 'middle'; context.fillStyle = '#ffffff'; context.fillText(symbol, 160, 185); context.shadowBlur = 0; context.font = '900 22px sans-serif'; context.fillStyle = '#f4fbff'; context.fillText(matched ? 'MATCHED' : 'POWER CARD', 160, 318);
+  return canvas;
+};
+
 const dispose = (root: Object3D) => root.traverse((child) => {
   const mesh = child as Mesh;
   mesh.geometry?.dispose();
@@ -103,24 +123,26 @@ export const MemoryCards3D: React.FC<{ cards: MemoryCard[]; disabled: boolean; o
       const scene = new THREE.Scene(); const camera = new THREE.PerspectiveCamera(43, 1, .1, 55); camera.up.set(0, 0, -1); camera.position.set(0, 12, 0); camera.lookAt(0, 0, 0);
       scene.add(new THREE.HemisphereLight(0xdbeeff, 0x11101d, 2.5)); const light = new THREE.DirectionalLight(0xffffff, 4.5); light.position.set(-4, 8, 5); light.castShadow = true; scene.add(light);
       const base = new THREE.Mesh(new THREE.BoxGeometry(7.5, .32, 7.5), new THREE.MeshStandardMaterial({ color: 0x171c34, metalness: .42, roughness: .32 })); base.position.y = -.28; base.receiveShadow = true; scene.add(base);
-      const meshes = new Map<number, Mesh>(); const raycaster = new THREE.Raycaster(); const pointer = new THREE.Vector2(); let hovered = -1; let signature = '';
+      const meshes = new Map<number, Mesh>(); const previousStates = new Map<number, string>(); const raycaster = new THREE.Raycaster(); const pointer = new THREE.Vector2(); let hovered = -1; let signature = '';
       const rebuild = () => {
         meshes.forEach((mesh) => { scene.remove(mesh); dispose(mesh); }); meshes.clear();
         stateRef.current.cards.forEach((card, index) => {
-          const texture = new THREE.CanvasTexture(cardCanvas(card.isFlipped ? card.symbol : '', card.isFlipped ? '' : '', !card.isFlipped)); texture.colorSpace = THREE.SRGBColorSpace;
-          if (card.isFlipped) { const ctx = texture.image.getContext('2d') as CanvasRenderingContext2D; ctx.fillStyle = '#191d2b'; ctx.font = '126px serif'; ctx.textAlign = 'center'; ctx.fillText(card.symbol, 128, 220); texture.needsUpdate = true; }
-          const edge = new THREE.MeshStandardMaterial({ color: card.isMatched ? 0x39dc7e : 0xdad7ce, roughness: .38 });
-          const face = new THREE.MeshStandardMaterial({ map: texture, emissive: card.isMatched ? 0x28c968 : 0x000000, emissiveIntensity: .5 });
+          const state = `${card.isFlipped}:${card.isMatched}`; const changed = previousStates.has(card.id) && previousStates.get(card.id) !== state; previousStates.set(card.id, state);
+          const texture = new THREE.CanvasTexture(memoryCardCanvas(card.symbol, card.isFlipped, card.isMatched)); texture.colorSpace = THREE.SRGBColorSpace;
+          const edge = new THREE.MeshStandardMaterial({ color: card.isMatched ? 0x4af0a0 : card.isFlipped ? 0x8abbd4 : 0x4a73a7, roughness: .27, metalness: .48 });
+          const face = new THREE.MeshStandardMaterial({ map: texture, roughness: .26, metalness: .08, emissive: card.isMatched ? 0x28c968 : 0x0b1c38, emissiveIntensity: card.isMatched ? .72 : .16 });
           const mesh = new THREE.Mesh(new THREE.BoxGeometry(1.42, .1, 1.72), [edge, edge, face, edge, edge, edge]);
-          mesh.position.set((index % 4 - 1.5) * 1.72, card.isMatched ? -.08 : .06, (Math.floor(index / 4) - 1.5) * 1.72); mesh.userData.id = card.id; mesh.userData.matched = card.isMatched; mesh.castShadow = true; scene.add(mesh); meshes.set(card.id, mesh);
+          mesh.position.set((index % 4 - 1.5) * 1.72, card.isMatched ? -.08 : .06, (Math.floor(index / 4) - 1.5) * 1.72); mesh.userData.id = card.id; mesh.userData.matched = card.isMatched; mesh.userData.flipBirth = changed ? performance.now() : 0; mesh.rotation.z = changed ? Math.PI : 0; mesh.castShadow = true;
+          if (card.isMatched) { const halo = new THREE.Mesh(new THREE.RingGeometry(.58, .9, 32), new THREE.MeshBasicMaterial({ color: 0x51f1a5, transparent: true, opacity: .36, side: THREE.DoubleSide, depthWrite: false })); halo.rotation.x = -Math.PI / 2; halo.position.y = -.09; mesh.add(halo); }
+          scene.add(mesh); meshes.set(card.id, mesh);
         });
       };
       const pick = (event: PointerEvent) => { const rect = canvas.getBoundingClientRect(); pointer.set(((event.clientX - rect.left) / rect.width) * 2 - 1, -((event.clientY - rect.top) / rect.height) * 2 + 1); raycaster.setFromCamera(pointer, camera); const hit = raycaster.intersectObjects([...meshes.values()], false)[0]; hovered = hit ? Number(hit.object.userData.id) : -1; canvas.style.cursor = hovered >= 0 && !stateRef.current.disabled && !hit?.object.userData.matched ? 'pointer' : 'default'; };
       const click = (event: PointerEvent) => { pick(event); const card = stateRef.current.cards.find((item) => item.id === hovered); if (card && !stateRef.current.disabled && !card.isFlipped && !card.isMatched) stateRef.current.onCardClick(hovered); };
       canvas.style.touchAction = 'none'; canvas.addEventListener('pointermove', pick); canvas.addEventListener('pointerdown', click);
       const observer = new ResizeObserver(() => { const rect = canvas.getBoundingClientRect(); if (!rect.width || !rect.height) return; renderer.setSize(rect.width, rect.height, false); camera.aspect = rect.width / rect.height; const requiredHeight = Math.max(8.2, 8.2 / camera.aspect); camera.position.y = requiredHeight / (2 * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2))); camera.updateProjectionMatrix(); }); observer.observe(canvas);
-      let frame = 0;
-      const animate = (now: number) => { const next = JSON.stringify(stateRef.current.cards); if (next !== signature) { signature = next; rebuild(); } meshes.forEach((mesh, id) => { const active = id === hovered && !stateRef.current.disabled; mesh.position.y += ((mesh.userData.matched ? -.08 : active ? .22 : .06) - mesh.position.y) * .13; if (mesh.userData.matched) mesh.rotation.y = Math.sin(now * .003 + id) * .05; }); renderer.render(scene, camera); frame = requestAnimationFrame(animate); };
+      let frame = 0; let last = performance.now();
+      const animate = (now: number) => { const delta = Math.min(.04, (now - last) / 1000); last = now; const smooth = 1 - Math.exp(-8.5 * delta); const next = JSON.stringify(stateRef.current.cards); if (next !== signature) { signature = next; rebuild(); } meshes.forEach((mesh, id) => { const active = id === hovered && !stateRef.current.disabled; mesh.position.y += ((mesh.userData.matched ? -.08 : active ? .22 : .06) - mesh.position.y) * smooth; const flipAge = Number(mesh.userData.flipBirth) ? Math.min(1, (now - Number(mesh.userData.flipBirth)) / 430) : 1; mesh.rotation.z = Math.PI * Math.pow(1 - flipAge, 3); if (mesh.userData.matched) { mesh.rotation.y = Math.sin(now * .003 + id) * .05; const halo = mesh.children[0] as Mesh | undefined; if (halo) { halo.rotation.z = now * .0015 + id; (halo.material as InstanceType<typeof THREE.MeshBasicMaterial>).opacity = .25 + Math.sin(now * .008 + id) * .12; } } }); renderer.render(scene, camera); frame = requestAnimationFrame(animate); };
       frame = requestAnimationFrame(animate);
       teardown = () => { cancelAnimationFrame(frame); observer.disconnect(); canvas.removeEventListener('pointermove', pick); canvas.removeEventListener('pointerdown', click); dispose(scene); renderer.dispose(); };
     });

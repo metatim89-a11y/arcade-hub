@@ -51,12 +51,12 @@ const SpinWheel3D: React.FC<{
       const raycaster = new THREE.Raycaster(); const cursor = new THREE.Vector2();
       const pick = (event: PointerEvent) => { const rect = canvas.getBoundingClientRect(); cursor.set(((event.clientX - rect.left) / rect.width) * 2 - 1, -((event.clientY - rect.top) / rect.height) * 2 + 1); raycaster.setFromCamera(cursor, camera); const hit = raycaster.intersectObjects(wedges, false)[0]; canvas.style.cursor = hit && !stateRef.current.spinning ? 'pointer' : 'default'; return hit; };
       const click = (event: PointerEvent) => { if (pick(event) && !stateRef.current.spinning) stateRef.current.onSpin(); };
-      canvas.addEventListener('pointermove', pick); canvas.addEventListener('pointerup', click);
+      canvas.style.touchAction = 'none'; canvas.addEventListener('pointermove', pick); canvas.addEventListener('pointerdown', click);
       const observer = new ResizeObserver(() => { const rect = canvas.getBoundingClientRect(); if (!rect.width || !rect.height) return; renderer.setSize(rect.width, rect.height, false); camera.aspect = rect.width / rect.height; camera.updateProjectionMatrix(); }); observer.observe(canvas);
-      let frame = 0;
-      const animate = (now: number) => { wheel.rotation.z = rotationRef.current; wedges.forEach((wedge, index) => { const material = wedge.material as InstanceType<typeof THREE.MeshPhysicalMaterial>; const winning = stateRef.current.winningIndex === index; material.emissiveIntensity = winning ? .72 + Math.sin(now * .012) * .28 : .07; wedge.position.z = winning ? Math.sin(now * .01) * .07 : -.15; }); pointer.rotation.z = stateRef.current.spinning ? Math.sin(rotationRef.current * segments.length) * .11 : 0; hub.rotation.y += .003; renderer.render(scene, camera); frame = requestAnimationFrame(animate); };
+      let frame = 0; let last = performance.now();
+      const animate = (now: number) => { const delta = Math.min(.04, (now - last) / 1000); last = now; wheel.rotation.z = rotationRef.current; wedges.forEach((wedge, index) => { const material = wedge.material as InstanceType<typeof THREE.MeshPhysicalMaterial>; const winning = stateRef.current.winningIndex === index; material.emissiveIntensity = winning ? .72 + Math.sin(now * .012) * .28 : .07; wedge.position.z = winning ? Math.sin(now * .01) * .07 : -.15; }); pointer.rotation.z = stateRef.current.spinning ? Math.sin(rotationRef.current * segments.length) * .11 : 0; hub.rotation.y += delta * .18; renderer.render(scene, camera); frame = requestAnimationFrame(animate); };
       frame = requestAnimationFrame(animate);
-      teardown = () => { cancelAnimationFrame(frame); observer.disconnect(); canvas.removeEventListener('pointermove', pick); canvas.removeEventListener('pointerup', click); dispose(scene); renderer.dispose(); };
+      teardown = () => { cancelAnimationFrame(frame); observer.disconnect(); canvas.removeEventListener('pointermove', pick); canvas.removeEventListener('pointerdown', click); dispose(scene); renderer.dispose(); };
     });
     return () => { cancelled = true; teardown(); };
   }, [rotationRef, segments]);

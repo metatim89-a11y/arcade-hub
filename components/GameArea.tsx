@@ -217,7 +217,8 @@ const GameArea: React.FC<GameAreaProps> = ({ games, selectedGame, onSelectGame, 
         .game-content-layer{border-radius:inherit;background:radial-gradient(circle at 50% -12%,color-mix(in srgb,var(--stage-accent) 18%,transparent),transparent 46%),linear-gradient(145deg,var(--stage-panel-from),var(--stage-panel-to));box-shadow:inset 0 1px color-mix(in srgb,var(--stage-accent) 18%,transparent)}
         .game-content-layer :where(.volt-slots,.wheel-game,.coin-pusher-game,.crash-game,.color-recall-game,.holdem-game,.online-table-game,.ocean-hunter){background:radial-gradient(circle at 50% -10%,color-mix(in srgb,var(--stage-accent) 14%,transparent),transparent 44%),linear-gradient(145deg,color-mix(in srgb,var(--stage-panel-from) 86%,transparent),color-mix(in srgb,var(--stage-panel-to) 88%,transparent))!important;border-color:color-mix(in srgb,var(--stage-accent) 42%,#394451)!important}
         .game-engine-stage:after{content:'';position:absolute;z-index:2;inset:0;pointer-events:none;border-radius:inherit;background:radial-gradient(circle at 50% 0%,rgba(115,224,255,.08),transparent 42%),linear-gradient(115deg,transparent 25%,rgba(255,255,255,.025) 42%,transparent 58%);mix-blend-mode:screen;animation:engine-light-sweep 9s ease-in-out infinite}
-        .game-engine-stage canvas{filter:saturate(1.12) contrast(1.035);transition:filter .4s ease}
+        .game-engine-stage canvas{contain:strict;transform:translateZ(0);backface-visibility:hidden;will-change:transform,filter;filter:saturate(1.12) contrast(1.035);transition:filter .45s cubic-bezier(.2,.75,.25,1)}
+        .game-content-layer :where(.poker-table,.online-felt,.volt-machine,.coin-pusher-machine,.mancala-board,.crash-stage,.wheel-glass,.color-recall-stage){transform:translateZ(0);backface-visibility:hidden;will-change:transform,filter;transition:border-color .35s ease,box-shadow .45s ease,background-color .45s ease}
         .game-engine-stage :where(button,[role='button']){transform-style:preserve-3d;transition:transform .18s ease,filter .18s ease,box-shadow .18s ease}
         .game-engine-stage :where(button,[role='button']):not(:disabled):active{transform:translateY(2px) rotateX(-4deg) scale(.98)}
         .game-engine-stage :where(.holdem-card-slot,.card-front,.card-back,.reel-deck,.vault-grid,.stone-stack-icon){transform-style:preserve-3d;backface-visibility:hidden}
@@ -229,7 +230,7 @@ const GameArea: React.FC<GameAreaProps> = ({ games, selectedGame, onSelectGame, 
         @keyframes engine-light-sweep{0%,100%{background-position:-40vw 0;opacity:.65}50%{background-position:40vw 0;opacity:1}}
         @keyframes engine-stage-breathe{50%{filter:drop-shadow(0 21px 34px rgba(0,0,0,.4)) drop-shadow(0 0 24px rgba(88,214,255,.15))}}
         @keyframes engine-token-float{50%{transform:translateZ(10px) translateY(-2px)}}
-        @media(prefers-reduced-motion:reduce){.game-engine-stage:after,.game-engine-stage :where(.poker-table,.volt-machine,.coin-pusher-machine,.wheel-glass,.color-wheel,.stone-stack-icon){animation:none}}
+        @media(prefers-reduced-motion:reduce){.game-engine-stage:after,.game-engine-stage *{scroll-behavior:auto!important}.game-engine-stage :where(.poker-table,.volt-machine,.coin-pusher-machine,.wheel-glass,.color-wheel,.stone-stack-icon,.online-seat,.poker-seat,.holdem-card){animation:none!important;transition-duration:.01ms!important}}
       `}</style>
     </div>
   );

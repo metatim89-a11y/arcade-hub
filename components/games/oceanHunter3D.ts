@@ -309,6 +309,8 @@ export class OceanHunter3DRenderer {
   private cannons = new Map<number, THREE.Group>();
   private background: THREE.Mesh | null = null;
   private seaPlants: THREE.Group[] = [];
+  private bubbles: THREE.Mesh[] = [];
+  private lastRenderTime = 0;
   private disposed = false;
 
   constructor(canvas: HTMLCanvasElement, backgroundUrl: string) {
@@ -351,6 +353,16 @@ export class OceanHunter3DRenderer {
       plant.position.set(-12 + (index * 2.43) % 24, -6.35, -2.1 - index % 6 * .62);
       plant.userData.phase = index * .73; plant.userData.speed = .7 + index % 5 * .08; this.scene.add(plant); this.seaPlants.push(plant);
     }
+    const bubbleMaterial = new THREE.MeshPhysicalMaterial({ color: 0xb9f3ff, transparent: true, opacity: .3, transmission: .65, roughness: .08, depthWrite: false });
+    for (let index = 0; index < 42; index += 1) {
+      const bubble = mesh(new THREE.SphereGeometry(.035 + index % 5 * .013, 10, 7), bubbleMaterial);
+      bubble.position.set(-9 + (index * 4.17) % 18, -6 + (index * 2.37) % 12, -5 + index % 7 * .72);
+      bubble.userData.speed = .38 + index % 6 * .08; bubble.userData.phase = index * .83; this.scene.add(bubble); this.bubbles.push(bubble);
+    }
+    for (let index = 0; index < 3; index += 1) {
+      const ray = mesh(new THREE.ConeGeometry(2.1 + index * .5, 16, 4, 1, true), new THREE.MeshBasicMaterial({ color: 0x75ddff, transparent: true, opacity: .028, depthWrite: false, side: THREE.DoubleSide }));
+      ray.rotation.z = -.3 + index * .22; ray.position.set(-7 + index * 6.8, 4.5, -5.5); this.scene.add(ray);
+    }
 
     const loader = new THREE.TextureLoader();
     loader.load(backgroundUrl, texture => {
@@ -371,7 +383,7 @@ export class OceanHunter3DRenderer {
     );
   }
 
-  private syncCreatures(frame: OceanFrame) {
+  private syncCreatures(frame: OceanFrame, smooth: number, turnSmooth: number) {
     const live = new Set(frame.fish.map(fish => fish.id));
     this.creatures.forEach((rig, id) => {
       if (live.has(id)) return;
@@ -389,22 +401,26 @@ export class OceanHunter3DRenderer {
       let rig = this.creatures.get(fish.id);
       if (!rig) {
         rig = createCreature(fish);
+        rig.root.userData.justCreated = true;
         this.creatures.set(fish.id, rig);
         this.scene.add(rig.root);
       }
       const point = this.worldPoint(fish.x, fish.y, fish.depth);
-      rig.root.position.lerp(point, .38);
+      if (rig.root.userData.justCreated) { rig.root.position.copy(point); rig.root.userData.justCreated = false; }
+      else rig.root.position.lerp(point, smooth);
       const dx = fish.x - rig.lastX;
       const dy = fish.y - rig.lastY;
       const depthVelocity = fish.depth - rig.lastDepth;
       rig.lastX = fish.x; rig.lastY = fish.y; rig.lastDepth = fish.depth;
       const heading = Math.atan2(-dy, dx || fish.vx);
-      rig.body.rotation.z += (heading - rig.body.rotation.z) * .18;
+      const headingDelta = Math.atan2(Math.sin(heading - rig.body.rotation.z), Math.cos(heading - rig.body.rotation.z));
+      rig.body.rotation.z += headingDelta * turnSmooth;
       const targetFacing = fish.vx < 0 ? Math.PI : 0;
       const facingDelta = Math.atan2(Math.sin(targetFacing - rig.body.rotation.y), Math.cos(targetFacing - rig.body.rotation.y));
-      rig.body.rotation.y += facingDelta * .12;
-      rig.body.rotation.x = Math.sin(fish.age * 1.7 + fish.phase) * .045 + THREE.MathUtils.clamp(depthVelocity * 18, -.32, .32);
-      rig.body.position.y = Math.sin(fish.age * 2.4 + fish.phase) * .08;
+      rig.body.rotation.y += facingDelta * turnSmooth;
+      const targetPitch = Math.sin(fish.age * 1.7 + fish.phase) * .045 + THREE.MathUtils.clamp(depthVelocity * 18, -.32, .32);
+      rig.body.rotation.x += (targetPitch - rig.body.rotation.x) * turnSmooth;
+      rig.body.position.y += (Math.sin(fish.age * 2.4 + fish.phase) * .08 - rig.body.position.y) * smooth;
       rig.animated.forEach((part, index) => {
         part.rotation.y = Math.sin(fish.age * (fish.behavior === 'dart' ? 10 : 6.4) + fish.phase + index * .55) * (.22 + index % 3 * .055);
         if (fish.emoji === '🪼' || fish.emoji === '🦑' || fish.emoji === '🐙') part.rotation.z = Math.sin(fish.age * 3.5 + index) * .16;
@@ -425,7 +441,7 @@ export class OceanHunter3DRenderer {
     }
   }
 
-  private syncBullets(frame: OceanFrame) {
+  private syncBullets(frame: OceanFrame, smooth: number) {
     const live = new Set(frame.bullets.map(value => value.id));
     this.bullets.forEach((value, id) => {
       if (!live.has(id)) { this.scene.remove(value); value.geometry.dispose(); (value.material as THREE.Material).dispose(); this.bullets.delete(id); }
@@ -435,13 +451,14 @@ export class OceanHunter3DRenderer {
       if (!value) {
         const color = bullet.weapon === 'Freeze' ? 0xa9f3ff : bullet.weapon === 'Piercing' ? 0xff79ec : colorOf(bullet.color).getHex();
         value = mesh(new THREE.SphereGeometry(bullet.weapon === 'Torpedo' ? .13 : .09, 12, 8), material(color, .18, .35, color));
+        value.position.copy(this.worldPoint(bullet.x, bullet.y, 1.18));
         this.bullets.set(bullet.id, value); this.scene.add(value);
       }
-      value.position.copy(this.worldPoint(bullet.x, bullet.y, 1.18));
+      value.position.lerp(this.worldPoint(bullet.x, bullet.y, 1.18), smooth);
     }
   }
 
-  private syncParticles(frame: OceanFrame) {
+  private syncParticles(frame: OceanFrame, smooth: number) {
     const live = new Set(frame.particles.map(value => value.id));
     this.particles.forEach((value, id) => {
       if (!live.has(id)) { this.scene.remove(value); value.geometry.dispose(); (value.material as THREE.Material).dispose(); this.particles.delete(id); }
@@ -450,14 +467,15 @@ export class OceanHunter3DRenderer {
       let value = this.particles.get(particle.id);
       if (!value) {
         value = mesh(new THREE.IcosahedronGeometry(Math.max(.025, particle.size / 90), 0), new THREE.MeshBasicMaterial({ color: particle.color, transparent: true }));
+        value.position.copy(this.worldPoint(particle.x, particle.y, 1.25));
         this.particles.set(particle.id, value); this.scene.add(value);
       }
-      value.position.copy(this.worldPoint(particle.x, particle.y, 1.25));
+      value.position.lerp(this.worldPoint(particle.x, particle.y, 1.25), smooth);
       (value.material as THREE.MeshBasicMaterial).opacity = Math.max(0, 1 - particle.age / particle.life);
     }
   }
 
-  private syncCannons(frame: OceanFrame) {
+  private syncCannons(frame: OceanFrame, smooth: number) {
     const live = new Set(frame.hunters.map(value => value.id));
     this.cannons.forEach((value, id) => {
       if (!live.has(id)) { this.scene.remove(value); this.cannons.delete(id); }
@@ -473,25 +491,32 @@ export class OceanHunter3DRenderer {
         cannon.add(base, barrel); this.cannons.set(hunter.id, cannon); this.scene.add(cannon);
       }
       const origin = cannonPosition(hunter.side);
-      cannon.position.copy(this.worldPoint(origin.x, origin.y, 1.28));
+      cannon.position.lerp(this.worldPoint(origin.x, origin.y, 1.28), smooth);
       const targetId = frame.targets.get(hunter.id);
       const target = targetId ? frame.fish.find(value => value.id === targetId) : undefined;
       const aim = target || frame.aims.get(hunter.id) || { x: GAME_WIDTH / 2, y: GAME_HEIGHT / 2 };
-      cannon.rotation.z = Math.atan2(origin.y - aim.y, aim.x - origin.x);
+      const targetRotation = Math.atan2(origin.y - aim.y, aim.x - origin.x);
+      cannon.rotation.z += Math.atan2(Math.sin(targetRotation - cannon.rotation.z), Math.cos(targetRotation - cannon.rotation.z)) * smooth;
     }
   }
 
   render(frame: OceanFrame) {
     if (this.disposed) return;
-    this.syncCreatures(frame);
-    this.syncBullets(frame);
-    this.syncParticles(frame);
-    this.syncCannons(frame);
+    const delta = this.lastRenderTime ? Math.min(.05, Math.max(.001, (frame.time - this.lastRenderTime) / 1000)) : 1 / 60;
+    this.lastRenderTime = frame.time;
+    const smooth = 1 - Math.exp(-20 * delta); const turnSmooth = 1 - Math.exp(-9 * delta);
+    this.syncCreatures(frame, smooth, turnSmooth);
+    this.syncBullets(frame, smooth);
+    this.syncParticles(frame, smooth);
+    this.syncCannons(frame, turnSmooth);
     const darkness = frame.environment === 'Darkness';
     this.renderer.toneMappingExposure = darkness ? .58 : frame.environment === 'Current' ? 1.24 : 1.05;
     this.seaPlants.forEach((plant) => { plant.rotation.z = Math.sin(frame.time * .001 * Number(plant.userData.speed) + Number(plant.userData.phase)) * .13; });
-    this.camera.position.x = Math.sin(frame.time * .00012) * .16 + (Math.random() - .5) * frame.shake * .003;
-    this.camera.position.y = Math.cos(frame.time * .00015) * .1 + (Math.random() - .5) * frame.shake * .003;
+    this.bubbles.forEach((bubble) => { bubble.position.y += Number(bubble.userData.speed) * delta; bubble.position.x += Math.sin(frame.time * .0012 + Number(bubble.userData.phase)) * delta * .05; if (bubble.position.y > 6.6) bubble.position.y = -6.4; });
+    const shakeX = Math.sin(frame.time * .081) * frame.shake * .0022; const shakeY = Math.cos(frame.time * .073) * frame.shake * .0018;
+    this.camera.position.x += (Math.sin(frame.time * .00012) * .16 + shakeX - this.camera.position.x) * turnSmooth;
+    this.camera.position.y += (Math.cos(frame.time * .00015) * .1 + shakeY - this.camera.position.y) * turnSmooth;
+    if (this.background) { this.background.position.x = this.camera.position.x * .14; this.background.position.y = this.camera.position.y * .12; }
     this.camera.lookAt(0, 0, 0);
     this.renderer.render(this.scene, this.camera);
   }

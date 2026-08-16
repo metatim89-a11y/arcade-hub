@@ -90,16 +90,17 @@ const SlotsMachine3D: React.FC<{
       const raycaster = new THREE.Raycaster(); const pointer = new THREE.Vector2();
       const pick = (event: PointerEvent) => { const rect = canvas.getBoundingClientRect(); pointer.set(((event.clientX - rect.left) / rect.width) * 2 - 1, -((event.clientY - rect.top) / rect.height) * 2 + 1); pointerTarget.copy(pointer); raycaster.setFromCamera(pointer, camera); const hit = raycaster.intersectObjects([leverBall, spinPad], false)[0]; canvas.style.cursor = hit && !stateRef.current.disabled ? 'pointer' : 'default'; return hit; };
       const activate = (event: PointerEvent) => { const hit = pick(event); if (!hit || stateRef.current.disabled) return; pullUntil = performance.now() + 520; stateRef.current.onSpin(); };
-      canvas.addEventListener('pointermove', pick); canvas.addEventListener('pointerup', activate);
-      let frame = 0;
+      canvas.style.touchAction = 'none'; canvas.addEventListener('pointermove', pick); canvas.addEventListener('pointerdown', activate);
+      let frame = 0; let last = performance.now();
       const animate = (now: number) => {
+        const delta = Math.min(.04, (now - last) / 1000); last = now; const smooth = 1 - Math.exp(-8 * delta); const settle = 1 - Math.exp(-16 * delta);
         const live = stateRef.current; const next = live.reels.map((reel) => `${reel.symbols.slice(-3).join('')}:${reel.spinning}`).join('|'); if (next !== signature) { signature = next; rebuildSymbols(); }
         const winSignature = live.winningPositions.join('|');
         if (winSignature && winSignature !== previousWinSignature) winBurstAt = now;
         previousWinSignature = winSignature;
         const spinningCount = live.reels.filter((reel) => reel.spinning).length;
         live.reels.forEach((reel, reelIndex) => {
-          drums[reelIndex].rotation.x += reel.spinning ? .32 + reelIndex * .018 : .004;
+          drums[reelIndex].rotation.x += delta * (reel.spinning ? 19.2 + reelIndex * 1.08 : .24);
           symbolMeshes.forEach((mesh, key) => {
             if (!key.startsWith(`${reelIndex}-`)) return;
             const row = Number(mesh.userData.row); const winning = live.winningPositions.includes(`${reelIndex}-${row}`);
@@ -110,8 +111,8 @@ const SlotsMachine3D: React.FC<{
               mesh.position.y = -Math.sin(angle) * 2.32; mesh.position.z = Math.cos(angle) * 1.45;
               mesh.rotation.x = angle; mesh.scale.set(1, .9, 1); material.opacity = .82; material.transparent = true;
             } else {
-              mesh.position.y += ((1.68 - row * 1.68) - mesh.position.y) * .24; mesh.position.z += (1.42 - mesh.position.z) * .24;
-              mesh.rotation.x *= .72; mesh.scale.setScalar(winning ? 1 + Math.sin(now * .01) * .045 : 1); material.opacity = 1; material.transparent = false;
+              mesh.position.y += ((1.68 - row * 1.68) - mesh.position.y) * settle; mesh.position.z += (1.42 - mesh.position.z) * settle;
+              mesh.rotation.x *= 1 - settle; mesh.scale.setScalar(winning ? 1 + Math.sin(now * .01) * .045 : 1); material.opacity = 1; material.transparent = false;
             }
           });
         });
@@ -126,14 +127,14 @@ const SlotsMachine3D: React.FC<{
           if (!coin.visible) return;
           const lane = (index % 9) - 4; coin.position.set(lane * .72, -2.5 + age * 6.1 - age * age * 3.4, 2 + Math.sin(index * 2.3) * .45); coin.rotation.x += .15; coin.rotation.y += .2;
         });
-        machine.rotation.y += (pointerTarget.x * .045 + Math.sin(now * .00025) * .012 - machine.rotation.y) * .06;
-        machine.rotation.x += (-pointerTarget.y * .018 - machine.rotation.x) * .06;
+        machine.rotation.y += (pointerTarget.x * .045 + Math.sin(now * .00025) * .012 - machine.rotation.y) * smooth;
+        machine.rotation.x += (-pointerTarget.y * .018 - machine.rotation.x) * smooth;
         machine.position.x = spinningCount ? Math.sin(now * .055) * .018 * spinningCount : 0;
-        camera.position.z += ((live.anticipation ? 11.25 : 12) - camera.position.z) * .04; camera.lookAt(0, 0, 0);
+        camera.position.z += ((live.anticipation ? 11.25 : 12) - camera.position.z) * smooth; camera.lookAt(0, 0, 0);
         renderer.render(scene, camera); frame = requestAnimationFrame(animate);
       };
       frame = requestAnimationFrame(animate);
-      teardown = () => { cancelAnimationFrame(frame); observer.disconnect(); canvas.removeEventListener('pointermove', pick); canvas.removeEventListener('pointerup', activate); dispose(scene); renderer.dispose(); };
+      teardown = () => { cancelAnimationFrame(frame); observer.disconnect(); canvas.removeEventListener('pointermove', pick); canvas.removeEventListener('pointerdown', activate); dispose(scene); renderer.dispose(); };
     });
     return () => { cancelled = true; teardown(); };
   }, []);

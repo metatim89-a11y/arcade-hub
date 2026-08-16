@@ -140,7 +140,7 @@ const RPSCardGame: React.FC<RPSCardGameProps> = ({ playMode }) => {
                 <span>{computerName}: {scores.player2}</span>
             </div>
             <div className="text-lg font-semibold h-7 mb-2">{status}</div>
-            <div className="h-[520px] w-full max-w-[620px] overflow-hidden rounded-3xl shadow-[0_28px_70px_rgba(0,0,0,.48)]">
+            <div className="h-[580px] w-full max-w-[720px] overflow-hidden rounded-3xl shadow-[0_28px_70px_rgba(0,0,0,.48)] max-sm:h-[500px]">
                 <MemoryCards3D cards={board} disabled={gameOver || isChecking || (playMode === 'vsComputer' && currentPlayer === 2)} onCardClick={(id) => handleCardClick(id)} />
             </div>
             {gameOver && <GlassButton onClick={handleReset} className="mt-4 text-xl py-3">Play Again</GlassButton>}

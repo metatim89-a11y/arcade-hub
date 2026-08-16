@@ -277,7 +277,7 @@ const BlackjackGame: React.FC = () => {
           </div>
       </div>
 
-      <div className="relative z-10 mt-8 h-[390px] w-full max-w-3xl overflow-hidden rounded-[38px] border border-yellow-200/15 shadow-[0_30px_70px_rgba(0,0,0,.45)]">
+      <div className="relative z-10 mt-8 h-[460px] w-full max-w-[850px] overflow-hidden rounded-[38px] border border-yellow-200/15 shadow-[0_30px_70px_rgba(0,0,0,.45)] max-sm:h-[390px]">
         <BlackjackTable3D dealerHand={dealerHand} playerHand={playerHand} />
         <div className="pointer-events-none absolute left-1/2 top-3 -translate-x-1/2 rounded-full border border-white/10 bg-black/55 px-4 py-1 text-xs font-bold uppercase tracking-widest text-gray-200">
           Dealer {gameState !== 'BETTING' && `• ${calculateScore(dealerHand)}`}

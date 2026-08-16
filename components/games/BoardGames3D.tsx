@@ -118,7 +118,7 @@ export const TicTacToeBoard3D: React.FC<TicTacToeBoard3DProps> = ({ board, winni
       };
       canvas.addEventListener('pointermove', updatePointer);
       canvas.addEventListener('pointerleave', () => { hovered = -1; });
-      canvas.addEventListener('pointerup', click);
+      canvas.style.touchAction = 'none'; canvas.addEventListener('pointerdown', click);
 
       const addPiece = (index: number, mark: Exclude<TicMark, null>) => {
         const group = new THREE.Group();
@@ -156,8 +156,9 @@ export const TicTacToeBoard3D: React.FC<TicTacToeBoard3DProps> = ({ board, winni
         camera.updateProjectionMatrix();
       });
       observer.observe(canvas);
-      let frame = 0;
+      let frame = 0; let last = performance.now();
       const animate = (now: number) => {
+        const delta = Math.min(.04, (now - last) / 1000); last = now; const smooth = 1 - Math.exp(-9 * delta);
         const live = stateRef.current;
         live.board.forEach((mark, index) => {
           const existing = pieces.get(index);
@@ -176,7 +177,7 @@ export const TicTacToeBoard3D: React.FC<TicTacToeBoard3DProps> = ({ board, winni
           const age = Math.min(1, (now - Number(piece.userData.birth)) / 420);
           const eased = 1 - Math.pow(1 - age, 3);
           piece.scale.setScalar(eased);
-          piece.position.y += (Number(piece.userData.targetY) - piece.position.y) * .14;
+          piece.position.y += (Number(piece.userData.targetY) - piece.position.y) * smooth;
           const winning = live.winningLine.includes(index);
           const pulse = winning ? 1 + Math.sin(now * .009) * .1 : 1;
           piece.scale.multiplyScalar(pulse);
@@ -192,7 +193,7 @@ export const TicTacToeBoard3D: React.FC<TicTacToeBoard3DProps> = ({ board, winni
         cancelAnimationFrame(frame);
         observer.disconnect();
         canvas.removeEventListener('pointermove', updatePointer);
-        canvas.removeEventListener('pointerup', click);
+        canvas.removeEventListener('pointerdown', click);
         disposeObject(scene);
         renderer.dispose();
       };
@@ -292,7 +293,7 @@ export const ConnectFourBoard3D: React.FC<ConnectFourBoard3DProps> = ({ pieces, 
         if (hovered >= 0 && !stateRef.current.disabled) stateRef.current.onColumnClick(hovered);
       };
       canvas.addEventListener('pointermove', updatePointer);
-      canvas.addEventListener('pointerup', click);
+      canvas.style.touchAction = 'none'; canvas.addEventListener('pointerdown', click);
 
       const addPiece = (piece: ConnectPiece3D) => {
         const color = piece.player === '1' ? 0xff3e4d : 0xffd43b;
@@ -360,7 +361,7 @@ export const ConnectFourBoard3D: React.FC<ConnectFourBoard3DProps> = ({ pieces, 
         cancelAnimationFrame(frame);
         observer.disconnect();
         canvas.removeEventListener('pointermove', updatePointer);
-        canvas.removeEventListener('pointerup', click);
+        canvas.removeEventListener('pointerdown', click);
         disposeObject(scene);
         renderer.dispose();
       };

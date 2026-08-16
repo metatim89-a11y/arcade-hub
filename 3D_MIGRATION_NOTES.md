@@ -92,6 +92,24 @@ Convert every game's actual playable surface and pieces to interactive 3D. The e
   - keyboard controls, sequence logic, timing, scoring, audio and best-score persistence remain intact.
 - Production build passed (`vite build`, 135 modules, 2m 26s). Existing large-chunk warnings only.
 
+## Seventh smoothness pass — in progress
+
+- Added GPU-compositing and stable transition hints to the shared game surface, plus broader reduced-motion protection for table, card and seat effects.
+- Converted Tic-Tac-Toe, Connect Four, Spin Wheel and Slots 3D interactions to immediate pointer-down input for cleaner phone response.
+- Made Slots, Coin Pusher, Mancala, Keno, RPS Memory and Color Recall easing frame-rate independent so motion keeps the same character across 30/60/120 Hz screens.
+- Coin Pusher now interpolates coin, pusher and aiming-beam positions between Matter.js frames instead of visibly stepping.
+- Ocean Hunter quality pass:
+  - frame-rate-independent creature position, heading, facing and depth-pitch easing;
+  - smoothed bullets, hit particles and cannon aiming;
+  - deterministic camera shake instead of per-frame random jitter;
+  - parallax backdrop, drifting bubble field and underwater light shafts;
+  - smoother plant movement and camera drift while retaining Phaser as the game clock.
+- Keno number faces now use high-contrast camera-facing 3D labels so all 1–80 values remain readable across WebGL/device texture variations.
+- Increased the available desktop footprint for Tic-Tac-Toe, Connect Four, Blackjack, RPS Memory and Keno while retaining phone-specific height limits.
+- Reduced Spin Wheel from a 430px wheel/620px cabinet to a 360px wheel/560px cabinet, with a smaller 320px phone cap.
+- Mancala pits/stores were rebuilt as dark recessed wells with raised metallic wood rims and player-side guide rails; stones now read as pieces sitting inside carved spaces instead of pucks stacked on the board.
+- RPS Memory cards now have symbol-specific neon palettes, a premium patterned back, state-driven 3D flip animation, brighter edge materials and animated matched-card halos.
+
 ## Planned conversion order
 
 1. Tic-Tac-Toe, Connect Four and Mancala board batch: complete and build-tested.

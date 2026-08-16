@@ -78,11 +78,11 @@ const TicTacToeGame: React.FC<TicTacToeGameProps> = ({ playMode, playerNames }) 
   }
 
   return (
-    <div className="flex flex-col items-center justify-center gap-4 h-full w-full max-w-md mx-auto">
+    <div className="flex flex-col items-center justify-center gap-4 h-full w-full max-w-lg mx-auto">
       <h2 className="text-3xl font-bold mb-4" style={{ color: 'var(--primary-text-color)' }}>Tic-Tac-Toe</h2>
       <div className="text-2xl mb-4 text-white h-8 font-semibold">{status}</div>
       
-      <div className="relative w-full aspect-square max-w-[390px] rounded-2xl overflow-hidden shadow-[0_24px_60px_rgba(0,0,0,.48)]">
+      <div className="relative w-full aspect-square max-w-[460px] rounded-2xl overflow-hidden shadow-[0_24px_60px_rgba(0,0,0,.48)]">
         <TicTacToeBoard3D
           board={board}
           winningLine={winningLine}
