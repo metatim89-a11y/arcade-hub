@@ -23,7 +23,7 @@ const SlotsMachine3D: React.FC<{
   reels: Reel[];
   winningPositions: string[];
   anticipation: boolean;
-  theme: 'base' | 'power' | 'free';
+  theme: string;
   disabled: boolean;
   onSpin: () => void;
 }> = ({ reels, winningPositions, anticipation, theme, disabled, onSpin }) => {
@@ -137,7 +137,8 @@ const SlotsMachine3D: React.FC<{
             }
           });
         });
-        const themeColor = live.theme === 'power' ? 0xffb31f : live.theme === 'free' ? 0x38e6c4 : 0xec50ff;
+        const themePalette: Record<string, number> = { volt: 0xec50ff, pig: 0xff6d9e, chicken: 0xffd34f, angels: 0x8fdcff, devil: 0xff4e5e, crypt: 0xb46cff };
+        const themeColor = themePalette[live.theme] ?? themePalette.volt;
         pink.color.setHex(themeColor); (marquee.material as InstanceType<typeof THREE.MeshStandardMaterial>).emissive.setHex(themeColor);
         lights.forEach((bulb, index) => { const material = bulb.material as InstanceType<typeof THREE.MeshStandardMaterial>; material.color.setHex(themeColor); material.emissive.setHex(themeColor); material.emissiveIntensity = reduceMotion ? (live.anticipation ? 2.2 : 1.05) : (live.anticipation ? 2.2 : 1.05) + Math.sin(now * (live.anticipation ? .02 : .006) + index) * .65; });
         paylines.forEach((line, row) => { const material = line.material as InstanceType<typeof THREE.MeshBasicMaterial>; const active = live.winningPositions.some((position) => position.endsWith(`-${row}`)); material.color.setHex(themeColor); material.opacity = active ? (reduceMotion ? .65 : .42 + Math.sin(now * .018 + row) * .3) : live.anticipation ? .08 + (reduceMotion ? 0 : Math.sin(now * .012 + row) * .05) : 0; line.scale.x = active && !reduceMotion ? .98 + Math.sin(now * .01) * .02 : 1; });

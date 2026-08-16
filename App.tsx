@@ -17,6 +17,7 @@ import ResetPasswordPage from './components/auth/ResetPasswordPage';
 import ProfilePage from './components/profile/ProfilePage';
 import AestheticShopPage from './components/shop/AestheticShopPage';
 import GlobalChat from './components/ui/GlobalChat';
+import ArcadeLobby from './components/ArcadeLobby';
 import { AdminSettingsProvider } from './context/AdminSettingsContext';
 import { recordSiteEvent } from './lib/analytics';
 
@@ -32,6 +33,7 @@ const AppContent: React.FC = () => {
     const requested = new URLSearchParams(window.location.search).get('game');
     return games.find((game) => game.id === requested) ?? games[0];
   });
+  const [showLobby, setShowLobby] = useState(() => !new URLSearchParams(window.location.search).has('game'));
   
   // View States for Auth/Profile
   const [authView, setAuthView] = useState<'login' | 'signup' | 'forgot'>('login');
@@ -64,6 +66,7 @@ const AppContent: React.FC = () => {
       setMode(newMode);
       const newGames = newMode === GameMode.Adult ? ADULT_GAMES : UNDER18_GAMES;
       setSelectedGame(newGames[0]);
+      setShowLobby(true);
       const url = new URL(window.location.href);
       url.searchParams.set('game', newGames[0].id);
       window.history.replaceState({}, '', `${url.pathname}${url.search}${url.hash}`);
@@ -72,6 +75,7 @@ const AppContent: React.FC = () => {
 
   const handleSelectGame = (game: Game) => {
     setSelectedGame(game);
+    setShowLobby(false);
     const url = new URL(window.location.href);
     url.searchParams.set('game', game.id);
     window.history.replaceState({}, '', `${url.pathname}${url.search}${url.hash}`);
@@ -139,9 +143,9 @@ const AppContent: React.FC = () => {
       <Header 
         mode={mode} 
         setMode={handleSetMode} 
-        onProfileClick={() => { setShowProfile(true); setShowShop(false); }}
-        onShopClick={() => { setShowShop(true); setShowProfile(false); }}
-        onHomeClick={() => { setShowProfile(false); setShowShop(false); }}
+        onProfileClick={() => { setShowProfile(true); setShowShop(false); setShowLobby(false); }}
+        onShopClick={() => { setShowShop(true); setShowProfile(false); setShowLobby(false); }}
+        onHomeClick={() => { setShowProfile(false); setShowShop(false); setShowLobby(true); }}
         isProfileActive={showProfile}
         isShopActive={showShop}
       />
@@ -156,6 +160,8 @@ const AppContent: React.FC = () => {
             <ProfilePage onBack={() => setShowProfile(false)} />
         ) : showShop ? (
             <AestheticShopPage onBack={() => setShowShop(false)} />
+        ) : showLobby ? (
+            <ArcadeLobby games={activeGames} mode={mode} onPlay={handleSelectGame} />
         ) : (
             <GameArea 
                 games={activeGames} 
