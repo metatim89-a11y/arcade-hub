@@ -2,6 +2,7 @@ import React from 'react';
 import GlassButton from './ui/GlassButton';
 
 type SupportPageProps = { onBack: () => void };
+const paypalUrl = String(import.meta.env.VITE_PAYPAL_URL || '').trim();
 
 const SupportPage: React.FC<SupportPageProps> = ({ onBack }) => (
   <section className="w-full max-w-4xl px-4 py-10 text-white">
@@ -17,6 +18,7 @@ const SupportPage: React.FC<SupportPageProps> = ({ onBack }) => (
         ].map(([icon, title, copy]) => <div key={title} className="rounded-2xl border border-white/10 bg-white/5 p-4"><span className="text-3xl" aria-hidden="true">{icon}</span><h3 className="mt-3 font-black text-yellow-200">{title}</h3><p className="mt-1 text-sm leading-6 text-slate-300">{copy}</p></div>)}
       </div>
       <div className="mt-8 flex flex-wrap gap-3">
+        {paypalUrl && <a className="rounded-xl bg-[#0070ba] px-5 py-3 font-black text-white transition hover:bg-[#005ea6]" href={paypalUrl} target="_blank" rel="noopener noreferrer">💙 Support with PayPal</a>}
         <a className="rounded-xl bg-yellow-300 px-5 py-3 font-black text-slate-950 transition hover:bg-yellow-200" href="https://github.com/metatim89-a11y/arcade-hub/issues/new?title=Arcade%20Hub%20sponsorship%20inquiry" target="_blank" rel="noopener noreferrer">Sponsor or contact us</a>
         <a className="rounded-xl border border-cyan-200/30 bg-cyan-950/60 px-5 py-3 font-black text-cyan-100 transition hover:bg-cyan-900" href="https://github.com/metatim89-a11y/arcade-hub" target="_blank" rel="noopener noreferrer">View the project</a>
         <GlassButton onClick={onBack}>Back to Arcade</GlassButton>

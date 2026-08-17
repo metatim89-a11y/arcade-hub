@@ -41,6 +41,7 @@ In GitHub → `metatim89-a11y/arcade-hub` → Settings → Secrets and variables
 Add this repository variable:
 
 - `VITE_ADMIN_EMAIL` — the email of the Supabase Auth account that may sign in using the `admin` alias
+- `VITE_PAYPAL_URL` — optional PayPal.Me or PayPal Payment Link shown on the Support page
 
 The workflow in [`.github/workflows/deploy-pages.yml`](.github/workflows/deploy-pages.yml) injects those values only during the Vite build and deploys `dist` to GitHub Pages. The project URL and publishable key are safe in a public browser bundle; database security comes from authentication and row-level security.
 
