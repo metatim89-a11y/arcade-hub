@@ -2,7 +2,7 @@ import React from 'react';
 import GlassButton from './ui/GlassButton';
 
 type SupportPageProps = { onBack: () => void };
-const paypalUrl = String(import.meta.env.VITE_PAYPAL_URL || '').trim();
+const paypalUrl = String(import.meta.env.VITE_PAYPAL_URL || 'https://paypal.me/metatim89').trim();
 
 const SupportPage: React.FC<SupportPageProps> = ({ onBack }) => (
   <section className="w-full max-w-4xl px-4 py-10 text-white">
