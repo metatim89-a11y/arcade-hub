@@ -92,12 +92,12 @@ const SlotsGame: React.FC = () => {
   }, [slotTheme]);
   const totalBet = betPerLine * activePaylines.length;
 
-  useEffect(() => { clearTimers(); setReels(freshReels(themePool)); setPhase('IDLE'); setWinInfo(null); setCelebration(null); setStatus(`${slotTheme.bonus} is ready. Pick a line and spin.`); }, [clearTimers, slotTheme.bonus, themeId, themePool]);
-
   const clearTimers = useCallback(() => {
     timersRef.current.forEach(window.clearTimeout);
     timersRef.current = [];
   }, []);
+
+  useEffect(() => { clearTimers(); setReels(freshReels(themePool)); setPhase('IDLE'); setWinInfo(null); setCelebration(null); setStatus(`${slotTheme.bonus} is ready. Pick a line and spin.`); }, [clearTimers, slotTheme.bonus, themeId, themePool]);
   const schedule = useCallback((fn: () => void, delay: number) => {
     const timer = window.setTimeout(fn, delay);
     timersRef.current.push(timer);

@@ -14,11 +14,13 @@ interface HeaderProps {
   onProfileClick?: () => void;
   onHomeClick?: () => void;
   onShopClick?: () => void;
+  onSupportClick?: () => void;
   isProfileActive?: boolean;
   isShopActive?: boolean;
+  isSupportActive?: boolean;
 }
 
-const Header: React.FC<HeaderProps> = ({ mode, setMode, simple = false, onProfileClick, onHomeClick, onShopClick, isProfileActive, isShopActive }) => {
+const Header: React.FC<HeaderProps> = ({ mode, setMode, simple = false, onProfileClick, onHomeClick, onShopClick, onSupportClick, isProfileActive, isShopActive, isSupportActive }) => {
   const { funCoins, realCoins, tickets, progression, currencyMode, resetCoins } = useCoinSystem();
   const { user, logout } = useAuth();
   const isCasinoMode = mode === GameMode.Adult;
@@ -56,6 +58,7 @@ const Header: React.FC<HeaderProps> = ({ mode, setMode, simple = false, onProfil
             <h1 className="text-3xl md:text-4xl tracking-wider text-yellow-400 [text-shadow:0_2px_8px_rgba(182,137,45,0.26),0_0_2px_#fff] font-bold">
             🎲 Game Arcade Hub
             </h1>
+            <button type="button" onClick={onSupportClick} className="rounded-lg border border-yellow-300/40 bg-black/20 px-4 py-2 text-xs font-black text-yellow-100 hover:bg-black/35">Support the project</button>
             {disclaimer}
             {showAdmin && <AdminPanel onClose={() => setShowAdmin(false)} />}
         </header>
@@ -108,6 +111,7 @@ const Header: React.FC<HeaderProps> = ({ mode, setMode, simple = false, onProfil
                 </button>
             </div>
         )}
+        <button type="button" onClick={onSupportClick} className={`rounded-lg border px-3 py-2 text-xs font-black transition ${isSupportActive ? 'border-yellow-200 bg-yellow-300 text-slate-950' : 'border-yellow-300/40 bg-black/25 text-yellow-100 hover:bg-black/40'}`}>💛 Support</button>
       </div>
 
       {/* Bottom Row: Coins and Mode Switch (Only if not in profile view) */}

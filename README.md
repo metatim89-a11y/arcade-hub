@@ -44,6 +44,8 @@ Add this repository variable:
 
 The workflow in [`.github/workflows/deploy-pages.yml`](.github/workflows/deploy-pages.yml) injects those values only during the Vite build and deploys `dist` to GitHub Pages. The project URL and publishable key are safe in a public browser bundle; database security comes from authentication and row-level security.
 
+The app includes a Support Arcade Hub page with a GitHub sponsorship/contact link. It is intentionally payment-neutral until the owner creates a payout account; add the verified payment link to `components/SupportPage.tsx` when one is available.
+
 ## Commands
 
 - `npm run dev` — local development server

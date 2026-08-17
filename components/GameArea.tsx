@@ -156,7 +156,7 @@ const GameArea: React.FC<GameAreaProps> = ({ games, selectedGame, onSelectGame, 
   
   const gameAreaSizeClass = activeGameProps.game.id === 'fishing'
     ? 'max-w-[1900px]'
-    : (activeGameProps.game.id === 'mancala' || activeGameProps.game.id === 'worm') ? 'max-w-7xl' : 'max-w-4xl';
+    : (activeGameProps.game.id === 'mancala' || activeGameProps.game.id === 'chutes') ? 'max-w-7xl' : 'max-w-4xl';
 
   const themeClasses = (() => {
     if (mode === GameMode.Adult) {

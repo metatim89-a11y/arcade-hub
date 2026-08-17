@@ -5,7 +5,9 @@ import { Game } from './types';
 
 const KenoGame = React.lazy(() => import('./components/games/KenoGame'));
 const PlinkoGame = React.lazy(() => import('./components/games/PlinkoGame'));
-const WormGame = React.lazy(() => import('./components/games/WormGame'));
+const NimGame = React.lazy(() => import('./components/games/NimGame'));
+const ChutesAndLaddersGame = React.lazy(() => import('./components/games/ChutesAndLaddersGame'));
+const BlockDropGame = React.lazy(() => import('./components/games/BlockDropGame'));
 const ConnectFourGame = React.lazy(() => import('./components/games/ConnectFourGame'));
 const FishingGame = React.lazy(() => import('./components/games/FishingGame'));
 const ColorRecallGame = React.lazy(() => import('./components/games/ColorRecallGame'));
@@ -19,7 +21,7 @@ const CoinPusherGame = React.lazy(() => import('./components/games/CoinPusherGam
 const RPSCardGame = React.lazy(() => import('./components/games/RPSCardGame'));
 const TicTacToeGame = React.lazy(() => import('./components/games/TicTacToeGame'));
 
-export const APP_VERSION = '0.0.29';
+export const APP_VERSION = '0.0.30';
 
 export const ADULT_GAMES: Game[] = [
     { id: 'wheel', label: 'Spin Wheel', component: SpinWheelGame },
@@ -34,7 +36,9 @@ export const ADULT_GAMES: Game[] = [
 ];
 
 export const UNDER18_GAMES: Game[] = [
-    { id: 'worm', label: 'Worm.io', component: WormGame },
+    { id: 'nim', label: 'Nim', component: NimGame },
+    { id: 'chutes', label: 'Chutes & Ladders', component: ChutesAndLaddersGame },
+    { id: 'blockdrop', label: 'Block Drop', component: BlockDropGame },
     { id: 'connect4', label: 'Connect Four', component: ConnectFourGame },
     { id: 'rubikscube', label: 'Color Recall', component: ColorRecallGame },
     { id: 'mancala', label: 'Mancala', component: MancalaGame },

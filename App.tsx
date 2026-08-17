@@ -18,6 +18,7 @@ import ProfilePage from './components/profile/ProfilePage';
 import AestheticShopPage from './components/shop/AestheticShopPage';
 import GlobalChat from './components/ui/GlobalChat';
 import ArcadeLobby from './components/ArcadeLobby';
+import SupportPage from './components/SupportPage';
 import { AdminSettingsProvider } from './context/AdminSettingsContext';
 import { recordSiteEvent } from './lib/analytics';
 
@@ -39,6 +40,7 @@ const AppContent: React.FC = () => {
   const [authView, setAuthView] = useState<'login' | 'signup' | 'forgot'>('login');
   const [showProfile, setShowProfile] = useState(false);
   const [showShop, setShowShop] = useState(false);
+  const [showSupport, setShowSupport] = useState(false);
 
   useEffect(() => {
     void recordSiteEvent('page_view', undefined, user && !user.isGuest ? user.id : undefined);
@@ -91,9 +93,9 @@ const AppContent: React.FC = () => {
   if (isPasswordRecovery) {
     return (
       <div className="min-h-screen bg-[radial-gradient(circle_at_50%_25%,_#161b22_60%,_#232a35_100%)] text-gray-100 font-sans flex flex-col">
-        <Header mode={mode} setMode={handleSetMode} simple />
+        <Header mode={mode} setMode={handleSetMode} simple onSupportClick={() => setShowSupport(true)} />
         <main className="flex-grow flex flex-col items-center w-full pt-10">
-          <ResetPasswordPage onComplete={() => setAuthView('login')} />
+            <ResetPasswordPage onComplete={() => setAuthView('login')} />
         </main>
         <Footer />
       </div>
@@ -104,7 +106,7 @@ const AppContent: React.FC = () => {
   if (verificationPendingEmail && !isAuthenticated) {
       return (
         <div className="min-h-screen bg-[radial-gradient(circle_at_50%_25%,_#161b22_60%,_#232a35_100%)] text-gray-100 font-sans flex flex-col">
-            <Header mode={mode} setMode={handleSetMode} simple />
+            <Header mode={mode} setMode={handleSetMode} simple onSupportClick={() => setShowSupport(true)} />
             <main className="flex-grow flex flex-col items-center w-full pt-10">
                 <VerificationPage email={verificationPendingEmail} />
             </main>
@@ -117,9 +119,9 @@ const AppContent: React.FC = () => {
   if (!isAuthenticated) {
     return (
         <div className="min-h-screen bg-[radial-gradient(circle_at_50%_25%,_#161b22_60%,_#232a35_100%)] text-gray-100 font-sans flex flex-col">
-            <Header mode={mode} setMode={handleSetMode} simple />
+            <Header mode={mode} setMode={handleSetMode} simple onSupportClick={() => setShowSupport(true)} />
             <main className="flex-grow flex flex-col items-center w-full pt-10">
-                {authView === 'login' ? (
+                {showSupport ? <SupportPage onBack={() => setShowSupport(false)} /> : authView === 'login' ? (
                     <LoginPage onSwitchToSignup={() => setAuthView('signup')} onForgotPassword={() => setAuthView('forgot')} />
                 ) : authView === 'signup' ? (
                     <SignupPage 
@@ -145,9 +147,11 @@ const AppContent: React.FC = () => {
         setMode={handleSetMode} 
         onProfileClick={() => { setShowProfile(true); setShowShop(false); setShowLobby(false); }}
         onShopClick={() => { setShowShop(true); setShowProfile(false); setShowLobby(false); }}
+        onSupportClick={() => { setShowSupport(true); setShowProfile(false); setShowShop(false); setShowLobby(false); }}
         onHomeClick={() => { setShowProfile(false); setShowShop(false); setShowLobby(true); }}
         isProfileActive={showProfile}
         isShopActive={showShop}
+        isSupportActive={showSupport}
       />
       <main className="flex-grow flex flex-col items-center w-full">
         {notification && (
@@ -156,7 +160,9 @@ const AppContent: React.FC = () => {
                 <button onClick={clearNotification} className="bg-white/20 hover:bg-white/30 rounded-full w-6 h-6 flex items-center justify-center">✕</button>
             </div>
         )}
-        {showProfile ? (
+        {showSupport ? (
+            <SupportPage onBack={() => setShowSupport(false)} />
+        ) : showProfile ? (
             <ProfilePage onBack={() => setShowProfile(false)} />
         ) : showShop ? (
             <AestheticShopPage onBack={() => setShowShop(false)} />

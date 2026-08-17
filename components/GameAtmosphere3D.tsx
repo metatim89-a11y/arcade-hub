@@ -5,7 +5,7 @@ const paletteFor = (gameId: string) => {
   const palettes: Record<string, [number, number, number]> = {
     wheel: [0xffc83d, 0xff4f81, 0x54d8ff], crash: [0xff5b64, 0x64efff, 0xffc84a], blackjack: [0x58d68d, 0xffdf68, 0xf4f7ff],
     poker: [0xe94e68, 0x4dd8a5, 0xffd766], keno: [0x6de6ff, 0x9d72ff, 0xffd85c], plinko: [0x62d9ff, 0xff5ca8, 0xffdd55],
-    slots: [0xffd54f, 0xff5277, 0x7c64ff], coinpusher: [0xffd45c, 0xff9f37, 0x6ee7ff], worm: [0x83f46d, 0x52dfff, 0xff73ce],
+    slots: [0xffd54f, 0xff5277, 0x7c64ff], coinpusher: [0xffd45c, 0xff9f37, 0x6ee7ff], nim: [0x22d3ee, 0x14b8a6, 0xfacc15], chutes: [0x22c55e, 0xf97316, 0xfacc15], blockdrop: [0xa855f7, 0xec4899, 0x22d3ee],
     connect4: [0xff5252, 0xffd84d, 0x55b8ff], rubikscube: [0xff584d, 0x5ee58b, 0x53a8ff], mancala: [0xe6a45f, 0x73d5a4, 0xffd27b],
     rps: [0xff6e91, 0x72d8ff, 0xffdd62], tictactoe: [0x65e6ff, 0xff5d9e, 0xffdf5e]
   };
@@ -45,7 +45,7 @@ const GameAtmosphere3D: React.FC<{ gameId: string }> = ({ gameId }) => {
         if (gameId === 'plinko') return new THREE.SphereGeometry(.13 + index % 3 * .045, 12, 8);
         if (gameId === 'crash') return index % 3 === 0 ? new THREE.ConeGeometry(.22, .65, 5) : new THREE.TetrahedronGeometry(.16);
         if (gameId === 'rubikscube') return new THREE.BoxGeometry(.42, .42, .42);
-        if (gameId === 'mancala' || gameId === 'keno' || gameId === 'worm') return new THREE.DodecahedronGeometry(.2 + index % 3 * .045, 0);
+        if (gameId === 'mancala' || gameId === 'keno' || gameId === 'nim' || gameId === 'chutes' || gameId === 'blockdrop') return new THREE.DodecahedronGeometry(.2 + index % 3 * .045, 0);
         return new THREE.IcosahedronGeometry(.2, 0);
       };
 

@@ -7,7 +7,7 @@ export const GOLD_SPEND_COINS = 100 * COINS_PER_USD;
 export const BADGE_GAMES = [
   ['wheel', 'Spin Wheel'], ['crash', 'Crash'], ['blackjack', 'Blackjack'], ['poker', 'Holdem'],
   ['keno', 'Keno'], ['plinko', 'Plinko'], ['slots', 'Slots'], ['fishing', 'Ocean Hunter'],
-  ['coinpusher', 'Coin Pusher'], ['worm', 'Worm.io'], ['connect4', 'Connect Four'],
+  ['coinpusher', 'Coin Pusher'], ['nim', 'Nim'], ['chutes', 'Chutes & Ladders'], ['blockdrop', 'Block Drop'], ['connect4', 'Connect Four'],
   ['rubikscube', 'Color Recall'], ['mancala', 'Mancala'], ['rps', 'RPS Cards'],
   ['tictactoe', 'Tic Tac Toe'],
 ] as const;
