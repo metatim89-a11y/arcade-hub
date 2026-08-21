@@ -19,29 +19,22 @@ const TexasHoldemLobby = React.lazy(() => import('./components/games/TexasHoldem
 const SpinWheelGame = React.lazy(() => import('./components/games/SpinWheelGame'));
 const CoinPusherGame = React.lazy(() => import('./components/games/CoinPusherGame'));
 const NeonHopperGame = React.lazy(() => import('./components/games/NeonHopperGame'));
-const TicTacToeGame = React.lazy(() => import('./components/games/TicTacToeGame'));
+const WormGame = React.lazy(() => import('./components/games/WormGame'));
 
 export const APP_VERSION = '0.0.34';
 
 export const ADULT_GAMES: Game[] = [
-    { id: 'wheel', label: 'Spin Wheel', component: SpinWheelGame },
-    { id: 'crash', label: 'Crash', component: CrashGame },
-    { id: 'blackjack', label: 'Blackjack', component: BlackjackGame },
-    { id: 'poker', label: 'Hold\'em', component: TexasHoldemLobby },
-    { id: 'keno', label: 'Keno', component: KenoGame },
-    { id: 'plinko', label: 'Plinko', component: PlinkoGame },
-    { id: 'slots', label: 'Slots', component: SlotsGame },
     { id: 'fishing', label: 'Ocean Hunter', component: FishingGame },
-    { id: 'coinpusher', label: 'Coin Pusher', component: CoinPusherGame },
+    { id: 'coinpusher', label: 'Coin Pusher 3D', component: CoinPusherGame },
+    { id: 'crash', label: 'Crash Velocity', component: CrashGame },
+    { id: 'plinko', label: 'Peg Plinko', component: PlinkoGame },
+    { id: 'slots', label: 'Volt Vault Slots', component: SlotsGame },
 ];
 
 export const UNDER18_GAMES: Game[] = [
-    { id: 'nim', label: 'Nim', component: NimGame },
-    { id: 'chutes', label: 'Chutes & Ladders', component: ChutesAndLaddersGame },
-    { id: 'blockdrop', label: 'Block Drop', component: BlockDropGame },
-    { id: 'connect4', label: 'Connect Four', component: ConnectFourGame },
-    { id: 'rubikscube', label: 'Color Recall', component: ColorRecallGame },
-    { id: 'mancala', label: 'Mancala', component: MancalaGame },
     { id: 'neonhopper', label: 'Neon Hopper', component: NeonHopperGame },
-    { id: 'tictactoe', label: 'Tic Tac Toe', component: TicTacToeGame },
+    { id: 'worm', label: 'Worm Arena 3D', component: WormGame },
+    { id: 'blockdrop', label: 'Block Drop', component: BlockDropGame },
+    { id: 'mancala', label: 'Mancala 3D', component: MancalaGame },
+    { id: 'chutes', label: 'Chutes & Ladders', component: ChutesAndLaddersGame },
 ];
