@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Automated Git Stage, Commit, Pull, and Push Script for Arcade Hub
+# Automated Git Stage, Commit, Merge, and Push Script for Arcade Hub
 set -e
 
 repo_root=$(git rev-parse --show-toplevel 2>/dev/null || echo ".")
@@ -27,8 +27,8 @@ else
     git commit -m "$COMMIT_MSG"
 fi
 
-echo "3. Fetching and rebasing from origin $CURRENT_BRANCH..."
-git pull --rebase origin "$CURRENT_BRANCH" || git rebase --abort
+echo "3. Pulling latest remote changes..."
+git pull --no-rebase -s recursive -X ours origin "$CURRENT_BRANCH" --no-edit || true
 
 echo "4. Pushing to origin $CURRENT_BRANCH..."
 git push origin "$CURRENT_BRANCH"
