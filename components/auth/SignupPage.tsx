@@ -17,6 +17,8 @@ const SignupPage: React.FC<SignupPageProps> = ({ onSwitchToLogin, onSignupSucces
 
   const [showPassword, setShowPassword] = useState(false);
 
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
@@ -26,11 +28,14 @@ const SignupPage: React.FC<SignupPageProps> = ({ onSwitchToLogin, onSignupSucces
         return;
     }
 
+    setIsSubmitting(true);
     try {
       await signup(username, email, password);
       onSignupSuccess(email);
     } catch (err: any) {
-      setError(err.message);
+      setError(err?.message || 'Failed to create account. Please try again.');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -101,8 +106,8 @@ const SignupPage: React.FC<SignupPageProps> = ({ onSwitchToLogin, onSignupSucces
             </div>
           </div>
 
-          <GlassButton type="submit" className="mt-2 w-full py-3 !bg-blue-600 hover:!bg-blue-500">
-            SIGN UP
+          <GlassButton type="submit" disabled={isSubmitting} className="mt-2 w-full py-3 !bg-blue-600 hover:!bg-blue-500 disabled:opacity-50">
+            {isSubmitting ? 'CREATING ACCOUNT...' : 'SIGN UP'}
           </GlassButton>
         </form>
 

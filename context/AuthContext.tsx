@@ -112,39 +112,40 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   }, []);
 
   const login = useCallback(async (identifier: string, password: string) => {
-    setIsLoading(true);
-    try {
-      const raw = identifier.trim();
-      if (!raw) throw new Error('Please enter your email or username.');
-      const normalized = raw.toLowerCase();
-      let email = raw;
+    const raw = identifier.trim();
+    if (!raw) throw new Error('Please enter your email or username.');
+    if (!password) throw new Error('Please enter your password.');
+    const normalized = raw.toLowerCase();
+    let email = raw;
 
-      if (normalized === 'admin') {
-        if (!ADMIN_LOGIN_EMAIL) {
-          throw new Error('The administrator login alias is not configured.');
-        }
-        email = ADMIN_LOGIN_EMAIL;
-      } else if (!raw.includes('@')) {
-        const supabase = getSupabase();
-        const { data: lookedUpEmail, error: rpcError } = await supabase.rpc('lookup_login_email', { p_username: raw });
-        if (rpcError) {
-          console.warn('Username lookup error:', rpcError);
-        }
-        if (lookedUpEmail && typeof lookedUpEmail === 'string' && lookedUpEmail.includes('@')) {
-          email = lookedUpEmail;
-        } else {
-          throw new Error(`No account found with username "${raw}". Try signing in with your email.`);
-        }
+    if (normalized === 'admin') {
+      if (!ADMIN_LOGIN_EMAIL) {
+        throw new Error('The administrator login alias is not configured.');
       }
-
-      const { data, error } = await getSupabase().auth.signInWithPassword({ email, password });
-      if (error) throw error;
-      if (!data.user) throw new Error('Sign in did not return a user.');
-      window.localStorage.removeItem(GUEST_SESSION_KEY);
-      setUser(await loadPlayer(data.user));
-    } finally {
-      setIsLoading(false);
+      email = ADMIN_LOGIN_EMAIL;
+    } else if (!raw.includes('@')) {
+      const supabase = getSupabase();
+      const { data: lookedUpEmail, error: rpcError } = await supabase.rpc('lookup_login_email', { p_username: raw });
+      if (rpcError) {
+        console.warn('Username lookup error:', rpcError);
+      }
+      if (lookedUpEmail && typeof lookedUpEmail === 'string' && lookedUpEmail.includes('@')) {
+        email = lookedUpEmail;
+      } else {
+        throw new Error(`No account found with username "${raw}". If this is a new account, please sign up first or use your email.`);
+      }
     }
+
+    const { data, error } = await getSupabase().auth.signInWithPassword({ email, password });
+    if (error) {
+      if (error.message.toLowerCase().includes('invalid login credentials')) {
+        throw new Error('Invalid email/username or password. Please check your credentials.');
+      }
+      throw error;
+    }
+    if (!data.user) throw new Error('Sign in did not return a user.');
+    window.localStorage.removeItem(GUEST_SESSION_KEY);
+    setUser(await loadPlayer(data.user));
   }, []);
 
   const loginAsGuest = useCallback(async () => {
@@ -164,23 +165,18 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   }, []);
 
   const signup = useCallback(async (username: string, email: string, password: string) => {
-    setIsLoading(true);
-    try {
-      const redirectTo = new URL(import.meta.env.BASE_URL, window.location.origin).toString();
-      const { data, error } = await getSupabase().auth.signUp({
-        email: email.trim().toLowerCase(),
-        password,
-        options: { data: { display_name: username.trim() }, emailRedirectTo: redirectTo },
-      });
-      if (error) throw error;
+    const redirectTo = new URL(import.meta.env.BASE_URL, window.location.origin).toString();
+    const { data, error } = await getSupabase().auth.signUp({
+      email: email.trim().toLowerCase(),
+      password,
+      options: { data: { display_name: username.trim() }, emailRedirectTo: redirectTo },
+    });
+    if (error) throw error;
 
-      if (data.session && data.user) {
-        setUser(await loadPlayer(data.user));
-      } else {
-        setVerificationPendingEmail(email.trim().toLowerCase());
-      }
-    } finally {
-      setIsLoading(false);
+    if (data.session && data.user) {
+      setUser(await loadPlayer(data.user));
+    } else {
+      setVerificationPendingEmail(email.trim().toLowerCase());
     }
   }, []);
 

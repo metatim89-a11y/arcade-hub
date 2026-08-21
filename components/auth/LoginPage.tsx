@@ -13,16 +13,20 @@ const LoginPage: React.FC<LoginPageProps> = ({ onSwitchToSignup, onForgotPasswor
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const [showPassword, setShowPassword] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    setIsSubmitting(true);
     try {
       await login(identifier, password);
     } catch (err: any) {
-      setError(err.message);
+      setError(err?.message || 'Failed to sign in. Please try again.');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -88,8 +92,8 @@ const LoginPage: React.FC<LoginPageProps> = ({ onSwitchToSignup, onForgotPasswor
             </div>
           </div>
 
-          <GlassButton type="submit" className="mt-2 w-full py-3 !bg-yellow-500 hover:!bg-yellow-400 text-gray-900">
-            ENTER ARCADE
+          <GlassButton type="submit" disabled={isSubmitting} className="mt-2 w-full py-3 !bg-yellow-500 hover:!bg-yellow-400 text-gray-900 disabled:opacity-50">
+            {isSubmitting ? 'ENTERING ARCADE...' : 'ENTER ARCADE'}
           </GlassButton>
         </form>
 
