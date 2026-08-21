@@ -22,12 +22,13 @@ import SupportPage from './components/SupportPage';
 import { AdminSettingsProvider } from './context/AdminSettingsContext';
 import { recordSiteEvent } from './lib/analytics';
 
+import TradingBotDashboard from './components/bot/TradingBotDashboard';
+
 const AppContent: React.FC = () => {
   const { user, isAuthenticated, isLoading, verificationPendingEmail, isPasswordRecovery } = useAuth();
   const { notification, clearNotification } = useCoinSystem();
   const [mode, setMode] = useState<GameMode>(GameMode.Under18);
   const [games] = useState(() => {
-      // Initial games logic - effect below updates it
       return mode === GameMode.Adult ? ADULT_GAMES : UNDER18_GAMES;
   });
   const [selectedGame, setSelectedGame] = useState<Game>(() => {
@@ -36,11 +37,12 @@ const AppContent: React.FC = () => {
   });
   const [showLobby, setShowLobby] = useState(() => !new URLSearchParams(window.location.search).has('game'));
   
-  // View States for Auth/Profile
+  // View States for Auth/Profile/TradingBot
   const [authView, setAuthView] = useState<'login' | 'signup' | 'forgot'>('login');
   const [showProfile, setShowProfile] = useState(false);
   const [showShop, setShowShop] = useState(false);
   const [showSupport, setShowSupport] = useState(false);
+  const [showTradingBot, setShowTradingBot] = useState(false);
 
   useEffect(() => {
     void recordSiteEvent('page_view', undefined, user && !user.isGuest ? user.id : undefined);
@@ -145,13 +147,15 @@ const AppContent: React.FC = () => {
       <Header 
         mode={mode} 
         setMode={handleSetMode} 
-        onProfileClick={() => { setShowProfile(true); setShowShop(false); setShowLobby(false); }}
-        onShopClick={() => { setShowShop(true); setShowProfile(false); setShowLobby(false); }}
-        onSupportClick={() => { setShowShop(true); setShowProfile(false); setShowLobby(false); }}
-        onHomeClick={() => { setShowProfile(false); setShowShop(false); setShowLobby(true); }}
+        onProfileClick={() => { setShowProfile(true); setShowShop(false); setShowSupport(false); setShowTradingBot(false); setShowLobby(false); }}
+        onShopClick={() => { setShowShop(true); setShowProfile(false); setShowSupport(false); setShowTradingBot(false); setShowLobby(false); }}
+        onSupportClick={() => { setShowSupport(true); setShowShop(false); setShowProfile(false); setShowTradingBot(false); setShowLobby(false); }}
+        onBotClick={() => { setShowTradingBot(true); setShowShop(false); setShowProfile(false); setShowSupport(false); setShowLobby(false); }}
+        onHomeClick={() => { setShowProfile(false); setShowShop(false); setShowSupport(false); setShowTradingBot(false); setShowLobby(true); }}
         isProfileActive={showProfile}
         isShopActive={showShop}
         isSupportActive={showSupport}
+        isBotActive={showTradingBot}
       />
       <main className="flex-grow flex flex-col items-center w-full">
         {notification && (
@@ -160,7 +164,9 @@ const AppContent: React.FC = () => {
                 <button onClick={clearNotification} className="bg-white/20 hover:bg-white/30 rounded-full w-6 h-6 flex items-center justify-center">✕</button>
             </div>
         )}
-        {showSupport ? (
+        {showTradingBot ? (
+            <TradingBotDashboard />
+        ) : showSupport ? (
             <SupportPage onBack={() => setShowSupport(false)} />
         ) : showProfile ? (
             <ProfilePage onBack={() => setShowProfile(false)} />

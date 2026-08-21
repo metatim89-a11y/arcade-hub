@@ -15,12 +15,14 @@ interface HeaderProps {
   onHomeClick?: () => void;
   onShopClick?: () => void;
   onSupportClick?: () => void;
+  onBotClick?: () => void;
   isProfileActive?: boolean;
   isShopActive?: boolean;
   isSupportActive?: boolean;
+  isBotActive?: boolean;
 }
 
-const Header: React.FC<HeaderProps> = ({ mode, setMode, simple = false, onProfileClick, onHomeClick, onShopClick, onSupportClick, isProfileActive, isShopActive, isSupportActive }) => {
+const Header: React.FC<HeaderProps> = ({ mode, setMode, simple = false, onProfileClick, onHomeClick, onShopClick, onSupportClick, onBotClick, isProfileActive, isShopActive, isSupportActive, isBotActive }) => {
   const { funCoins, realCoins, tickets, progression, currencyMode, resetCoins } = useCoinSystem();
   const { user, logout } = useAuth();
   const isCasinoMode = mode === GameMode.Adult;
@@ -159,16 +161,25 @@ const Header: React.FC<HeaderProps> = ({ mode, setMode, simple = false, onProfil
 
             <div className="flex gap-2 ml-auto">
                 <button
-                    onClick={() => setMode(GameMode.Under18)}
-                    className={`${buttonClasses} ${!isCasinoMode ? activeButtonClasses : ''}`}
+                    type="button"
+                    onClick={() => { onHomeClick?.(); setMode(GameMode.Under18); }}
+                    className={`${buttonClasses} ${!isCasinoMode && !isBotActive ? activeButtonClasses : ''}`}
                 >
                     Arcade
                 </button>
                 <button
-                    onClick={() => setMode(GameMode.Adult)}
-                    className={`${buttonClasses} ${isCasinoMode ? activeButtonClasses : ''}`}
+                    type="button"
+                    onClick={() => { onHomeClick?.(); setMode(GameMode.Adult); }}
+                    className={`${buttonClasses} ${isCasinoMode && !isBotActive ? activeButtonClasses : ''}`}
                 >
                     Casino 18+
+                </button>
+                <button
+                    type="button"
+                    onClick={onBotClick}
+                    className={`${buttonClasses} ${isBotActive ? activeButtonClasses : ''}`}
+                >
+                    🤖 TRADING BOT
                 </button>
             </div>
         </div>
