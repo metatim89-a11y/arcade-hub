@@ -1,8 +1,8 @@
-import React from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import type { Game, GameMode } from '../types';
 import { useCoinSystem } from '../context/CoinContext';
 import { useAuth } from '../context/AuthContext';
-import { useEffect, useState } from 'react';
+import { getSupabase } from '../lib/supabase';
 
 type ArcadeLobbyProps = {
   games: Game[];
@@ -10,322 +10,216 @@ type ArcadeLobbyProps = {
   onPlay: (game: Game) => void;
 };
 
-// SVG badges for games (replacing emojis)
-const gameBadges: Record<string, { tag: string; blurb: string; iconSvg: React.ReactNode }> = {
-  fishing: {
-    tag: 'DEEP OCEAN',
-    blurb: 'Track trophy catches & deep sea targets',
-    iconSvg: (
-      <svg className="w-8 h-8 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 21a9 9 0 01-9-9c0-4.97 4.03-9 9-9s9 4.03 9 9a9 9 0 01-9 9zm0-15a6 6 0 100 12 6 6 0 000-12z" />
-      </svg>
-    )
-  },
-  slots: {
-    tag: 'VOLT VAULT',
-    blurb: 'Spin high yield multiplier reels',
-    iconSvg: (
-      <svg className="w-8 h-8 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 6h16M4 10h16M4 14h16M4 18h16" />
-      </svg>
-    )
-  },
-  plinko: {
-    tag: 'PEG MATRIX',
-    blurb: 'Drop down high velocity multiplier pegs',
-    iconSvg: (
-      <svg className="w-8 h-8 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 3v18m9-9H3m15.364 6.364l-12.728-12.728m12.728 0L6.364 18.364" />
-      </svg>
-    )
-  },
-  crash: {
-    tag: 'VELOCITY CURVE',
-    blurb: 'Time your cash out before collision',
-    iconSvg: (
-      <svg className="w-8 h-8 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
-      </svg>
-    )
-  },
-  wheel: {
-    tag: 'TITANIUM WHEEL',
-    blurb: 'Pick precision sector stakes',
-    iconSvg: (
-      <svg className="w-8 h-8 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-      </svg>
-    )
-  },
-  nim: {
-    tag: 'LOGIC NIM',
-    blurb: 'Execute strategic pile elimination',
-    iconSvg: (
-      <svg className="w-8 h-8 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 7h6m-6 5h6m-6 5h6M6 7h.01M6 12h.01M6 17h.01" />
-      </svg>
-    )
-  },
-  chutes: {
-    tag: 'TACTICAL RACE',
-    blurb: 'Climb ladders and calculate slides',
-    iconSvg: (
-      <svg className="w-8 h-8 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 5h16M4 12h16M4 19h16M8 5v14m8-14v14" />
-      </svg>
-    )
-  },
-  blockdrop: {
-    tag: 'GRID STACK',
-    blurb: 'Stack block formations and clear lines',
-    iconSvg: (
-      <svg className="w-8 h-8 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2z" />
-      </svg>
-    )
-  },
-  mancala: {
-    tag: 'PIT TACTICS',
-    blurb: 'Classic pebble distribution strategy',
-    iconSvg: (
-      <svg className="w-8 h-8 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M20 12H4m16 0a8 8 0 11-16 0 8 8 0 0116 0z" />
-      </svg>
-    )
-  },
-  rps: {
-    tag: 'SHOWDOWN',
-    blurb: 'Predict table sequences and counter moves',
-    iconSvg: (
-      <svg className="w-8 h-8 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-      </svg>
-    )
-  },
-  neonhopper: {
-    tag: 'RETRO HOPPER',
-    blurb: 'Dodge laser cars and navigate floating river logs',
-    iconSvg: (
-      <svg className="w-8 h-8 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M13 10V3L4 14h7v7l9-11h-7z" />
-      </svg>
-    )
-  },
-  kongclimber: {
-    tag: 'RETRO CLIMBER',
-    blurb: 'Dodge rolling barrels and climb steel girders to victory',
-    iconSvg: (
-      <svg className="w-8 h-8 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M5 3v18M19 3v18M5 7h14M5 12h14M5 17h14" />
-      </svg>
-    )
-  },
-  coinpusher: {
-    tag: 'PHYSICS DROPS',
-    blurb: 'Drop shiny coins to push massive token cascades',
-    iconSvg: (
-      <svg className="w-8 h-8 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-      </svg>
-    )
-  }
+type LeaderboardRow = {
+  display_name: string;
+  play_count: number;
+  coins_spent: number;
 };
 
+const GAME_META: Record<string, { icon: string; tag: string; blurb: string }> = {
+  fishing: { icon: '🌊', tag: 'Ocean Action', blurb: 'Hunt targets, chain combos, face bosses and push deeper into the ocean.' },
+  coinpusher: { icon: '🪙', tag: 'Physics Arcade', blurb: 'Drop coins, build pressure and trigger satisfying cascades off the edge.' },
+  crash: { icon: '🚀', tag: 'Timing', blurb: 'Ride the multiplier and decide when to cash out before the run ends.' },
+  plinko: { icon: '🔻', tag: 'Drop Game', blurb: 'Choose your risk, release the ball and watch it bounce through the peg field.' },
+  slots: { icon: '⚡', tag: 'Reels', blurb: 'Spin themed reels with bonuses, free spins, power meters and special features.' },
+  neonhopper: { icon: '🟢', tag: 'Reflex', blurb: 'Dodge traffic, ride moving logs and climb the neon course one hop at a time.' },
+  kongclimber: { icon: '🦍', tag: 'Platform', blurb: 'Climb girders, dodge barrels and reach the top without getting knocked back.' },
+  blockdrop: { icon: '🧱', tag: 'Puzzle', blurb: 'Stack clean lines, use fast drops and keep the board alive as speed increases.' },
+  mancala: { icon: '🟡', tag: 'Strategy', blurb: 'Plan captures, extra turns and long sequences in a classic head-to-head board game.' },
+  chutes: { icon: '🪜', tag: 'Race', blurb: 'Race to the finish while ladders launch you forward and chutes send you back.' },
+  connect4: { icon: '🔴', tag: 'Strategy', blurb: 'Build four in a row while blocking your opponent and planning several moves ahead.' },
+  blackjack: { icon: '🂡', tag: 'Cards', blurb: 'Play a clean virtual blackjack table using entertainment-only arcade currency.' },
+  poker: { icon: '♠️', tag: 'Cards', blurb: 'Take a seat at the Hold’em table and play against other people when tables are available.' },
+  keno: { icon: '🎯', tag: 'Numbers', blurb: 'Pick numbers, set your entertainment wager and reveal the draw.' },
+  wheel: { icon: '🎡', tag: 'Spin', blurb: 'Choose a sector and spin a fast arcade wheel with mixed outcomes.' },
+};
+
+const fallbackMeta = { icon: '🎮', tag: 'Arcade Original', blurb: 'A playable Arcade Hub original built for quick browser sessions.' };
+
 const ArcadeLobby: React.FC<ArcadeLobbyProps> = ({ games, mode, onPlay }) => {
-
-  const { progression, claimLevelFaucet } = useCoinSystem();
+  const { progression, claimLevelFaucet, tickets, funCoins, realCoins } = useCoinSystem();
   const { user } = useAuth();
-  const [faucetReadyStr, setFaucetReadyStr] = useState<string>('');
   const [faucetReady, setFaucetReady] = useState(false);
+  const [faucetLabel, setFaucetLabel] = useState('Checking faucet…');
+  const [leaderboardGameId, setLeaderboardGameId] = useState(games[0]?.id ?? '');
+  const [leaderboard, setLeaderboard] = useState<LeaderboardRow[]>([]);
+  const [leaderboardLoading, setLeaderboardLoading] = useState(false);
+  const [leaderboardError, setLeaderboardError] = useState('');
 
-  useEffect(() => {
+  const isAdult = String(mode) === 'Adult';
+  const featured = games.find((game) => game.id === (isAdult ? 'fishing' : 'neonhopper')) ?? games[0];
+  const featuredMeta = GAME_META[featured?.id] ?? fallbackMeta;
+
+  const updateFaucetState = () => {
     if (!progression.nextFaucetAt) {
       setFaucetReady(true);
-      setFaucetReadyStr('CLAIM FREE GC NOW');
+      setFaucetLabel(`CLAIM ${progression.faucetAmount.toLocaleString()} FREE GC`);
       return;
     }
-    const interval = setInterval(() => {
-      const now = new Date().getTime();
-      const nextTime = new Date(progression.nextFaucetAt!).getTime();
-      if (now >= nextTime) {
-         setFaucetReady(true);
-         setFaucetReadyStr('CLAIM FREE GC NOW');
-      } else {
-         setFaucetReady(false);
-         const diff = Math.floor((nextTime - now) / 1000);
-         const m = Math.floor(diff / 60);
-         const s = diff % 60;
-         setFaucetReadyStr(`COOLDOWN: ${m}m ${String(s).padStart(2, '0')}s`);
-      }
-    }, 1000);
-    return () => clearInterval(interval);
-  }, [progression.nextFaucetAt]);
-
-  const handleClaim = async () => {
-     if (!faucetReady) return;
-     const result = await claimLevelFaucet();
-     if (result) {
-       alert("Successfully claimed free GC!");
-     }
+    const remainingMs = new Date(progression.nextFaucetAt).getTime() - Date.now();
+    if (remainingMs <= 0) {
+      setFaucetReady(true);
+      setFaucetLabel(`CLAIM ${progression.faucetAmount.toLocaleString()} FREE GC`);
+      return;
+    }
+    const totalSeconds = Math.ceil(remainingMs / 1000);
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
+    setFaucetReady(false);
+    setFaucetLabel(`Free GC in ${minutes}:${String(seconds).padStart(2, '0')}`);
   };
 
-  const featured = games.find((game) => game.id === (mode === 'Adult' ? 'fishing' : 'nim')) ?? games[0];
-  const art = gameBadges[featured.id] ?? { tag: 'ORIGINAL', blurb: 'Featured Arcade Hub Title', iconSvg: null };
-  const originals = games.slice(0, 6);
+  useEffect(() => {
+    updateFaucetState();
+    const timer = window.setInterval(updateFaucetState, 1000);
+    return () => window.clearInterval(timer);
+  }, [progression.nextFaucetAt, progression.faucetAmount]);
+
+  useEffect(() => {
+    if (!games.some((game) => game.id === leaderboardGameId)) {
+      setLeaderboardGameId(games[0]?.id ?? '');
+    }
+  }, [games, leaderboardGameId]);
+
+  useEffect(() => {
+    if (!leaderboardGameId || !user || user.isGuest) {
+      setLeaderboard([]);
+      return;
+    }
+    let cancelled = false;
+    const load = async () => {
+      setLeaderboardLoading(true);
+      setLeaderboardError('');
+      try {
+        const { data, error } = await getSupabase().rpc('get_game_activity_leaderboard', { p_game_id: leaderboardGameId });
+        if (error) throw error;
+        if (!cancelled) {
+          setLeaderboard((data ?? []).map((row: any) => ({
+            display_name: String(row.display_name || 'Player'),
+            play_count: Number(row.play_count || 0),
+            coins_spent: Number(row.coins_spent || 0),
+          })));
+        }
+      } catch (error: any) {
+        if (!cancelled) {
+          setLeaderboard([]);
+          setLeaderboardError(error?.message || 'Leaderboard unavailable.');
+        }
+      } finally {
+        if (!cancelled) setLeaderboardLoading(false);
+      }
+    };
+    void load();
+    return () => { cancelled = true; };
+  }, [leaderboardGameId, user?.id]);
+
+  const handleClaim = async () => {
+    if (!faucetReady) return;
+    await claimLevelFaucet();
+  };
+
+  const economyCards = useMemo(() => [
+    ['GC', 'Free play currency', 'GC is given away through the faucet and play systems. You do not need to buy GC to enjoy Arcade Hub.'],
+    ['Tickets', 'Competitive rewards', 'Tickets are earned through eligible head-to-head and real-player competition and can be used in the shop or traded toward XP.'],
+    ['XP + Levels', 'Long-term progression', 'Trade eligible GC and tickets for XP to raise your level, improve progression rewards and build your arcade profile.'],
+    ['RC', 'Virtual arcade credits', 'RC is a virtual entertainment balance. Ticket-shop systems can award RC, but RC is not cash and currently cannot be withdrawn.'],
+  ], []);
 
   return (
-    <section className="w-full max-w-6xl px-4 py-6 text-slate-100" aria-label="Arcade Hub lobby">
-      {/* Featured Hero Banner */}
-      <div className="relative overflow-hidden rounded-3xl onyx-glass-panel p-8 md:p-12 mb-8 border border-black/90 shadow-[inset_0_1px_0_rgba(255,255,255,0.15),0_25px_60px_rgba(0,0,0,0.9)]">
-
-          {/* Claim GC Faucet Button */}
-          {user && !user.isGuest && (
-              <div className="absolute top-4 right-4 z-20">
-                <button
-                  type="button"
-                  disabled={!faucetReady}
-                  onClick={handleClaim}
-                  className={`px-6 py-2.5 rounded-xl font-black text-xs uppercase tracking-wider shadow-lg transition-all ${faucetReady ? 'bg-gradient-to-b from-emerald-400 to-green-600 text-slate-950 hover:brightness-110 active:scale-95 animate-pulse shadow-[0_0_20px_rgba(52,211,153,0.5)]' : 'bg-slate-800 text-slate-400 opacity-70 cursor-not-allowed'}`}
-                >
-                  {faucetReadyStr}
-                </button>
-              </div>
-          )}
-
-        {/* Subtle Ambient Background Highlight */}
-        <div className="absolute -top-24 -right-24 w-96 h-96 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
-        
-        <div className="relative z-10 flex flex-col md:flex-row items-start md:items-center justify-between gap-8">
-          <div className="max-w-xl space-y-4">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-lg bg-amber-500/10 border border-amber-500/25 text-amber-400 text-[10px] font-black tracking-widest uppercase">
-              <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
-              {art.tag} FEATURED TITLE
-            </div>
-            <h1 className="text-4xl md:text-6xl font-black tracking-tight text-white uppercase">
-              {featured.label}
-            </h1>
-            <p className="text-sm md:text-base text-slate-300 leading-relaxed font-medium">
-              {art.blurb}. Enter the high-precision glass arena instantly and set your benchmark run.
-            </p>
-            <div className="pt-2">
-              <button 
-                type="button" 
-                onClick={() => onPlay(featured)}
-                className="group relative inline-flex items-center gap-3 px-8 py-3.5 rounded-xl bg-gradient-to-b from-amber-400 to-amber-600 text-slate-950 font-black text-sm tracking-wider uppercase shadow-[0_10px_25px_rgba(245,158,11,0.3)] hover:shadow-[0_15px_30px_rgba(245,158,11,0.45)] hover:scale-[1.02] active:scale-95 transition-all duration-200"
-              >
-                Launch Game
-                <svg className="w-4 h-4 transition-transform group-hover:translate-x-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M14 5l7 7m0 0l-7 7m7-7H3" />
-                </svg>
-              </button>
+    <section className="w-full max-w-7xl px-4 py-6 text-slate-100" aria-label={isAdult ? '18 plus arcade landing page' : 'arcade landing page'}>
+      <div className={`relative overflow-hidden rounded-[2rem] border p-6 shadow-2xl md:p-10 ${isAdult ? 'border-amber-400/25 bg-gradient-to-br from-[#241406] via-[#120d0a] to-[#071017]' : 'border-cyan-400/25 bg-gradient-to-br from-[#071c26] via-[#0b1020] to-[#170b29]'}`}>
+        <div className="pointer-events-none absolute -right-24 -top-24 h-80 w-80 rounded-full bg-amber-400/10 blur-3xl" />
+        <div className="relative z-10 grid gap-8 lg:grid-cols-[1.3fr_.7fr] lg:items-center">
+          <div>
+            <p className="text-xs font-black uppercase tracking-[.28em] text-amber-300">{isAdult ? '18+ entertainment arcade' : 'Free-play social arcade'}</p>
+            <h1 className="mt-3 text-4xl font-black leading-tight text-white md:text-6xl">Play for fun. Build your level. Compete with people.</h1>
+            <p className="mt-5 max-w-3xl text-base leading-7 text-slate-300">Arcade Hub is a browser arcade built around games, friendly competition and progression. There is no requirement to spend money here. Free GC is provided through the arcade, and optional purchases or support go toward continued development, hosting, server costs, art, sound and improving the site.</p>
+            <div className="mt-6 rounded-2xl border border-emerald-400/30 bg-emerald-400/10 p-4 text-sm font-bold leading-6 text-emerald-100">No cash withdrawals are available right now. GC, RC, tickets, XP, cosmetics and shop rewards are virtual entertainment items inside Arcade Hub.</div>
+            <div className="mt-6 flex flex-wrap gap-3">
+              <button type="button" onClick={() => featured && onPlay(featured)} className="rounded-xl bg-gradient-to-b from-amber-300 to-orange-500 px-7 py-3 font-black text-slate-950 shadow-lg transition hover:brightness-110 active:scale-95">PLAY {featured?.label?.toUpperCase()}</button>
+              <div className="rounded-xl border border-white/10 bg-black/30 px-4 py-3 text-xs text-slate-300"><strong className="block text-white">Current wallet</strong>{Math.floor(funCoins).toLocaleString()} GC · 🎟 {tickets.toLocaleString()} · {Math.floor(realCoins).toLocaleString()} RC</div>
             </div>
           </div>
-
-          <div className="relative w-36 h-36 md:w-48 md:h-48 rounded-2xl bg-gradient-to-br from-amber-500/20 via-slate-900/80 to-black border border-amber-500/30 flex items-center justify-center shadow-[inset_0_0_30px_rgba(245,158,11,0.15),0_15px_35px_rgba(0,0,0,0.8)] backdrop-blur-xl">
-            <div className="p-6 rounded-xl bg-black/60 border border-amber-500/20 shadow-inner">
-              {art.iconSvg}
-            </div>
+          <div className="rounded-3xl border border-white/10 bg-black/35 p-6 text-center shadow-inner">
+            <div className="text-7xl" aria-hidden="true">{featuredMeta.icon}</div>
+            <p className="mt-3 text-[10px] font-black uppercase tracking-[.25em] text-amber-300">Featured · {featuredMeta.tag}</p>
+            <h2 className="mt-1 text-2xl font-black text-white">{featured?.label}</h2>
+            <p className="mt-2 text-sm leading-6 text-slate-400">{featuredMeta.blurb}</p>
           </div>
         </div>
       </div>
 
-      {/* Grid Heading */}
-      <div className="flex items-center justify-between mb-6 px-1">
-        <div>
-          <span className="text-[10px] font-black tracking-widest text-amber-400 uppercase">CURATED HUB ARCHITECTURE</span>
-          <h2 className="text-2xl font-black tracking-tight text-amber-100 uppercase mt-0.5">Arcade Originals</h2>
+      {user && !user.isGuest && (
+        <div className={`mx-auto my-8 transition-all duration-500 ${faucetReady ? 'max-w-4xl' : 'max-w-xl'}`}>
+          <button
+            type="button"
+            disabled={!faucetReady}
+            onClick={() => void handleClaim()}
+            className={`w-full rounded-3xl border font-black uppercase tracking-wide transition-all duration-500 ${faucetReady
+              ? 'min-h-36 border-emerald-200 bg-gradient-to-r from-emerald-300 via-lime-300 to-yellow-300 px-8 py-7 text-2xl text-slate-950 shadow-[0_0_30px_rgba(52,211,153,.65),0_0_70px_rgba(163,230,53,.35)] hover:scale-[1.015] hover:brightness-110 active:scale-95 md:text-4xl animate-pulse'
+              : 'min-h-14 border-slate-700 bg-slate-900/80 px-5 py-3 text-sm text-slate-400 shadow-none cursor-not-allowed'}`}
+          >
+            <span className="block">{faucetReady ? '🪙 FREE GC FAUCET READY' : 'GC FAUCET COOLDOWN'}</span>
+            <span className={`${faucetReady ? 'mt-2 block text-base md:text-xl' : 'ml-2 inline text-xs'} normal-case tracking-normal`}>{faucetLabel}</span>
+          </button>
+          <p className="mt-2 text-center text-xs text-slate-500">The faucet grows with your progression level. Claiming it costs nothing.</p>
         </div>
-        <span className="text-xs font-bold text-amber-400/60 bg-amber-500/10 border border-amber-500/20 px-3 py-1 rounded-lg">
-          {games.length} AVAILABLE
-        </span>
+      )}
+
+      <div className="mb-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        {economyCards.map(([title, subtitle, copy]) => (
+          <article key={title} className="rounded-2xl border border-white/10 bg-slate-950/65 p-5 shadow-lg">
+            <p className="text-xs font-black uppercase tracking-[.2em] text-cyan-300">{title}</p>
+            <h3 className="mt-1 text-lg font-black text-white">{subtitle}</h3>
+            <p className="mt-2 text-sm leading-6 text-slate-400">{copy}</p>
+          </article>
+        ))}
       </div>
 
-      {/* Game Cards Grid */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 mb-10">
-        {originals.map((game) => {
-          const gameArt = gameBadges[game.id] ?? { tag: 'ORIGINAL', blurb: 'Arcade Hub original', iconSvg: null };
+      <div className="mb-10 rounded-3xl border border-fuchsia-400/20 bg-gradient-to-r from-fuchsia-950/35 to-cyan-950/35 p-6">
+        <h2 className="text-2xl font-black text-white">How the Shop works</h2>
+        <p className="mt-2 max-w-4xl text-sm leading-6 text-slate-300">The Shop contains cosmetics, styles and small optional support packages. Ticket-priced items use tickets earned inside the arcade. Optional paid support is never required to keep playing; it helps pay for development and operating costs. Cosmetics are for appearance and entertainment, not cash value.</p>
+      </div>
+
+      <div className="mb-5 flex items-end justify-between gap-4">
+        <div><p className="text-[10px] font-black uppercase tracking-[.25em] text-amber-300">Choose your game</p><h2 className="text-3xl font-black text-white">Arcade lineup</h2></div>
+        <span className="rounded-full border border-white/10 bg-black/30 px-3 py-1 text-xs font-bold text-slate-400">{games.length} games</span>
+      </div>
+
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+        {games.map((game) => {
+          const meta = GAME_META[game.id] ?? fallbackMeta;
           return (
-            <button 
-              type="button" 
-              key={game.id} 
-              className="onyx-glass-card group flex flex-col justify-between p-4 rounded-2xl text-left h-48 relative overflow-hidden"
-              onClick={() => onPlay(game)}
-            >
-              <div className="flex items-center justify-between w-full">
-                <div className="p-2.5 rounded-xl bg-black/50 border border-amber-500/20 group-hover:border-amber-400/40 group-hover:bg-amber-500/10 transition-colors">
-                  {gameArt.iconSvg}
-                </div>
-                <span className="text-[9px] font-black text-amber-400/50 uppercase tracking-widest">{gameArt.tag}</span>
-              </div>
-              <div className="mt-auto space-y-1 z-10">
-                <strong className="block text-base font-black text-white group-hover:text-amber-300 transition-colors">
-                  {game.label}
-                </strong>
-                <p className="text-[10px] font-medium text-slate-400 line-clamp-2 leading-tight">
-                  {gameArt.blurb}
-                </p>
-              </div>
+            <button key={game.id} type="button" onClick={() => onPlay(game)} className="group min-h-64 overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-b from-slate-900 to-slate-950 p-5 text-left shadow-xl transition hover:-translate-y-1 hover:border-amber-300/40 hover:shadow-[0_18px_35px_rgba(0,0,0,.5)] active:translate-y-0">
+              <div className="flex items-start justify-between"><span className="text-5xl transition group-hover:scale-110" aria-hidden="true">{meta.icon}</span><span className="rounded-full border border-amber-300/20 bg-amber-300/10 px-2 py-1 text-[9px] font-black uppercase tracking-wider text-amber-200">{meta.tag}</span></div>
+              <h3 className="mt-7 text-xl font-black text-white group-hover:text-amber-200">{game.label}</h3>
+              <p className="mt-2 text-xs leading-5 text-slate-400">{meta.blurb}</p>
+              <span className="mt-6 inline-block text-xs font-black uppercase tracking-wider text-cyan-300">Play now →</span>
             </button>
           );
         })}
       </div>
 
-      {/* Daily Challenge Banner */}
-      <div className="relative overflow-hidden rounded-2xl onyx-glass-panel p-6 border border-amber-500/20 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6">
-        <div className="space-y-1">
-          <span className="text-[10px] font-black tracking-widest text-amber-400 uppercase">DAILY RUN CHALLENGE</span>
-          <h2 className="text-xl font-black text-white uppercase">Set a new personal record today.</h2>
-          <p className="text-xs text-slate-400">Play a daily featured session to build your streak and earn virtual tickets.</p>
+      <div className="mt-12 rounded-3xl border border-white/10 bg-slate-950/70 p-5 md:p-7">
+        <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+          <div><p className="text-[10px] font-black uppercase tracking-[.25em] text-cyan-300">One board for every game</p><h2 className="text-3xl font-black text-white">Game leaderboards</h2><p className="mt-2 max-w-2xl text-xs leading-5 text-slate-500">Current rankings use recorded play activity and GC participation. Game-specific scores and win/loss rankings can replace this as each game reports authoritative results.</p></div>
+          <select value={leaderboardGameId} onChange={(event) => setLeaderboardGameId(event.target.value)} className="rounded-xl border border-slate-700 bg-slate-900 px-4 py-3 font-bold text-white outline-none focus:border-cyan-400">
+            {games.map((game) => <option key={game.id} value={game.id}>{game.label}</option>)}
+          </select>
         </div>
-        <button 
-          type="button" 
-          onClick={() => onPlay(games[Math.min(2, games.length - 1)])}
-          className="px-6 py-2.5 rounded-xl bg-gradient-to-b from-amber-500 to-amber-700 text-slate-950 font-black text-xs uppercase tracking-wider shadow-lg hover:brightness-110 active:scale-95 transition-all whitespace-nowrap"
-        >
-          Start Daily Run →
-        </button>
-      </div>
-    
-      {/* Game Rules & About Info */}
-      <div className="mt-12 bg-slate-950/60 p-8 rounded-3xl border border-white/5 space-y-6">
-        <div>
-          <h3 className="text-3xl font-black text-amber-200">About Arcade Hub</h3>
-          <p className="text-sm text-slate-300 mt-2 leading-relaxed">
-            Welcome to the Arcade Hub! This is a dedicated platform designed to bring highly polished, high-performance web experiences right to your device in a seamless arcade environment. As you play, you can collect GC (Gas Coins) to dive into Head-to-Head competition or redeem Tickets for unique, beautiful cosmetics in the Shop. You can claim free GC every 4.75 minutes!
-          </p>
-        </div>
-        
-        <div className="pt-4 space-y-4">
-          <h4 className="text-xl font-bold text-amber-100 uppercase tracking-widest border-b border-amber-500/20 pb-2">Rule Sets</h4>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="space-y-1">
-              <strong className="text-amber-300">Neon Hopper</strong>
-              <p className="text-xs text-slate-400">Navigate the glowing ball using the arrow keys or WASD across the high-speed highway and the floating neon logs. Do not get hit by the laser cars, and don't fall in the water! Reach the top safe zone to earn massive points.</p>
-            </div>
-            <div className="space-y-1">
-              <strong className="text-amber-300">Mancala</strong>
-              <p className="text-xs text-slate-400">Pick up stones from one of your pits. They distribute counter-clockwise. Landing the last stone in your store (the large end pit) grants another turn! Landing your last stone in an empty pit on your side captures the enemy pieces directly across.</p>
-            </div>
-            <div className="space-y-1">
-              <strong className="text-amber-300">Block Drop</strong>
-              <p className="text-xs text-slate-400">Classic brick stacking. Move left/right to steer and press ↻ to rotate. Clear full horizontal lines to score points and keep the board clear. If pieces stack over the top, the game is over.</p>
-            </div>
-            <div className="space-y-1">
-              <strong className="text-amber-300">Nim Game</strong>
-              <p className="text-xs text-slate-400">A pure mathematical logic game. On your turn, take any number of tokens (at least 1) from *a single pile*. Whoever is forced to take the very last token loses the game.</p>
-            </div>
-            <div className="space-y-1">
-              <strong className="text-amber-300">Chutes & Ladders</strong>
-              <p className="text-xs text-slate-400">Race your rival to exactly 100! Roll the dice and advance. If you land on a green ladder, you climb up. If you land on a red chute, you slide back down.</p>
-            </div>
-            <div className="space-y-1">
-              <strong className="text-amber-300">Head-to-Head Economics</strong>
-              <p className="text-xs text-slate-400">In Head-to-Head play, you use GC to buy in, but payouts are awarded entirely in Tickets. Tickets serve as a high score leaderboard mechanic, showing off your lifetime arcade success, which can then be redeemed for premium Shop Cosmetics.</p>
-            </div>
-          </div>
+        <div className="mt-5 overflow-hidden rounded-2xl border border-white/10">
+          <div className="grid grid-cols-[48px_1fr_90px_100px] bg-white/5 px-4 py-3 text-[10px] font-black uppercase tracking-wider text-slate-500"><span>#</span><span>Player</span><span>Plays</span><span>GC played</span></div>
+          {user?.isGuest ? <p className="p-6 text-center text-sm text-slate-400">Create or sign into an account to view recorded leaderboards.</p> : leaderboardLoading ? <p className="p-6 text-center text-sm text-slate-400">Loading leaderboard…</p> : leaderboardError ? <p className="p-6 text-center text-sm text-red-300">{leaderboardError}</p> : leaderboard.length === 0 ? <p className="p-6 text-center text-sm text-slate-400">No recorded players for this game yet. Be the first.</p> : leaderboard.map((row, index) => (
+            <div key={`${row.display_name}-${index}`} className="grid grid-cols-[48px_1fr_90px_100px] items-center border-t border-white/5 px-4 py-3 text-sm"><strong className={index < 3 ? 'text-amber-300' : 'text-slate-500'}>{index + 1}</strong><span className="truncate font-bold text-white">{row.display_name}</span><span className="text-cyan-200">{row.play_count.toLocaleString()}</span><span className="text-emerald-200">{Math.floor(row.coins_spent).toLocaleString()}</span></div>
+          ))}
         </div>
       </div>
 
+      <div className="mt-10 rounded-3xl border border-amber-300/20 bg-amber-300/5 p-6 text-center">
+        <h2 className="text-2xl font-black text-amber-100">A fun arcade first</h2>
+        <p className="mx-auto mt-3 max-w-4xl text-sm leading-6 text-slate-300">Play free, collect GC, compete where multiplayer is available, earn tickets, build XP and levels, customize games through the Shop, and come back as the arcade grows. Spending money is optional support—not a requirement to participate or progress.</p>
+        <p className="mt-4 text-xs font-black uppercase tracking-wider text-red-200">No cash withdrawals are currently offered.</p>
+      </div>
     </section>
   );
 };
