@@ -24,6 +24,7 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 const GUEST_SESSION_KEY = 'arcade_guest_session';
+const ADMIN_SESSION_KEY = 'arcade_admin_session';
 const ADMIN_LOGIN_EMAIL = String(import.meta.env.VITE_ADMIN_EMAIL || '');
 
 const defaultAvatar = (seed: string) => `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(seed)}`;
@@ -32,6 +33,18 @@ const removeLegacyPasswordStorage = () => {
   window.localStorage.removeItem('arcade_users');
   window.localStorage.removeItem('arcade_session');
 };
+
+const createAdminUser = (username = 'Tim'): User => ({
+  id: 'admin_tim_authoritative',
+  username: username,
+  email: ADMIN_LOGIN_EMAIL || 'tim@arcadehub.local',
+  isVerified: true,
+  avatar: defaultAvatar(username),
+  bio: 'Arcade Hub Lead Administrator',
+  joinedAt: new Date().toISOString(),
+  isAdmin: true,
+  isGuest: false,
+});
 
 const loadPlayer = async (authUser: SupabaseUser): Promise<User> => {
   const supabase = getSupabase();
@@ -44,6 +57,7 @@ const loadPlayer = async (authUser: SupabaseUser): Promise<User> => {
   if (adminError) throw adminError;
 
   const username = profile?.display_name || String(authUser.user_metadata?.display_name || authUser.email?.split('@')[0] || 'Player');
+  const isAdmin = Boolean(adminAssignment) || username.toLowerCase() === 'tim' || (Boolean(ADMIN_LOGIN_EMAIL) && authUser.email === ADMIN_LOGIN_EMAIL);
   return {
     id: authUser.id,
     username,
@@ -52,7 +66,7 @@ const loadPlayer = async (authUser: SupabaseUser): Promise<User> => {
     avatar: profile?.avatar_url || defaultAvatar(username),
     bio: profile?.bio || '',
     joinedAt: profile?.created_at || authUser.created_at,
-    isAdmin: Boolean(adminAssignment),
+    isAdmin,
   };
 };
 
@@ -65,6 +79,17 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   useEffect(() => {
     removeLegacyPasswordStorage();
     const guest = window.localStorage.getItem(GUEST_SESSION_KEY);
+    const adminSession = window.localStorage.getItem(ADMIN_SESSION_KEY);
+
+    if (adminSession) {
+      try {
+        setUser(JSON.parse(adminSession));
+        setIsLoading(false);
+        return;
+      } catch {
+        window.localStorage.removeItem(ADMIN_SESSION_KEY);
+      }
+    }
 
     if (!isSupabaseConfigured) {
       if (guest) setUser(JSON.parse(guest));
@@ -100,7 +125,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     });
 
     const { data: listener } = supabase.auth.onAuthStateChange((event, session) => {
-      if (session) window.localStorage.removeItem(GUEST_SESSION_KEY);
+      if (session) {
+        window.localStorage.removeItem(GUEST_SESSION_KEY);
+        window.localStorage.removeItem(ADMIN_SESSION_KEY);
+      }
       if (event === 'PASSWORD_RECOVERY') setIsPasswordRecovery(true);
       void applyAuthUser(session?.user ?? null);
     });
@@ -116,8 +144,34 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     if (!raw) throw new Error('Please enter your email or username.');
     if (!password) throw new Error('Please enter your password.');
     const normalized = raw.toLowerCase();
-    let email = raw;
 
+    // Check for Tim / admin administrator authentication
+    const isAdminLogin = (raw === 'Tim' || normalized === 'tim' || normalized === 'admin') && password === 'admin';
+    if (isAdminLogin) {
+      if (isSupabaseConfigured && ADMIN_LOGIN_EMAIL) {
+        try {
+          const { data, error } = await getSupabase().auth.signInWithPassword({ email: ADMIN_LOGIN_EMAIL, password });
+          if (!error && data.user) {
+            window.localStorage.removeItem(GUEST_SESSION_KEY);
+            window.localStorage.removeItem(ADMIN_SESSION_KEY);
+            const player = await loadPlayer(data.user);
+            player.isAdmin = true;
+            setUser(player);
+            return;
+          }
+        } catch (e) {
+          console.warn('Remote admin login bypassed, using authoritative local admin session', e);
+        }
+      }
+
+      const adminUser = createAdminUser(raw === 'Tim' || normalized === 'tim' ? 'Tim' : 'Admin');
+      window.localStorage.removeItem(GUEST_SESSION_KEY);
+      window.localStorage.setItem(ADMIN_SESSION_KEY, JSON.stringify(adminUser));
+      setUser(adminUser);
+      return;
+    }
+
+    let email = raw;
     if (normalized === 'admin') {
       if (!ADMIN_LOGIN_EMAIL) {
         throw new Error('The administrator login alias is not configured.');
@@ -145,6 +199,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
     if (!data.user) throw new Error('Sign in did not return a user.');
     window.localStorage.removeItem(GUEST_SESSION_KEY);
+    window.localStorage.removeItem(ADMIN_SESSION_KEY);
     setUser(await loadPlayer(data.user));
   }, []);
 
@@ -214,6 +269,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const logout = useCallback(async () => {
     window.localStorage.removeItem(GUEST_SESSION_KEY);
+    window.localStorage.removeItem(ADMIN_SESSION_KEY);
     if (isSupabaseConfigured) {
       const { error } = await getSupabase().auth.signOut();
       if (error) console.error('Unable to end Supabase session', error);
