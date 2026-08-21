@@ -45,7 +45,6 @@ const MancalaGame: React.FC<MancalaProps> = ({ playMode, playerNames }) => {
     const [puzzleName, setPuzzleName] = useState<string | null>(null);
     const [stats, setStats] = useState({ moves: 0, captures: 0, extraTurns: 0 });
     const [highlightedPit, setHighlightedPit] = useState<number | null>(null);
-    const [flyingStone, setFlyingStone] = useState<{ key: number; fromX: number; fromY: number; toX: number; toY: number; colorClass: string; duration: number } | null>(null);
     const isAnimating = useRef(false);
     const boardRef = useRef<HTMLDivElement>(null);
     const pitRefs = useRef(new Map<number, HTMLDivElement>());
@@ -118,17 +117,9 @@ const MancalaGame: React.FC<MancalaProps> = ({ playMode, playerNames }) => {
         const boardBounds = board.getBoundingClientRect();
         const fromBounds = from.getBoundingClientRect();
         const toBounds = to.getBoundingClientRect();
-        setFlyingStone({
-            key: ++flightKeyRef.current,
-            fromX: fromBounds.left + fromBounds.width / 2 - boardBounds.left,
-            fromY: fromBounds.top + fromBounds.height / 2 - boardBounds.top,
-            toX: toBounds.left + toBounds.width / 2 - boardBounds.left,
-            toY: toBounds.top + toBounds.height / 2 - boardBounds.top,
-            colorClass,
-            duration
-        });
+        ;
         await sleep(duration);
-        setFlyingStone(null);
+        
     };
 
     const performMove = async (index: number) => {
@@ -267,7 +258,7 @@ const MancalaGame: React.FC<MancalaProps> = ({ playMode, playerNames }) => {
     const handleReset = (startingPlayer: 1 | 2 = 1) => {
         moveGenerationRef.current += 1;
         if (lastHopTimerRef.current) window.clearTimeout(lastHopTimerRef.current);
-        isAnimating.current = false; setFlyingStone(null); setHighlightedPit(null);
+        isAnimating.current = false; 
         setPits(INITIAL_PITS); setCurrentPlayer(startingPlayer); setStatus(`Player ${startingPlayer}'s Turn`); setGameOver(false); setWinner(null);
         setLastMovePath([]); setCaptureStreak({ 1: 0, 2: 0 }); setPuzzleName(null); setStats({ moves: 0, captures: 0, extraTurns: 0 });
     }
@@ -381,40 +372,6 @@ const MancalaGame: React.FC<MancalaProps> = ({ playMode, playerNames }) => {
                                     onPitClick={handlePitClick}
                                 />
                             </div>
-                            <div className="pointer-events-none invisible grid grid-cols-[1.5fr_1fr_1fr_1fr_1fr_1fr_1fr_1.5fr] h-full" style={{ gap: 'var(--mancala-pit-gap)'}}>
-                                {/* Player 2 Store */}
-                                    <div ref={(element) => { if (element) pitRefs.current.set(PLAYER_2_STORE, element); }} className={`row-span-2 mancala-store ${highlightedPit === PLAYER_2_STORE ? 'highlight' : ''} ${previewEnd === PLAYER_2_STORE ? 'preview-end' : ''} ${lastMovePath.includes(PLAYER_2_STORE) ? 'last-path' : ''}`}>
-                                    {renderStones(pits[PLAYER_2_STORE], PLAYER_2_STORE)}
-                                </div>
-                                
-                                {/* Player 2 Pits */}
-                                {pits.slice(7, 13).reverse().map((count, i) => {
-                                  const pitIndex = 12 - i;
-                                  return (
-                                    <div ref={(element) => { if (element) pitRefs.current.set(pitIndex, element); }} key={pitIndex} onPointerEnter={() => currentPlayer === 2 && setPreviewPit(pitIndex)} onPointerLeave={() => setPreviewPit(null)} onClick={() => handlePitClick(pitIndex)} className={`mancala-pit ${highlightedPit === pitIndex ? 'highlight' : ''} ${previewEnd === pitIndex ? 'preview-end' : ''} ${lastMovePath.includes(pitIndex) ? 'last-path' : ''} ${currentPlayer === 2 && !gameOver && pits[pitIndex] > 0 ? 'cursor-pointer hover:bg-[#D2691E]' : 'cursor-not-allowed'}`}>
-                                      {renderStones(count, pitIndex)}
-                                    </div>
-                                  );
-                                })}
-                                
-                                {/* Player 1 Store */}
-                                <div ref={(element) => { if (element) pitRefs.current.set(PLAYER_1_STORE, element); }} className={`row-span-2 mancala-store ${highlightedPit === PLAYER_1_STORE ? 'highlight' : ''} ${previewEnd === PLAYER_1_STORE ? 'preview-end' : ''} ${lastMovePath.includes(PLAYER_1_STORE) ? 'last-path' : ''}`}>
-                                    {renderStones(pits[PLAYER_1_STORE], PLAYER_1_STORE)}
-                                </div>
-                                
-                                {/* Player 1 Pits */}
-                                {pits.slice(0, 6).map((count, i) => (
-                                  <div ref={(element) => { if (element) pitRefs.current.set(i, element); }} key={i} onPointerEnter={() => currentPlayer === 1 && setPreviewPit(i)} onPointerLeave={() => setPreviewPit(null)} onClick={() => handlePitClick(i)} className={`mancala-pit ${highlightedPit === i ? 'highlight' : ''} ${previewEnd === i ? 'preview-end' : ''} ${lastMovePath.includes(i) ? 'last-path' : ''} ${currentPlayer === 1 && !gameOver && pits[i] > 0 ? 'cursor-pointer hover:bg-[#D2691E]' : 'cursor-not-allowed'}`}>
-                                      {renderStones(count, i)}
-                                  </div>
-                                ))}
-                            </div>
-                            {flyingStone && <div key={flyingStone.key} className={`flying-mancala-stone ${flyingStone.colorClass}`} style={{
-                                left: flyingStone.fromX,
-                                top: flyingStone.fromY,
-                                offsetPath: `path("M 0 0 Q ${(flyingStone.toX - flyingStone.fromX) / 2} ${(flyingStone.toY - flyingStone.fromY) / 2 - 85} ${flyingStone.toX - flyingStone.fromX} ${flyingStone.toY - flyingStone.fromY}")`,
-                                animationDuration: `${flyingStone.duration}ms`
-                            }} />}
                         </div>
 
                         {/* Player 1 Pit Counts */}

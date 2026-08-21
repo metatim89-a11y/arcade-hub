@@ -18,7 +18,7 @@ const BlackjackGame = React.lazy(() => import('./components/games/BlackjackGame'
 const TexasHoldemLobby = React.lazy(() => import('./components/games/TexasHoldemLobby'));
 const SpinWheelGame = React.lazy(() => import('./components/games/SpinWheelGame'));
 const CoinPusherGame = React.lazy(() => import('./components/games/CoinPusherGame'));
-const RPSCardGame = React.lazy(() => import('./components/games/RPSCardGame'));
+const NeonHopperGame = React.lazy(() => import('./components/games/NeonHopperGame'));
 const TicTacToeGame = React.lazy(() => import('./components/games/TicTacToeGame'));
 
 export const APP_VERSION = '0.0.34';
@@ -42,6 +42,6 @@ export const UNDER18_GAMES: Game[] = [
     { id: 'connect4', label: 'Connect Four', component: ConnectFourGame },
     { id: 'rubikscube', label: 'Color Recall', component: ColorRecallGame },
     { id: 'mancala', label: 'Mancala', component: MancalaGame },
-    { id: 'rps', label: 'RPS Cards', component: RPSCardGame },
+    { id: 'neonhopper', label: 'Neon Hopper', component: NeonHopperGame },
     { id: 'tictactoe', label: 'Tic Tac Toe', component: TicTacToeGame },
 ];

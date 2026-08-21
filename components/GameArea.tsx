@@ -189,37 +189,43 @@ const GameArea: React.FC<GameAreaProps> = ({ games, selectedGame, onSelectGame, 
 
   return (
     <div className={`flex flex-col items-center w-full py-6 md:py-8 ${activeGameProps.game.id === 'fishing' ? 'px-0 sm:px-2' : 'px-4'}`}>
-      {/* Game Navigation */}
-      <div className="game-picker-row mb-3 w-full max-w-7xl">
-      <label className="game-picker-mobile w-full max-w-md md:hidden">
-        <span>CHOOSE GAME</span>
-        <select
+      {/* Smooth Carousel Game Navigation */}
+      <div className="w-full max-w-7xl mb-4 relative group">
+        <div className="absolute left-0 top-0 bottom-0 w-8 bg-gradient-to-r from-slate-950 to-transparent z-10 pointer-events-none" />
+        <nav 
+          className="flex w-full overflow-x-auto scroll-smooth snap-x snap-mandatory gap-3 py-4 px-4 custom-scrollbar items-center" 
           aria-label="Choose a game"
-          value={selectedGame.id}
-          onChange={(event) => {
-            const game = games.find((candidate) => candidate.id === event.target.value);
-            if (game) handleSelectGame(game);
-          }}
         >
-          {games.map((game) => <option key={game.id} value={game.id}>{game.label}</option>)}
-        </select>
-      </label>
-      <nav className="hidden w-full max-w-7xl flex-wrap justify-center gap-2 pb-1 mb-3 md:flex" aria-label="Choose a game">
-        {games.map((game) => (
-          <button
-            key={game.id}
-            onClick={() => handleSelectGame(game)}
-            className={`shrink-0 text-xs md:text-sm font-extrabold border py-1.5 px-4 rounded-xl cursor-pointer transition-all duration-200 ${
-              selectedGame.id === game.id
-                ? 'bg-gradient-to-b from-amber-400 to-amber-600 text-slate-950 border-amber-300 shadow-[0_0_15px_rgba(245,158,11,0.35)] scale-105'
-                : 'bg-black/60 text-amber-300/80 border-amber-500/20 hover:border-amber-400/50 hover:bg-black/80 hover:text-amber-200'
-            }`}
-          >
-            {game.label}
-          </button>
-        ))}
-      </nav>
-      <button type="button" className="px-4 py-1.5 rounded-xl bg-black/50 border border-amber-500/20 text-amber-300 text-xs font-bold hover:bg-black/80 hover:border-amber-400/40 transition-colors" onClick={() => void shareGame()} aria-label={`Share ${selectedGame.label}`}>↗ Share {selectedGame.label}</button>
+          {games.map((game) => {
+            const isSelected = selectedGame.id === game.id;
+            return (
+              <button
+                key={game.id}
+                onClick={() => {
+                  handleSelectGame(game);
+                  // Auto scroll the clicked item into center if possible
+                  document.getElementById(`game-tab-${game.id}`)?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+                }}
+                id={`game-tab-${game.id}`}
+                className={`snap-center shrink-0 flex items-center justify-center font-black transition-all duration-300 rounded-2xl relative
+                  ${isSelected
+                    ? 'py-3 px-8 text-slate-950 bg-gradient-to-b from-amber-300 to-orange-500 shadow-[0_0_20px_rgba(245,158,11,0.5)] scale-105 z-10'
+                    : 'py-2 px-6 text-amber-200/70 bg-slate-900/80 border border-white/5 hover:bg-slate-800 hover:text-amber-100 hover:scale-100 shadow-inner'
+                  }
+                `}
+              >
+                <div className="flex flex-col items-center gap-1">
+                  <span className="text-sm md:text-base tracking-wide whitespace-nowrap">{game.label}</span>
+                  {isSelected && <span className="absolute -bottom-1.5 w-1/3 h-1 bg-white rounded-full opacity-70 blur-[1px]" />}
+                </div>
+              </button>
+            );
+          })}
+        </nav>
+        <div className="absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-slate-950 to-transparent z-10 pointer-events-none" />
+        <div className="absolute right-2 top-0 !text-[10px] hidden sm:block">
+            <button type="button" className="opacity-50 hover:opacity-100 text-amber-200/50 hover:text-amber-300 transition-colors py-1 uppercase" onClick={() => void shareGame()} aria-label={`Share ${selectedGame.label}`}>↗ Share Game</button>
+        </div>
       </div>
       
       {/* Game Options */}

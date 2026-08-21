@@ -48,12 +48,78 @@ const BlockDropGame: React.FC = () => {
   }, [board, gameOver, piece, step]);
 
   const reset = () => { setBoard(emptyBoard()); setPiece(randomPiece()); setScore(0); setGameOver(false); };
-  const occupied = (x: number, y: number) => { if (piece.shape[y - piece.y]?.[x - piece.x]) return piece.color; return board[y][x]; };
+  
   return <div className="flex w-full max-w-md flex-col items-center gap-4 px-2 text-white">
     <div className="flex w-full items-center justify-between"><h2 className="text-3xl font-black text-fuchsia-200">Block Drop</h2><span className="rounded-lg bg-white/10 px-3 py-2 text-sm font-black">Score {score}</span></div>
     <p className="text-center text-xs text-fuchsia-100/70">Arrow keys move and rotate the falling blocks. Clear complete rows.</p>
-    <div className="grid w-full max-w-[300px] grid-cols-10 gap-px rounded-xl border-4 border-fuchsia-300/30 bg-slate-950 p-1" role="grid" aria-label="Block Drop board">{board.map((row, y) => row.map((_, x) => { const value = occupied(x, y); return <span key={`${x}-${y}`} className="aspect-square rounded-[3px]" style={{ background: value ? colors[value - 1] : 'rgba(255,255,255,.045)', boxShadow: value ? `0 0 10px ${colors[value - 1]}` : 'none' }} />; }))}</div>
-    <div className="flex gap-2"><GlassButton onClick={() => { if (!collides(board, { ...piece, x: piece.x - 1 })) setPiece({ ...piece, x: piece.x - 1 }); }}>←</GlassButton><GlassButton onClick={step}>↓</GlassButton><GlassButton onClick={() => { const turned = { ...piece, shape: rotate(piece.shape) }; if (!collides(board, turned)) setPiece(turned); }}>↻</GlassButton><GlassButton onClick={reset}>{gameOver ? 'PLAY AGAIN' : 'RESET'}</GlassButton></div>
+    
+    <div className="relative grid w-full max-w-[300px] grid-cols-10 gap-px rounded-xl border-4 border-fuchsia-300/30 bg-slate-950 p-1" role="grid" aria-label="Block Drop board">
+      {/* Background and Settled Blocks */}
+      {board.map((row, y) => row.map((_, x) => { 
+        const value = board[y][x]; 
+        return <span key={`bg-${x}-${y}`} className="aspect-square rounded-[3px] transition-colors duration-300" style={{ background: value ? colors[value - 1] : 'rgba(255,255,255,.045)', boxShadow: value ? `0 0 10px ${colors[value - 1]}` : 'none' }} />; 
+      }))}
+
+      {/* Active Animated Piece */}
+      {!gameOver && piece.shape.map((row, dy) => row.map((cell, dx) => {
+         if (!cell) return null;
+         const gridX = piece.x + dx;
+         const gridY = piece.y + dy;
+         return <span 
+           key={`active-${dx}-${dy}`} 
+           className="absolute z-10 rounded-[3px] transition-all duration-[120ms] ease-out shadow-lg shadow-black/50 aspect-square"
+           style={{ 
+             width: 'calc(10% - 1px)',
+             left: `calc(4px + ${gridX} * 10%)`,
+             top: `calc(4px + ${gridY} * ((100% - 8px) / 18))`,
+             backgroundColor: colors[piece.color - 1], 
+             boxShadow: `inset 0 0 8px rgba(255,255,255,0.4), 0 0 15px ${colors[piece.color - 1]}`
+           }} 
+         />; 
+      }))}
+    </div>
+    
+    <div className="mt-4 flex w-full max-w-[300px] justify-between gap-4">
+      {/* Directional pad */}
+      <div className="flex gap-2 rounded-xl bg-slate-900/50 p-2 shadow-inner border border-white/5">
+        <button 
+          className="flex h-12 w-12 items-center justify-center rounded-lg bg-slate-800 text-xl text-fuchsia-300 shadow-[0_4px_0_theme(colors.slate.950),_0_2px_10px_rgba(0,0,0,0.5)] transition-transform hover:-translate-y-0.5 active:translate-y-1 active:shadow-[0_0px_0_theme(colors.slate.950)]" 
+          onClick={() => { if (!collides(board, { ...piece, x: piece.x - 1 })) setPiece({ ...piece, x: piece.x - 1 }); }}
+          aria-label="Move Left"
+        >
+          ◀
+        </button>
+        <button 
+          className="flex h-12 w-12 items-center justify-center rounded-lg bg-slate-800 text-xl text-fuchsia-300 shadow-[0_4px_0_theme(colors.slate.950),_0_2px_10px_rgba(0,0,0,0.5)] transition-transform hover:-translate-y-0.5 active:translate-y-1 active:shadow-[0_0px_0_theme(colors.slate.950)]" 
+          onClick={step}
+          aria-label="Drop Down"
+        >
+          ▼
+        </button>
+        <button 
+          className="flex h-12 w-12 items-center justify-center rounded-lg bg-slate-800 text-xl text-fuchsia-300 shadow-[0_4px_0_theme(colors.slate.950),_0_2px_10px_rgba(0,0,0,0.5)] transition-transform hover:-translate-y-0.5 active:translate-y-1 active:shadow-[0_0px_0_theme(colors.slate.950)]" 
+          onClick={() => { if (!collides(board, { ...piece, x: piece.x + 1 })) setPiece({ ...piece, x: piece.x + 1 }); }}
+          aria-label="Move Right"
+        >
+          ▶
+        </button>
+      </div>
+      
+      {/* Action / Rotate Button */}
+      <div className="flex items-center">
+        <button 
+          className="flex h-14 w-14 rounded-full items-center justify-center bg-fuchsia-500 text-2xl text-white shadow-[0_6px_0_theme(colors.fuchsia.700),_0_4px_15px_rgba(217,70,239,0.4)] transition-all hover:-translate-y-1 active:translate-y-1 active:shadow-[0_0px_0_theme(colors.fuchsia.700)] outline-none focus:ring-4 ring-fuchsia-400/50"
+          onClick={() => { const turned = { ...piece, shape: rotate(piece.shape) }; if (!collides(board, turned)) setPiece(turned); }}
+          aria-label="Rotate Piece"
+        >
+          ↻
+        </button>
+      </div>
+    </div>
+    
+    <div className="mt-2 text-center w-full max-w-[300px]">
+      <GlassButton onClick={reset} className="w-full justify-center opacity-80 hover:opacity-100">{gameOver ? 'PLAY AGAIN' : 'RESET'}</GlassButton>
+    </div>
     {gameOver && <p className="animate-pop-in text-xl font-black text-yellow-200">Game over — final score {score}</p>}
   </div>;
 };
