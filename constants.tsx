@@ -1,5 +1,5 @@
 
-// constants.tsx v0.0.36 - Lazy Game Registry
+// constants.tsx v0.0.39 - Lazy Game Registry
 import React from 'react';
 import { Game } from './types';
 
@@ -17,15 +17,15 @@ const MancalaGame = React.lazy(() => import('./components/games/MancalaGame'));
 const BlackjackGame = React.lazy(() => import('./components/games/BlackjackGame'));
 const TexasHoldemLobby = React.lazy(() => import('./components/games/TexasHoldemLobby'));
 const SpinWheelGame = React.lazy(() => import('./components/games/SpinWheelGame'));
-const CoinPusherGame = React.lazy(() => import('./components/games/CoinPusherGame'));
+const WhackAttack3D = React.lazy(() => import('./components/games/WhackAttack3D'));
 const NeonHopperGame = React.lazy(() => import('./components/games/NeonHopperGame'));
 const KongClimberGame = React.lazy(() => import('./components/games/KongClimberGame'));
 
-export const APP_VERSION = '0.0.38';
+export const APP_VERSION = '0.0.39';
 
 export const ADULT_GAMES: Game[] = [
     { id: 'fishing', label: 'Ocean Hunter', component: FishingGame },
-    { id: 'coinpusher', label: 'Coin Pusher 3D', component: CoinPusherGame },
+    { id: 'whackattack', label: 'Whack Attack 3D', component: WhackAttack3D },
     { id: 'jetpilot', label: 'Jet Pilot Lander', component: JetPilotGame },
     { id: 'plinko', label: 'Peg Plinko', component: PlinkoGame },
     { id: 'slots', label: 'Volt Vault Slots', component: SlotsGame },
