@@ -16,6 +16,13 @@ type LeaderboardRow = {
   coins_spent: number;
 };
 
+type LandingComment = {
+  id: number;
+  display_name: string;
+  body: string;
+  created_at: string;
+};
+
 const GAME_META: Record<string, { icon: string; tag: string; blurb: string }> = {
   fishing: { icon: '🌊', tag: 'Ocean Action', blurb: 'Hunt targets, chain combos, face bosses and push deeper into the ocean.' },
   coinpusher: { icon: '🪙', tag: 'Physics Arcade', blurb: 'Drop coins, build pressure and trigger satisfying cascades off the edge.' },
@@ -45,8 +52,13 @@ const ArcadeLobby: React.FC<ArcadeLobbyProps> = ({ games, mode, onPlay }) => {
   const [leaderboard, setLeaderboard] = useState<LeaderboardRow[]>([]);
   const [leaderboardLoading, setLeaderboardLoading] = useState(false);
   const [leaderboardError, setLeaderboardError] = useState('');
+  const [comments, setComments] = useState<LandingComment[]>([]);
+  const [commentText, setCommentText] = useState('');
+  const [commentLoading, setCommentLoading] = useState(false);
+  const [commentError, setCommentError] = useState('');
 
   const isAdult = String(mode) === 'Adult';
+  const commentMode = isAdult ? 'adult' : 'regular';
   const featured = games.find((game) => game.id === (isAdult ? 'fishing' : 'neonhopper')) ?? games[0];
   const featuredMeta = GAME_META[featured?.id] ?? fallbackMeta;
 
@@ -113,6 +125,59 @@ const ArcadeLobby: React.FC<ArcadeLobbyProps> = ({ games, mode, onPlay }) => {
     return () => { cancelled = true; };
   }, [leaderboardGameId, user?.id]);
 
+  const loadComments = async () => {
+    setCommentLoading(true);
+    setCommentError('');
+    try {
+      const { data, error } = await getSupabase().rpc('get_landing_comments', { p_mode: commentMode });
+      if (error) throw error;
+      setComments((data ?? []).map((row: any) => ({
+        id: Number(row.id),
+        display_name: String(row.display_name || 'Player'),
+        body: String(row.body || ''),
+        created_at: String(row.created_at || ''),
+      })));
+    } catch (error: any) {
+      setComments([]);
+      setCommentError(error?.message || 'Comments are unavailable right now.');
+    } finally {
+      setCommentLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    void loadComments();
+  }, [commentMode]);
+
+  const handlePostComment = async () => {
+    const body = commentText.trim();
+    if (!user || user.isGuest || !body || body.length > 500) return;
+    setCommentLoading(true);
+    setCommentError('');
+    try {
+      const { error } = await getSupabase().rpc('post_landing_comment', { p_mode: commentMode, p_body: body });
+      if (error) throw error;
+      setCommentText('');
+      await loadComments();
+    } catch (error: any) {
+      setCommentError(error?.message || 'Could not post that comment.');
+    } finally {
+      setCommentLoading(false);
+    }
+  };
+
+  const handleDeleteComment = async (id: number) => {
+    if (!user?.isAdmin) return;
+    setCommentError('');
+    try {
+      const { error } = await getSupabase().rpc('admin_delete_landing_comment', { p_comment_id: id });
+      if (error) throw error;
+      setComments((current) => current.filter((comment) => comment.id !== id));
+    } catch (error: any) {
+      setCommentError(error?.message || 'Could not remove that comment.');
+    }
+  };
+
   const handleClaim = async () => {
     if (!faucetReady) return;
     await claimLevelFaucet();
@@ -151,14 +216,7 @@ const ArcadeLobby: React.FC<ArcadeLobbyProps> = ({ games, mode, onPlay }) => {
 
       {user && !user.isGuest && (
         <div className={`mx-auto my-8 transition-all duration-500 ${faucetReady ? 'max-w-4xl' : 'max-w-xl'}`}>
-          <button
-            type="button"
-            disabled={!faucetReady}
-            onClick={() => void handleClaim()}
-            className={`w-full rounded-3xl border font-black uppercase tracking-wide transition-all duration-500 ${faucetReady
-              ? 'min-h-36 border-emerald-200 bg-gradient-to-r from-emerald-300 via-lime-300 to-yellow-300 px-8 py-7 text-2xl text-slate-950 shadow-[0_0_30px_rgba(52,211,153,.65),0_0_70px_rgba(163,230,53,.35)] hover:scale-[1.015] hover:brightness-110 active:scale-95 md:text-4xl animate-pulse'
-              : 'min-h-14 border-slate-700 bg-slate-900/80 px-5 py-3 text-sm text-slate-400 shadow-none cursor-not-allowed'}`}
-          >
+          <button type="button" disabled={!faucetReady} onClick={() => void handleClaim()} className={`w-full rounded-3xl border font-black uppercase tracking-wide transition-all duration-500 ${faucetReady ? 'min-h-36 border-emerald-200 bg-gradient-to-r from-emerald-300 via-lime-300 to-yellow-300 px-8 py-7 text-2xl text-slate-950 shadow-[0_0_30px_rgba(52,211,153,.65),0_0_70px_rgba(163,230,53,.35)] hover:scale-[1.015] hover:brightness-110 active:scale-95 md:text-4xl animate-pulse' : 'min-h-14 border-slate-700 bg-slate-900/80 px-5 py-3 text-sm text-slate-400 shadow-none cursor-not-allowed'}`}>
             <span className="block">{faucetReady ? '🪙 FREE GC FAUCET READY' : 'GC FAUCET COOLDOWN'}</span>
             <span className={`${faucetReady ? 'mt-2 block text-base md:text-xl' : 'ml-2 inline text-xs'} normal-case tracking-normal`}>{faucetLabel}</span>
           </button>
@@ -211,6 +269,32 @@ const ArcadeLobby: React.FC<ArcadeLobbyProps> = ({ games, mode, onPlay }) => {
           <div className="grid grid-cols-[48px_1fr_90px_100px] bg-white/5 px-4 py-3 text-[10px] font-black uppercase tracking-wider text-slate-500"><span>#</span><span>Player</span><span>Plays</span><span>GC played</span></div>
           {user?.isGuest ? <p className="p-6 text-center text-sm text-slate-400">Create or sign into an account to view recorded leaderboards.</p> : leaderboardLoading ? <p className="p-6 text-center text-sm text-slate-400">Loading leaderboard…</p> : leaderboardError ? <p className="p-6 text-center text-sm text-red-300">{leaderboardError}</p> : leaderboard.length === 0 ? <p className="p-6 text-center text-sm text-slate-400">No recorded players for this game yet. Be the first.</p> : leaderboard.map((row, index) => (
             <div key={`${row.display_name}-${index}`} className="grid grid-cols-[48px_1fr_90px_100px] items-center border-t border-white/5 px-4 py-3 text-sm"><strong className={index < 3 ? 'text-amber-300' : 'text-slate-500'}>{index + 1}</strong><span className="truncate font-bold text-white">{row.display_name}</span><span className="text-cyan-200">{row.play_count.toLocaleString()}</span><span className="text-emerald-200">{Math.floor(row.coins_spent).toLocaleString()}</span></div>
+          ))}
+        </div>
+      </div>
+
+      <div className="mt-10 rounded-3xl border border-cyan-400/20 bg-slate-950/75 p-5 md:p-7">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+          <div><p className="text-[10px] font-black uppercase tracking-[.25em] text-cyan-300">Community wall</p><h2 className="text-3xl font-black text-white">{isAdult ? '18+ Arcade comments' : 'Arcade comments'}</h2><p className="mt-2 text-sm text-slate-400">Tell us what works, what breaks, and what game you want improved next.</p></div>
+          <button type="button" onClick={() => void loadComments()} disabled={commentLoading} className="rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-xs font-black uppercase tracking-wider text-slate-300 hover:bg-white/10 disabled:opacity-50">Refresh</button>
+        </div>
+
+        {!user || user.isGuest ? (
+          <div className="mt-5 rounded-2xl border border-white/10 bg-black/20 p-4 text-sm text-slate-400">Sign in with a player account to leave a comment. You can still read the board.</div>
+        ) : (
+          <div className="mt-5">
+            <textarea value={commentText} onChange={(event) => setCommentText(event.target.value.slice(0, 500))} maxLength={500} rows={3} placeholder="Leave feedback for the arcade…" className="w-full resize-none rounded-2xl border border-slate-700 bg-slate-900/90 p-4 text-sm text-white outline-none placeholder:text-slate-600 focus:border-cyan-400" />
+            <div className="mt-2 flex items-center justify-between gap-3"><span className="text-xs text-slate-500">{commentText.length}/500 · 15 second anti-spam cooldown</span><button type="button" onClick={() => void handlePostComment()} disabled={commentLoading || !commentText.trim()} className="rounded-xl bg-cyan-300 px-5 py-2 text-xs font-black uppercase tracking-wider text-slate-950 hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40">Post comment</button></div>
+          </div>
+        )}
+
+        {commentError && <p className="mt-4 rounded-xl border border-red-400/20 bg-red-500/10 p-3 text-sm text-red-200">{commentError}</p>}
+        <div className="mt-5 space-y-3">
+          {commentLoading && comments.length === 0 ? <p className="py-5 text-center text-sm text-slate-500">Loading comments…</p> : comments.length === 0 ? <p className="py-5 text-center text-sm text-slate-500">No comments yet. Be the first to leave feedback.</p> : comments.map((comment) => (
+            <article key={comment.id} className="rounded-2xl border border-white/10 bg-black/25 p-4">
+              <div className="flex items-start justify-between gap-4"><div><strong className="text-sm text-white">{comment.display_name}</strong><span className="ml-2 text-[11px] text-slate-600">{comment.created_at ? new Date(comment.created_at).toLocaleString() : ''}</span></div>{user?.isAdmin && <button type="button" onClick={() => void handleDeleteComment(comment.id)} className="rounded-lg border border-red-400/20 bg-red-500/10 px-2 py-1 text-[10px] font-black uppercase text-red-200 hover:bg-red-500/20">Delete</button>}</div>
+              <p className="mt-2 whitespace-pre-wrap break-words text-sm leading-6 text-slate-300">{comment.body}</p>
+            </article>
           ))}
         </div>
       </div>
