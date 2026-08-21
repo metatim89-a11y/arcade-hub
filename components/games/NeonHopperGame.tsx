@@ -272,6 +272,35 @@ export default function NeonHopperGame({ playMode, playerNames }: { playMode: Pl
     return () => cancelAnimationFrame(req);
   }, []);
 
+  const touchStartRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    const touch = e.touches[0];
+    touchStartRef.current = { x: touch.clientX, y: touch.clientY };
+  };
+
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    const touch = e.changedTouches[0];
+    const dx = touch.clientX - touchStartRef.current.x;
+    const dy = touch.clientY - touchStartRef.current.y;
+    const absDx = Math.abs(dx);
+    const absDy = Math.abs(dy);
+
+    if (absDx < 10 && absDy < 10) {
+      // Tap -> Hop Up
+      act(0, -1);
+      return;
+    }
+
+    if (absDx > absDy && absDx > 20) {
+      if (dx > 0) act(1, 0);  // Swipe Right
+      else act(-1, 0);       // Swipe Left
+    } else if (absDy > absDx && absDy > 20) {
+      if (dy > 0) act(0, 1);   // Swipe Down
+      else act(0, -1);         // Swipe Up
+    }
+  };
+
   return (
     <div className="flex w-full flex-col items-center gap-4 text-white">
       <div className="flex w-full max-w-xl justify-between items-center px-4">
@@ -282,7 +311,11 @@ export default function NeonHopperGame({ playMode, playerNames }: { playMode: Pl
         </div>
       </div>
 
-      <div className="relative w-full max-w-xl aspect-square sm:aspect-[4/3] rounded-2xl overflow-hidden shadow-[0_0_50px_rgba(34,197,94,0.15)] bg-slate-950 border border-slate-700">
+      <div 
+        className="relative w-full max-w-xl aspect-square sm:aspect-[4/3] rounded-2xl overflow-hidden shadow-[0_0_50px_rgba(34,197,94,0.15)] bg-slate-950 border border-slate-700 touch-none select-none"
+        onTouchStart={handleTouchStart}
+        onTouchEnd={handleTouchEnd}
+      >
         <canvas ref={canvasRef} width={800} height={600} className="w-full h-full object-cover" />
         {gameOver && (
             <div className="absolute inset-0 bg-black/75 flex items-center justify-center flex-col animate-in fade-in duration-300 z-20">

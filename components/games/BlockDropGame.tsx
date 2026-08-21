@@ -202,6 +202,60 @@ const BlockDropGame: React.FC = () => {
     setGameOver(false); 
   };
 
+  const touchStartRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    const touch = e.touches[0];
+    touchStartRef.current = { x: touch.clientX, y: touch.clientY };
+  };
+
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    const touch = e.changedTouches[0];
+    const dx = touch.clientX - touchStartRef.current.x;
+    const dy = touch.clientY - touchStartRef.current.y;
+    const absDx = Math.abs(dx);
+    const absDy = Math.abs(dy);
+
+    if (absDx < 10 && absDy < 10) {
+      // Tap -> Rotate
+      const turned = { ...piece, shape: rotate(piece.shape) };
+      if (!collides(board, turned)) {
+        playSfx('rotate');
+        setPiece(turned);
+      }
+      return;
+    }
+
+    if (absDx > absDy && absDx > 25) {
+      if (dx > 0) {
+        // Swipe Right
+        if (!collides(board, { ...piece, x: piece.x + 1 })) {
+          playSfx('move');
+          setPiece((p) => ({ ...p, x: p.x + 1 }));
+        }
+      } else {
+        // Swipe Left
+        if (!collides(board, { ...piece, x: piece.x - 1 })) {
+          playSfx('move');
+          setPiece((p) => ({ ...p, x: p.x - 1 }));
+        }
+      }
+    } else if (absDy > absDx && absDy > 25) {
+      if (dy > 0) {
+        // Swipe Down -> Soft Drop
+        playSfx('move');
+        step();
+      } else {
+        // Swipe Up -> Rotate
+        const turned = { ...piece, shape: rotate(piece.shape) };
+        if (!collides(board, turned)) {
+          playSfx('rotate');
+          setPiece(turned);
+        }
+      }
+    }
+  };
+
   const ghostY = getGhostY();
   
   return (
@@ -214,7 +268,13 @@ const BlockDropGame: React.FC = () => {
         </div>
       </div>
 
-      <div className="relative grid w-full max-w-[300px] grid-cols-10 gap-px rounded-2xl border-4 border-fuchsia-400/30 bg-slate-950 p-1.5 shadow-[0_0_40px_rgba(217,70,239,0.15)]" role="grid" aria-label="Block Drop board">
+      <div 
+        className="relative grid w-full max-w-[300px] grid-cols-10 gap-px rounded-2xl border-4 border-fuchsia-400/30 bg-slate-950 p-1.5 shadow-[0_0_40px_rgba(217,70,239,0.15)] touch-none select-none" 
+        role="grid" 
+        aria-label="Block Drop board"
+        onTouchStart={handleTouchStart}
+        onTouchEnd={handleTouchEnd}
+      >
         {/* Background Grid & Settled Blocks */}
         {board.map((row, y) => row.map((_, x) => { 
           const value = board[y][x]; 
