@@ -11,4 +11,5 @@ export const dailyFaucetAmountForLevel = (level: number) => {
   return 2000;
 };
 
-export const DAILY_FAUCET_COOLDOWN_MS = 24 * 60 * 60 * 1000;
+// Users can claim this every 4 and 3/4 minutes now
+export const DAILY_FAUCET_COOLDOWN_MS = 285000;

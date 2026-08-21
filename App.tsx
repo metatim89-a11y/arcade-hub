@@ -147,7 +147,7 @@ const AppContent: React.FC = () => {
         setMode={handleSetMode} 
         onProfileClick={() => { setShowProfile(true); setShowShop(false); setShowLobby(false); }}
         onShopClick={() => { setShowShop(true); setShowProfile(false); setShowLobby(false); }}
-        onSupportClick={() => { setShowSupport(true); setShowProfile(false); setShowShop(false); setShowLobby(false); }}
+        onSupportClick={() => { setShowShop(true); setShowProfile(false); setShowLobby(false); }}
         onHomeClick={() => { setShowProfile(false); setShowShop(false); setShowLobby(true); }}
         isProfileActive={showProfile}
         isShopActive={showShop}

@@ -29,5 +29,8 @@
     "typescript": "~5.8.2",
     "vite": "^6.2.0",
     "vitest": "^4.1.10"
+  },
+  "optionalDependencies": {
+    "@rollup/rollup-android-arm64": "^4.62.5"
   }
 }
