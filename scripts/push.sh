@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Automated Git Stage, Commit, and Push Script for Arcade Hub
+# Automated Git Stage, Commit, Pull, and Push Script for Arcade Hub
 set -e
 
 repo_root=$(git rev-parse --show-toplevel 2>/dev/null || echo ".")
@@ -20,14 +20,17 @@ echo "1. Staging all changes..."
 git add -A
 
 if git diff --staged --quiet; then
-    echo "No changes to commit."
+    echo "No local changes to commit."
 else
     COMMIT_MSG="release: $VERSION - $TIMESTAMP updates"
     echo "2. Committing changes: '$COMMIT_MSG'..."
     git commit -m "$COMMIT_MSG"
 fi
 
-echo "3. Pushing to origin $CURRENT_BRANCH..."
+echo "3. Fetching and rebasing from origin $CURRENT_BRANCH..."
+git pull --rebase origin "$CURRENT_BRANCH" || git rebase --abort
+
+echo "4. Pushing to origin $CURRENT_BRANCH..."
 git push origin "$CURRENT_BRANCH"
 
 echo "==============================================="
