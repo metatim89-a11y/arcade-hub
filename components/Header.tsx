@@ -48,17 +48,22 @@ const Header: React.FC<HeaderProps> = ({ mode, setMode, simple = false, onProfil
       </>
   );
 
-  const buttonClasses = "text-sm md:text-base border-none py-2 px-4 rounded-lg bg-gray-800 text-yellow-400 cursor-pointer shadow-md transition-colors duration-200";
-  const activeButtonClasses = "bg-yellow-400 text-gray-800";
+  const buttonClasses = "text-xs md:text-sm border border-amber-500/20 py-1.5 px-3.5 rounded-xl bg-black/40 text-amber-300 font-semibold cursor-pointer transition-all duration-200 hover:border-amber-400/50 hover:bg-black/60 shadow-inner";
+  const activeButtonClasses = "bg-gradient-to-b from-amber-500 to-amber-600 text-slate-950 font-black border-amber-400 shadow-[0_0_15px_rgba(245,158,11,0.35)]";
 
   if (simple) {
       return (
-        <header className="relative flex flex-col justify-center items-center gap-4 p-6 bg-gradient-to-r from-[#a87c4f] to-[#7e3c3c] shadow-lg border-b-2 border-yellow-400/20 w-full">
+        <header className="relative flex flex-col justify-center items-center gap-4 p-6 onyx-glass-panel w-full border-b border-black/80">
             {versionButton}
-            <h1 className="text-3xl md:text-4xl tracking-wider text-yellow-400 [text-shadow:0_2px_8px_rgba(182,137,45,0.26),0_0_2px_#fff] font-bold">
-            🎲 Game Arcade Hub
-            </h1>
-            <button type="button" onClick={onSupportClick} className="rounded-lg border border-yellow-300/40 bg-black/20 px-4 py-2 text-xs font-black text-yellow-100 hover:bg-black/35">Support the project</button>
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-amber-400 to-amber-700 flex items-center justify-center text-slate-950 font-black shadow-md">
+                AH
+              </div>
+              <h1 className="text-2xl md:text-3xl tracking-widest text-amber-300 font-black uppercase">
+                Arcade Hub
+              </h1>
+            </div>
+            <button type="button" onClick={onSupportClick} className="rounded-xl border border-amber-500/30 bg-amber-950/40 px-4 py-2 text-xs font-bold text-amber-200 hover:bg-amber-900/60 transition">Support Project</button>
             {disclaimer}
             {showAdmin && <AdminPanel onClose={() => setShowAdmin(false)} />}
         </header>
@@ -66,17 +71,20 @@ const Header: React.FC<HeaderProps> = ({ mode, setMode, simple = false, onProfil
   }
 
   return (
-    <header className="relative flex flex-col gap-2 p-2.5 pt-5 md:px-5 md:py-4 md:pt-6 bg-gradient-to-r from-[#a87c4f] to-[#7e3c3c] shadow-lg border-b-2 border-yellow-400/20 w-full">
+    <header className="relative flex flex-col gap-3 p-3 pt-5 md:px-6 md:py-4 md:pt-6 onyx-glass-panel w-full border-b border-black/90">
       {versionButton}
       
       {/* Top Row: Title and User Controls */}
-      <div className="flex flex-wrap justify-between items-center w-full gap-2.5">
-        <div className="flex items-center gap-2.5 cursor-pointer" onClick={onHomeClick}>
-            <h1 className="text-xl md:text-2xl tracking-wider text-yellow-400 [text-shadow:0_2px_8px_rgba(182,137,45,0.26),0_0_2px_#fff] font-bold">
-            🎲 Game Arcade Hub
+      <div className="flex flex-wrap justify-between items-center w-full gap-3">
+        <div className="flex items-center gap-3 cursor-pointer group" onClick={onHomeClick}>
+            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-amber-400 to-amber-600 flex items-center justify-center text-slate-950 font-black text-sm shadow-[0_0_12px_rgba(245,158,11,0.3)] group-hover:scale-105 transition-transform">
+              AH
+            </div>
+            <h1 className="text-lg md:text-xl tracking-wider text-amber-200 font-extrabold uppercase group-hover:text-amber-100 transition-colors">
+              Arcade Hub
             </h1>
-            <span className="hidden md:inline-block text-sm bg-black/20 text-white rounded-full px-3 py-1">
-            {isCasinoMode ? 'Casino Mode (18+)' : 'Under 18 Mode'}
+            <span className="hidden md:inline-block text-[11px] font-bold uppercase tracking-widest bg-amber-500/10 text-amber-400 border border-amber-500/20 rounded-lg px-2.5 py-0.5">
+            {isCasinoMode ? 'Casino 18+' : 'Standard Arcade'}
             </span>
         </div>
 
@@ -84,54 +92,54 @@ const Header: React.FC<HeaderProps> = ({ mode, setMode, simple = false, onProfil
             <div className="flex items-center gap-2">
                 <button 
                     onClick={handleProfileClick}
-                    className={`flex items-center gap-2 px-3 py-1.5 rounded-full transition-colors ${isProfileActive ? 'bg-yellow-400 text-black' : 'bg-black/30 text-white hover:bg-black/40'}`}
+                    className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border transition-all ${isProfileActive ? 'bg-amber-500 text-slate-950 border-amber-400 font-black' : 'bg-black/50 text-amber-100 border-amber-500/20 hover:border-amber-400/40 hover:bg-black/70'}`}
                 >
-                    <img src={user.avatar} alt="avatar" className="h-8 w-8 rounded-full border-2 object-cover" style={{ borderColor: profileFrame.color, boxShadow: `0 0 10px ${profileFrame.glow}` }} />
-                    <span className="font-semibold hidden sm:inline">{user.username}</span>
+                    <img src={user.avatar} alt="avatar" className="h-7 w-7 rounded-lg border object-cover" style={{ borderColor: profileFrame.color, boxShadow: `0 0 8px ${profileFrame.glow}` }} />
+                    <span className="font-bold text-xs hidden sm:inline">{user.username}</span>
                 </button>
                 {user.isAdmin && (
                     <button
                         type="button"
                         onClick={() => setShowAdmin(true)}
-                        className="rounded-lg border border-sky-300/50 bg-sky-950/60 px-3 py-2 text-xs font-bold text-sky-100 hover:bg-sky-900/70"
+                        className="rounded-xl border border-amber-500/40 bg-amber-950/50 px-3 py-1.5 text-xs font-bold text-amber-200 hover:bg-amber-900/60"
                     >
                         Admin
                     </button>
                 )}
                 {!user.isGuest && (
-                    <button type="button" onClick={onShopClick} className={`rounded-lg border px-3 py-2 text-xs font-black transition ${isShopActive ? 'border-fuchsia-200 bg-fuchsia-500 text-white' : 'border-fuchsia-300/40 bg-fuchsia-950/60 text-fuchsia-100 hover:bg-fuchsia-900/70'}`}>
-                        ✨ Shop
+                    <button type="button" onClick={onShopClick} className={`rounded-xl border px-3 py-1.5 text-xs font-bold transition ${isShopActive ? 'border-amber-300 bg-amber-400 text-slate-950 font-black' : 'border-amber-500/30 bg-black/40 text-amber-200 hover:bg-amber-950/40'}`}>
+                        Shop
                     </button>
                 )}
                 <button 
                     onClick={logout}
-                    className="text-xs text-red-200 hover:text-red-100 hover:underline"
+                    className="text-xs text-amber-400/60 hover:text-amber-300 hover:underline px-1"
                 >
                     Logout
                 </button>
             </div>
         )}
-        <button type="button" onClick={onSupportClick} className={`rounded-lg border px-3 py-2 text-xs font-black transition ${isSupportActive ? 'border-yellow-200 bg-yellow-300 text-slate-950' : 'border-yellow-300/40 bg-black/25 text-yellow-100 hover:bg-black/40'}`}>💛 Support</button>
+        <button type="button" onClick={onSupportClick} className={`rounded-xl border px-3 py-1.5 text-xs font-bold transition ${isSupportActive ? 'border-amber-300 bg-amber-400 text-slate-950' : 'border-amber-500/30 bg-black/40 text-amber-200 hover:bg-amber-950/40'}`}>Support</button>
       </div>
 
       {/* Bottom Row: Coins and Mode Switch (Only if not in profile view) */}
       {!isProfileActive && !isShopActive && (
-        <div className="flex flex-wrap justify-between items-center gap-4 w-full border-t border-white/10 pt-2">
-            <div className="flex items-center gap-4">
+        <div className="flex flex-wrap justify-between items-center gap-3 w-full border-t border-amber-500/15 pt-2.5">
+            <div className="flex items-center gap-3">
                 {!user?.isGuest && (
-                    <button type="button" onClick={handleProfileClick} className="flex gap-2 text-xs font-black">
-                        <span className="rounded-xl border border-purple-300/25 bg-purple-950/60 px-3 py-1.5 text-purple-200">LV {progression.level}</span>
-                        <span className="rounded-xl border border-cyan-300/25 bg-cyan-950/60 px-3 py-1.5 text-cyan-200">🎟 {tickets.toLocaleString()}</span>
+                    <button type="button" onClick={handleProfileClick} className="flex gap-2 text-xs font-bold">
+                        <span className="rounded-lg border border-amber-500/25 bg-black/60 px-2.5 py-1 text-amber-300">LV {progression.level}</span>
+                        <span className="rounded-lg border border-amber-500/25 bg-black/60 px-2.5 py-1 text-amber-200">TK {tickets.toLocaleString()}</span>
                     </button>
                 )}
                 {isCasinoMode && (
                 <div className="flex items-center gap-2">
-                    <div className="flex gap-2 text-sm md:text-base font-bold">
-                        <div className={`py-1 px-3 rounded-xl shadow-inner shadow-black/50 transition-colors ${currencyMode === 'fun' ? 'bg-yellow-400 text-gray-900' : 'bg-gray-900/70 text-yellow-400/60'}`}>
-                        Fun: <span>{Math.floor(funCoins)}</span>
+                    <div className="flex gap-2 text-xs md:text-sm font-bold">
+                        <div className={`py-1 px-3 rounded-lg border shadow-inner transition-all ${currencyMode === 'fun' ? 'bg-amber-500/20 text-amber-200 border-amber-500/40' : 'bg-black/50 text-amber-400/50 border-black/80'}`}>
+                        FC: <span className="font-black text-amber-300">{Math.floor(funCoins)}</span>
                         </div>
-                        <div className={`py-1 px-3 rounded-xl shadow-inner shadow-black/50 transition-colors ${currencyMode === 'real' ? 'bg-green-500 text-gray-900' : 'bg-gray-900/70 text-green-400/60'}`}>
-                        Virtual RC: <span>{Math.floor(realCoins)}</span>
+                        <div className={`py-1 px-3 rounded-lg border shadow-inner transition-all ${currencyMode === 'real' ? 'bg-amber-500/20 text-amber-200 border-amber-500/40' : 'bg-black/50 text-amber-400/50 border-black/80'}`}>
+                        VRC: <span className="font-black text-amber-300">{Math.floor(realCoins)}</span>
                         </div>
                     </div>
                 </div>
@@ -141,10 +149,10 @@ const Header: React.FC<HeaderProps> = ({ mode, setMode, simple = false, onProfil
                 {user?.isGuest && (
                     <button
                         onClick={resetCoins}
-                        className="text-xs bg-red-900/50 hover:bg-red-800 text-red-200 px-2 py-1 rounded border border-red-700/50 transition-colors shadow-sm"
+                        className="text-xs bg-amber-950/40 hover:bg-amber-900/60 text-amber-300 px-2.5 py-1 rounded-lg border border-amber-500/30 transition-colors shadow-sm"
                         title="Reset coin balance to default"
                     >
-                        Reset Coins
+                        Reset Balance
                     </button>
                 )}
             </div>
@@ -152,15 +160,15 @@ const Header: React.FC<HeaderProps> = ({ mode, setMode, simple = false, onProfil
             <div className="flex gap-2 ml-auto">
                 <button
                     onClick={() => setMode(GameMode.Under18)}
-                    className={`${buttonClasses} ${!isCasinoMode ? activeButtonClasses : ''} py-1 px-3 text-xs`}
+                    className={`${buttonClasses} ${!isCasinoMode ? activeButtonClasses : ''}`}
                 >
-                    Under 18
+                    Arcade
                 </button>
                 <button
                     onClick={() => setMode(GameMode.Adult)}
-                    className={`${buttonClasses} ${isCasinoMode ? activeButtonClasses : ''} py-1 px-3 text-xs`}
+                    className={`${buttonClasses} ${isCasinoMode ? activeButtonClasses : ''}`}
                 >
-                    Casino (18+)
+                    Casino 18+
                 </button>
             </div>
         </div>

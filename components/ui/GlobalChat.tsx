@@ -51,14 +51,17 @@ const GlobalChat: React.FC = () => {
         return (
             <button 
                 onClick={() => setIsOpen(true)}
-                className="global-chat-launcher fixed z-50 bg-yellow-500 text-black font-bold rounded-full shadow-2xl hover:scale-105 transition-transform flex items-center justify-center gap-2 border-2 border-yellow-300"
+                className="global-chat-launcher fixed z-50 bg-gradient-to-b from-amber-400 to-amber-600 text-slate-950 font-black rounded-xl shadow-[0_10px_25px_rgba(245,158,11,0.3)] hover:scale-105 transition-all duration-200 flex items-center justify-center gap-2 border border-amber-300"
                 aria-label="Open global chat"
                 title="Open global chat"
             >
-                <span aria-hidden="true">💬</span><span className="hidden md:inline">Global Chat</span>
+                <svg className="w-4 h-4 text-slate-950" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                </svg>
+                <span className="hidden md:inline uppercase text-xs tracking-wider">Chat</span>
                 <style>{`
-                    .global-chat-launcher{right:max(12px,env(safe-area-inset-right));bottom:max(12px,env(safe-area-inset-bottom));min-width:48px;height:48px;padding:0 14px;opacity:.9}
-                    @media(max-width:640px){.global-chat-launcher{min-width:42px;width:42px;height:42px;padding:0;opacity:.68}.global-chat-launcher:focus-visible,.global-chat-launcher:hover{opacity:1}}
+                    .global-chat-launcher{right:max(12px,env(safe-area-inset-right));bottom:max(12px,env(safe-area-inset-bottom));min-width:44px;height:44px;padding:0 14px;}
+                    @media(max-width:640px){.global-chat-launcher{min-width:40px;width:40px;height:40px;padding:0;}}
                     body:has(.game-engine-stage:fullscreen) .global-chat-launcher{display:none}
                 `}</style>
             </button>
@@ -66,14 +69,14 @@ const GlobalChat: React.FC = () => {
     }
 
     return (
-        <div role="dialog" aria-label="Global chat" className="global-chat-panel fixed z-50 w-80 h-96 bg-gray-900/95 backdrop-blur-lg border-2 border-yellow-400/30 rounded-2xl shadow-2xl flex flex-col overflow-hidden animate-in slide-in-from-bottom-5">
+        <div role="dialog" aria-label="Global chat" className="global-chat-panel fixed z-50 w-80 h-96 onyx-glass-panel border border-amber-500/30 rounded-2xl shadow-2xl flex flex-col overflow-hidden animate-in slide-in-from-bottom-5">
             {/* Header */}
-            <div className="bg-yellow-500/10 p-3 border-b border-yellow-400/20 flex justify-between items-center">
-                <span className="text-yellow-400 font-bold flex items-center gap-2">
-                    <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
-                    Global Chat
+            <div className="bg-amber-500/10 p-3 border-b border-amber-500/20 flex justify-between items-center">
+                <span className="text-amber-300 font-extrabold text-xs uppercase tracking-wider flex items-center gap-2">
+                    <span className="w-2 h-2 bg-amber-400 rounded-full animate-pulse"></span>
+                    Global Arcade Hub Chat
                 </span>
-                <button onClick={() => setIsOpen(false)} className="text-gray-400 hover:text-white" aria-label="Close global chat">✕</button>
+                <button onClick={() => setIsOpen(false)} className="text-amber-400/60 hover:text-amber-300 font-bold" aria-label="Close global chat">✕</button>
             </div>
 
             {/* Messages */}
@@ -81,10 +84,10 @@ const GlobalChat: React.FC = () => {
                 {messages.map(msg => (
                     <div key={msg.id} className="flex flex-col gap-1">
                         <div className="flex items-baseline gap-2">
-                            <span className="text-yellow-400 text-xs font-bold">{msg.username}</span>
-                            <span className="text-[10px] text-gray-500">{new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                            <span className="text-amber-300 text-xs font-bold">{msg.username}</span>
+                            <span className="text-[10px] text-slate-500">{new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                         </div>
-                        <div className="bg-white/5 p-2 rounded-lg text-sm text-gray-200 break-words border border-white/5">
+                        <div className="bg-black/40 p-2.5 rounded-xl text-xs text-slate-200 break-words border border-amber-500/15">
                             {msg.text}
                         </div>
                     </div>
@@ -92,22 +95,22 @@ const GlobalChat: React.FC = () => {
             </div>
 
             {/* Input */}
-            <div className="p-3 bg-black/40 border-t border-white/10 flex gap-2">
+            <div className="p-3 bg-black/60 border-t border-amber-500/20 flex gap-2">
                 <input 
                     type="text" 
                     value={inputText}
                     onChange={(e) => setInputText(e.target.value)}
                     onKeyDown={(e) => e.key === 'Enter' && handleSend()}
-                    placeholder="Type a message..."
-                    aria-label="Chat message"
-                    className="flex-grow bg-white/5 border border-white/10 rounded-lg px-3 py-1 text-sm focus:outline-none focus:border-yellow-400/50"
+                    placeholder={user ? "Type a message..." : "Log in to chat"}
+                    disabled={!user}
+                    className="flex-grow bg-black/50 border border-amber-500/20 rounded-xl px-3 py-1.5 text-xs text-amber-100 placeholder-amber-400/30 focus:outline-none focus:border-amber-400/60"
                 />
-                <button 
+                <button
                     onClick={handleSend}
-                    className="bg-yellow-500 text-black p-2 rounded-lg hover:bg-yellow-400 transition-colors"
-                    aria-label="Send message"
+                    disabled={!user || !inputText.trim()}
+                    className="px-3 py-1.5 rounded-xl bg-gradient-to-b from-amber-400 to-amber-600 text-slate-950 font-black text-xs uppercase disabled:opacity-40"
                 >
-                    ✈️
+                    Send
                 </button>
             </div>
 

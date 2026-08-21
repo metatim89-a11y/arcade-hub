@@ -111,8 +111,8 @@ const GameAtmosphere3D: React.FC<{ gameId: string }> = ({ gameId }) => {
     return () => { cancelled = true; dispose(); };
   }, [gameId]);
 
-  if (gameId === 'fishing') return null;
-  return <canvas ref={canvasRef} aria-hidden="true" className="pointer-events-none absolute inset-0 h-full w-full opacity-60" />;
+  if (gameId === 'fishing' || gameId === 'mancala') return null;
+  return <canvas ref={canvasRef} aria-hidden="true" className="pointer-events-none absolute inset-0 h-full w-full opacity-35" />;
 };
 
 export default GameAtmosphere3D;

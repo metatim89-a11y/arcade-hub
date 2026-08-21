@@ -7,50 +7,202 @@ type ArcadeLobbyProps = {
   onPlay: (game: Game) => void;
 };
 
-const cardArt: Record<string, { icon: string; className: string; blurb: string }> = {
-  fishing: { icon: '🐋', className: 'lobby-art-ocean', blurb: 'Track the big catch' },
-  slots: { icon: '🎰', className: 'lobby-art-vault', blurb: 'Spin the Volt Vault' },
-  plinko: { icon: '💎', className: 'lobby-art-plinko', blurb: 'Drop into the multipliers' },
-  crash: { icon: '🚀', className: 'lobby-art-crash', blurb: 'Ride the curve' },
-  wheel: { icon: '🎡', className: 'lobby-art-wheel', blurb: 'Pick your lucky lane' },
-  nim: { icon: '🧮', className: 'lobby-art-nim', blurb: 'Take the last pile' },
-  chutes: { icon: '🎲', className: 'lobby-art-chutes', blurb: 'Climb, slide, and race' },
-  blockdrop: { icon: '🧱', className: 'lobby-art-blockdrop', blurb: 'Stack lines and clear them' },
-  mancala: { icon: '🟠', className: 'lobby-art-mancala', blurb: 'Classic strategy' },
-  rps: { icon: '🃏', className: 'lobby-art-rps', blurb: 'Read the table' },
+// SVG badges for games (replacing emojis)
+const gameBadges: Record<string, { tag: string; blurb: string; iconSvg: React.ReactNode }> = {
+  fishing: {
+    tag: 'DEEP OCEAN',
+    blurb: 'Track trophy catches & deep sea targets',
+    iconSvg: (
+      <svg className="w-8 h-8 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 21a9 9 0 01-9-9c0-4.97 4.03-9 9-9s9 4.03 9 9a9 9 0 01-9 9zm0-15a6 6 0 100 12 6 6 0 000-12z" />
+      </svg>
+    )
+  },
+  slots: {
+    tag: 'VOLT VAULT',
+    blurb: 'Spin high yield multiplier reels',
+    iconSvg: (
+      <svg className="w-8 h-8 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 6h16M4 10h16M4 14h16M4 18h16" />
+      </svg>
+    )
+  },
+  plinko: {
+    tag: 'PEG MATRIX',
+    blurb: 'Drop down high velocity multiplier pegs',
+    iconSvg: (
+      <svg className="w-8 h-8 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 3v18m9-9H3m15.364 6.364l-12.728-12.728m12.728 0L6.364 18.364" />
+      </svg>
+    )
+  },
+  crash: {
+    tag: 'VELOCITY CURVE',
+    blurb: 'Time your cash out before collision',
+    iconSvg: (
+      <svg className="w-8 h-8 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+      </svg>
+    )
+  },
+  wheel: {
+    tag: 'TITANIUM WHEEL',
+    blurb: 'Pick precision sector stakes',
+    iconSvg: (
+      <svg className="w-8 h-8 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+      </svg>
+    )
+  },
+  nim: {
+    tag: 'LOGIC NIM',
+    blurb: 'Execute strategic pile elimination',
+    iconSvg: (
+      <svg className="w-8 h-8 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 7h6m-6 5h6m-6 5h6M6 7h.01M6 12h.01M6 17h.01" />
+      </svg>
+    )
+  },
+  chutes: {
+    tag: 'TACTICAL RACE',
+    blurb: 'Climb ladders and calculate slides',
+    iconSvg: (
+      <svg className="w-8 h-8 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 5h16M4 12h16M4 19h16M8 5v14m8-14v14" />
+      </svg>
+    )
+  },
+  blockdrop: {
+    tag: 'GRID STACK',
+    blurb: 'Stack block formations and clear lines',
+    iconSvg: (
+      <svg className="w-8 h-8 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2z" />
+      </svg>
+    )
+  },
+  mancala: {
+    tag: 'PIT TACTICS',
+    blurb: 'Classic pebble distribution strategy',
+    iconSvg: (
+      <svg className="w-8 h-8 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M20 12H4m16 0a8 8 0 11-16 0 8 8 0 0116 0z" />
+      </svg>
+    )
+  },
+  rps: {
+    tag: 'SHOWDOWN',
+    blurb: 'Predict table sequences and counter moves',
+    iconSvg: (
+      <svg className="w-8 h-8 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+      </svg>
+    )
+  }
 };
 
 const ArcadeLobby: React.FC<ArcadeLobbyProps> = ({ games, mode, onPlay }) => {
   const featured = games.find((game) => game.id === (mode === 'Adult' ? 'fishing' : 'nim')) ?? games[0];
-  const art = cardArt[featured.id] ?? { icon: '✨', className: 'lobby-art-default', blurb: 'Play the latest Arcade Hub game' };
+  const art = gameBadges[featured.id] ?? { tag: 'ORIGINAL', blurb: 'Featured Arcade Hub Title', iconSvg: null };
   const originals = games.slice(0, 6);
 
   return (
-    <section className="arcade-lobby" aria-label="Arcade Hub lobby">
-      <div className={`lobby-hero ${art.className}`}>
-        <div className="lobby-hero-copy">
-          <span className="lobby-eyebrow">ARCADE HUB ORIGINAL</span>
-          <h1>{featured.label}</h1>
-          <p>{art.blurb}. Jump in instantly, then share your run with a friend.</p>
-          <button type="button" onClick={() => onPlay(featured)}>PLAY NOW <span>→</span></button>
+    <section className="w-full max-w-6xl px-4 py-6 text-slate-100" aria-label="Arcade Hub lobby">
+      {/* Featured Hero Banner */}
+      <div className="relative overflow-hidden rounded-3xl onyx-glass-panel p-8 md:p-12 mb-8 border border-black/90 shadow-[inset_0_1px_0_rgba(255,255,255,0.15),0_25px_60px_rgba(0,0,0,0.9)]">
+        {/* Subtle Ambient Background Highlight */}
+        <div className="absolute -top-24 -right-24 w-96 h-96 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
+        
+        <div className="relative z-10 flex flex-col md:flex-row items-start md:items-center justify-between gap-8">
+          <div className="max-w-xl space-y-4">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-lg bg-amber-500/10 border border-amber-500/25 text-amber-400 text-[10px] font-black tracking-widest uppercase">
+              <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
+              {art.tag} FEATURED TITLE
+            </div>
+            <h1 className="text-4xl md:text-6xl font-black tracking-tight text-white uppercase">
+              {featured.label}
+            </h1>
+            <p className="text-sm md:text-base text-slate-300 leading-relaxed font-medium">
+              {art.blurb}. Enter the high-precision glass arena instantly and set your benchmark run.
+            </p>
+            <div className="pt-2">
+              <button 
+                type="button" 
+                onClick={() => onPlay(featured)}
+                className="group relative inline-flex items-center gap-3 px-8 py-3.5 rounded-xl bg-gradient-to-b from-amber-400 to-amber-600 text-slate-950 font-black text-sm tracking-wider uppercase shadow-[0_10px_25px_rgba(245,158,11,0.3)] hover:shadow-[0_15px_30px_rgba(245,158,11,0.45)] hover:scale-[1.02] active:scale-95 transition-all duration-200"
+              >
+                Launch Game
+                <svg className="w-4 h-4 transition-transform group-hover:translate-x-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                </svg>
+              </button>
+            </div>
+          </div>
+
+          <div className="relative w-36 h-36 md:w-48 md:h-48 rounded-2xl bg-gradient-to-br from-amber-500/20 via-slate-900/80 to-black border border-amber-500/30 flex items-center justify-center shadow-[inset_0_0_30px_rgba(245,158,11,0.15),0_15px_35px_rgba(0,0,0,0.8)] backdrop-blur-xl">
+            <div className="p-6 rounded-xl bg-black/60 border border-amber-500/20 shadow-inner">
+              {art.iconSvg}
+            </div>
+          </div>
         </div>
-        <div className="lobby-hero-icon" aria-hidden="true">{art.icon}</div>
       </div>
 
-      <div className="lobby-section-heading"><div><span>CURATED FOR YOU</span><h2>Arcade Originals</h2></div><small>{games.length} games</small></div>
-      <div className="lobby-card-row">
+      {/* Grid Heading */}
+      <div className="flex items-center justify-between mb-6 px-1">
+        <div>
+          <span className="text-[10px] font-black tracking-widest text-amber-400 uppercase">CURATED HUB ARCHITECTURE</span>
+          <h2 className="text-2xl font-black tracking-tight text-amber-100 uppercase mt-0.5">Arcade Originals</h2>
+        </div>
+        <span className="text-xs font-bold text-amber-400/60 bg-amber-500/10 border border-amber-500/20 px-3 py-1 rounded-lg">
+          {games.length} AVAILABLE
+        </span>
+      </div>
+
+      {/* Game Cards Grid */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 mb-10">
         {originals.map((game) => {
-          const gameArt = cardArt[game.id] ?? { icon: '✨', className: 'lobby-art-default', blurb: 'Arcade Hub original' };
-          return <button type="button" key={game.id} className={`lobby-game-card ${gameArt.className}`} onClick={() => onPlay(game)}><span className="lobby-card-icon" aria-hidden="true">{gameArt.icon}</span><strong>{game.label}</strong><small>{gameArt.blurb}</small></button>;
+          const gameArt = gameBadges[game.id] ?? { tag: 'ORIGINAL', blurb: 'Arcade Hub original', iconSvg: null };
+          return (
+            <button 
+              type="button" 
+              key={game.id} 
+              className="onyx-glass-card group flex flex-col justify-between p-4 rounded-2xl text-left h-48 relative overflow-hidden"
+              onClick={() => onPlay(game)}
+            >
+              <div className="flex items-center justify-between w-full">
+                <div className="p-2.5 rounded-xl bg-black/50 border border-amber-500/20 group-hover:border-amber-400/40 group-hover:bg-amber-500/10 transition-colors">
+                  {gameArt.iconSvg}
+                </div>
+                <span className="text-[9px] font-black text-amber-400/50 uppercase tracking-widest">{gameArt.tag}</span>
+              </div>
+              <div className="mt-auto space-y-1 z-10">
+                <strong className="block text-base font-black text-white group-hover:text-amber-300 transition-colors">
+                  {game.label}
+                </strong>
+                <p className="text-[10px] font-medium text-slate-400 line-clamp-2 leading-tight">
+                  {gameArt.blurb}
+                </p>
+              </div>
+            </button>
+          );
         })}
       </div>
 
-      <div className="lobby-challenge"><div><span>DAILY CHALLENGE</span><h2>Make one great run.</h2><p>Try a new game today and keep your streak alive.</p></div><button type="button" onClick={() => onPlay(games[Math.min(2, games.length - 1)])}>START CHALLENGE <span>→</span></button></div>
-
-      <style>{`
-        .arcade-lobby{width:100%;max-width:1120px;padding:14px 0 22px;color:#e8f5ff}.lobby-hero{position:relative;display:flex;align-items:center;justify-content:space-between;min-height:260px;overflow:hidden;padding:28px 32px;border:1px solid #31536b;border-radius:24px;background:radial-gradient(circle at 80% 30%,rgba(63,213,245,.34),transparent 35%),linear-gradient(135deg,#132d3c,#08131d);box-shadow:0 24px 55px rgba(0,0,0,.32),inset 0 1px rgba(255,255,255,.1)}.lobby-hero:after{content:'';position:absolute;inset:auto -10% -55%;height:180px;background:radial-gradient(ellipse,rgba(255,207,78,.28),transparent 64%);transform:rotate(-5deg)}.lobby-hero-copy{position:relative;z-index:1;max-width:520px}.lobby-eyebrow,.lobby-section-heading span,.lobby-challenge>div>span{color:#f1c84e;font-size:9px;font-weight:950;letter-spacing:.2em}.lobby-hero h1{margin:5px 0 8px;font-size:clamp(36px,6vw,70px);line-height:.95;letter-spacing:-.06em;text-shadow:0 7px 22px rgba(0,0,0,.36)}.lobby-hero p{max-width:440px;margin:0 0 18px;color:#b1c9d8;font-size:14px}.lobby-hero button,.lobby-challenge button{padding:12px 18px;border:0;border-radius:10px;background:linear-gradient(#ffe066,#e89520);box-shadow:0 5px 0 #81500d;color:#261b08;font-weight:950;cursor:pointer}.lobby-hero button span,.lobby-challenge button span{margin-left:10px;font-size:18px}.lobby-hero-icon{position:relative;z-index:1;display:grid;place-items:center;width:230px;height:230px;border-radius:50%;background:radial-gradient(circle,#fef3b4,#f1a522 42%,#7b3517 70%,transparent 71%);font-size:112px;filter:drop-shadow(0 20px 25px rgba(0,0,0,.45));animation:lobby-float 4s ease-in-out infinite}.lobby-section-heading{display:flex;align-items:end;justify-content:space-between;margin:26px 2px 10px}.lobby-section-heading h2{margin:3px 0 0;font-size:27px;letter-spacing:-.04em}.lobby-section-heading small{color:#8ba8b9;font-size:11px}.lobby-card-row{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:10px}.lobby-game-card{display:flex;min-height:172px;flex-direction:column;align-items:flex-start;justify-content:flex-end;gap:4px;overflow:hidden;padding:12px;border:1px solid rgba(255,255,255,.12);border-radius:15px;background:linear-gradient(160deg,#7d4ce8,#e5368c);color:white;text-align:left;box-shadow:0 12px 22px rgba(0,0,0,.2);cursor:pointer;transition:transform .18s,filter .18s}.lobby-game-card:hover{transform:translateY(-5px);filter:brightness(1.12)}.lobby-game-card strong{font-size:16px;text-shadow:0 2px 5px rgba(0,0,0,.35)}.lobby-game-card small{color:rgba(255,255,255,.8);font-size:9px}.lobby-card-icon{align-self:center;margin:auto 0 8px;font-size:54px;filter:drop-shadow(0 8px 5px rgba(0,0,0,.28))}.lobby-art-plinko{background:linear-gradient(160deg,#7849ef,#fa3155)}.lobby-art-vault{background:linear-gradient(160deg,#182b92,#eb3f3f)}.lobby-art-ocean{background:linear-gradient(160deg,#067da4,#38d8bd)}.lobby-art-crash{background:linear-gradient(160deg,#152e76,#f04e38)}.lobby-art-wheel{background:linear-gradient(160deg,#0f826f,#f2ae2e)}.lobby-art-worm{background:linear-gradient(160deg,#1e88c7,#7c3aed)}.lobby-art-mancala{background:linear-gradient(160deg,#8b4513,#e6a437)}.lobby-art-rps{background:linear-gradient(160deg,#853fe7,#ea3f98)}.lobby-challenge{display:flex;align-items:center;justify-content:space-between;gap:20px;margin-top:24px;padding:20px 24px;border:1px solid #2d536b;border-radius:16px;background:linear-gradient(115deg,#142c3b,#0c1a26)}.lobby-challenge h2{margin:4px 0;font-size:24px}.lobby-challenge p{margin:0;color:#9bb4c4;font-size:12px}@keyframes lobby-float{50%{transform:translateY(-8px) rotate(2deg)}}@media(max-width:760px){.arcade-lobby{padding:6px 0 14px}.lobby-hero{min-height:270px;padding:22px 18px;border-radius:17px}.lobby-hero-icon{position:absolute;right:-38px;bottom:-35px;width:205px;height:205px;font-size:92px;opacity:.82}.lobby-hero-copy{max-width:80%}.lobby-hero h1{font-size:42px}.lobby-hero p{font-size:12px}.lobby-section-heading{margin-top:20px}.lobby-section-heading h2{font-size:22px}.lobby-card-row{grid-template-columns:repeat(3,minmax(0,1fr));gap:7px}.lobby-game-card{min-height:145px;padding:9px;border-radius:12px}.lobby-card-icon{font-size:40px}.lobby-game-card strong{font-size:12px}.lobby-game-card small{font-size:8px}.lobby-challenge{align-items:flex-start;flex-direction:column;padding:16px}.lobby-challenge button{width:100%}}
-        .lobby-art-nim{background:linear-gradient(160deg,#0f766e,#22d3ee)}.lobby-art-chutes{background:linear-gradient(160deg,#15803d,#f97316)}.lobby-art-blockdrop{background:linear-gradient(160deg,#4338ca,#ec4899)}
-      `}</style>
+      {/* Daily Challenge Banner */}
+      <div className="relative overflow-hidden rounded-2xl onyx-glass-panel p-6 border border-amber-500/20 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6">
+        <div className="space-y-1">
+          <span className="text-[10px] font-black tracking-widest text-amber-400 uppercase">DAILY RUN CHALLENGE</span>
+          <h2 className="text-xl font-black text-white uppercase">Set a new personal record today.</h2>
+          <p className="text-xs text-slate-400">Play a daily featured session to build your streak and earn virtual tickets.</p>
+        </div>
+        <button 
+          type="button" 
+          onClick={() => onPlay(games[Math.min(2, games.length - 1)])}
+          className="px-6 py-2.5 rounded-xl bg-gradient-to-b from-amber-500 to-amber-700 text-slate-950 font-black text-xs uppercase tracking-wider shadow-lg hover:brightness-110 active:scale-95 transition-all whitespace-nowrap"
+        >
+          Start Daily Run →
+        </button>
+      </div>
     </section>
   );
 };

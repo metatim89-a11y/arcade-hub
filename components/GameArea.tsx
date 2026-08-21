@@ -204,22 +204,22 @@ const GameArea: React.FC<GameAreaProps> = ({ games, selectedGame, onSelectGame, 
           {games.map((game) => <option key={game.id} value={game.id}>{game.label}</option>)}
         </select>
       </label>
-      <nav className="hidden w-full max-w-7xl flex-wrap justify-center gap-1.5 pb-1 mb-3 md:flex" aria-label="Choose a game">
+      <nav className="hidden w-full max-w-7xl flex-wrap justify-center gap-2 pb-1 mb-3 md:flex" aria-label="Choose a game">
         {games.map((game) => (
           <button
             key={game.id}
             onClick={() => handleSelectGame(game)}
-            className={`shrink-0 text-xs md:text-sm bg-gray-800 text-yellow-400 border-none py-1.5 px-3 md:px-4 rounded-xl cursor-pointer shadow-md shadow-yellow-400/20 transition-all duration-200 ${
+            className={`shrink-0 text-xs md:text-sm font-extrabold border py-1.5 px-4 rounded-xl cursor-pointer transition-all duration-200 ${
               selectedGame.id === game.id
-                ? 'bg-yellow-400 text-gray-800 shadow-lg shadow-yellow-400/40 scale-105'
-                : 'hover:bg-yellow-400/80 hover:text-gray-800 hover:shadow-lg hover:shadow-yellow-400/40'
+                ? 'bg-gradient-to-b from-amber-400 to-amber-600 text-slate-950 border-amber-300 shadow-[0_0_15px_rgba(245,158,11,0.35)] scale-105'
+                : 'bg-black/60 text-amber-300/80 border-amber-500/20 hover:border-amber-400/50 hover:bg-black/80 hover:text-amber-200'
             }`}
           >
             {game.label}
           </button>
         ))}
       </nav>
-      <button type="button" className="game-share-button" onClick={() => void shareGame()} aria-label={`Share ${selectedGame.label}`}>↗ Share {selectedGame.label}</button>
+      <button type="button" className="px-4 py-1.5 rounded-xl bg-black/50 border border-amber-500/20 text-amber-300 text-xs font-bold hover:bg-black/80 hover:border-amber-400/40 transition-colors" onClick={() => void shareGame()} aria-label={`Share ${selectedGame.label}`}>↗ Share {selectedGame.label}</button>
       </div>
       
       {/* Game Options */}
