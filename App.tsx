@@ -1,5 +1,5 @@
 
-// App.tsx v0.0.7 - Core Application Shell
+// App.tsx v0.0.39 - Core Application Shell
 import React, { useEffect, useState } from 'react';
 import { CoinProvider } from './context/CoinContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
@@ -27,21 +27,37 @@ import { recordSiteEvent } from './lib/analytics';
 
 import TradingBotDashboard from './components/bot/TradingBotDashboard';
 
+const requestedGameId = () => {
+  const requested = new URLSearchParams(window.location.search).get('game');
+  return requested === 'coinpusher' ? 'whackattack' : requested;
+};
+
 const AppContent: React.FC = () => {
   const { user, isAuthenticated, isLoading, verificationPendingEmail, isPasswordRecovery } = useAuth();
   const { notification, clearNotification } = useCoinSystem();
-  const [mode, setMode] = useState<GameMode>(GameMode.Under18);
+  const [mode, setMode] = useState<GameMode>(() => {
+    const requested = requestedGameId();
+    return requested && ADULT_GAMES.some((game) => game.id === requested) ? GameMode.Adult : GameMode.Under18;
+  });
   const [games] = useState(() => {
       return mode === GameMode.Adult ? ADULT_GAMES : UNDER18_GAMES;
   });
   const [selectedGame, setSelectedGame] = useState<Game>(() => {
-    const requested = new URLSearchParams(window.location.search).get('game');
+    const requested = requestedGameId();
     return games.find((game) => game.id === requested) ?? games[0];
   });
   const [showLobby, setShowLobby] = useState(() => {
-    const requested = new URLSearchParams(window.location.search).get('game');
+    const requested = requestedGameId();
     return !requested;
   });
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('game') === 'coinpusher') {
+      params.set('game', 'whackattack');
+      window.history.replaceState({}, '', `${window.location.pathname}?${params.toString()}${window.location.hash}`);
+    }
+  }, []);
 
   // Default to Arcade Lobby on authentication unless specific game query requested
   useEffect(() => {
