@@ -1,79 +1,248 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import type { PlayMode } from '../../types';
 import GlassButton from '../ui/GlassButton';
 
 type Props = { playMode: PlayMode; playerNames: { player1: string; player2: string } };
-const jumps: Record<number, number> = { 1: 38, 4: 14, 9: 31, 21: 42, 28: 84, 36: 44, 51: 67, 71: 91, 80: 100, 16: 6, 47: 26, 49: 11, 56: 53, 62: 19, 64: 60, 87: 24, 93: 73, 95: 75, 98: 78 };
+const jumps: Record<number, number> = { 
+  1: 38, 4: 14, 9: 31, 21: 42, 28: 84, 36: 44, 51: 67, 71: 91, 80: 100, 
+  16: 6, 47: 26, 49: 11, 56: 53, 62: 19, 64: 60, 87: 24, 93: 73, 95: 75, 98: 78 
+};
 
 const ChutesAndLaddersGame: React.FC<Props> = ({ playMode, playerNames }) => {
   const [positions, setPositions] = useState([1, 1]);
   const [turn, setTurn] = useState(0);
   const [roll, setRoll] = useState<number | null>(null);
+  const [isRolling, setIsRolling] = useState(false);
   const [winner, setWinner] = useState<number | null>(null);
+  
   const names = [playerNames.player1, playMode === 'vsComputer' ? 'Computer' : playerNames.player2];
-  const board = useMemo(() => Array.from({ length: 100 }, (_, index) => 100 - index), []);
+  
+  const audioCtxRef = useRef<AudioContext | null>(null);
+
+  const playSfx = (type: 'roll' | 'ladder' | 'chute' | 'win') => {
+    try {
+      if (!audioCtxRef.current) {
+        audioCtxRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
+      }
+      const ctx = audioCtxRef.current;
+      if (ctx.state === 'suspended') void ctx.resume();
+
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      const now = ctx.currentTime;
+
+      if (type === 'roll') {
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(300 + Math.random() * 200, now);
+        gain.gain.setValueAtTime(0.15, now);
+        gain.gain.linearRampToValueAtTime(0.01, now + 0.08);
+        osc.start(now);
+        osc.stop(now + 0.08);
+      } else if (type === 'ladder') {
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(300, now);
+        osc.frequency.exponentialRampToValueAtTime(800, now + 0.25);
+        gain.gain.setValueAtTime(0.2, now);
+        gain.gain.linearRampToValueAtTime(0.01, now + 0.25);
+        osc.start(now);
+        osc.stop(now + 0.25);
+      } else if (type === 'chute') {
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(600, now);
+        osc.frequency.linearRampToValueAtTime(150, now + 0.25);
+        gain.gain.setValueAtTime(0.2, now);
+        gain.gain.linearRampToValueAtTime(0.01, now + 0.25);
+        osc.start(now);
+        osc.stop(now + 0.25);
+      } else if (type === 'win') {
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(523, now);
+        osc.frequency.setValueAtTime(659, now + 0.12);
+        osc.frequency.setValueAtTime(783, now + 0.24);
+        gain.gain.setValueAtTime(0.25, now);
+        gain.gain.linearRampToValueAtTime(0.01, now + 0.4);
+        osc.start(now);
+        osc.stop(now + 0.4);
+      }
+    } catch (e) {}
+  };
+
+  // Generate 10x10 grid numbers in boustrophedon (snake) order from top to bottom
+  const boardGrid = useMemo(() => {
+    const grid: number[][] = [];
+    for (let r = 9; r >= 0; r--) {
+      const row: number[] = [];
+      const isEvenFromBottom = r % 2 === 0;
+      for (let c = 0; c < 10; c++) {
+        const num = isEvenFromBottom ? r * 10 + c + 1 : r * 10 + (9 - c) + 1;
+        row.push(num);
+      }
+      grid.push(row);
+    }
+    return grid;
+  }, []);
 
   const move = (player: number) => {
-    if (winner !== null || player !== turn) return;
-    const die = Math.floor(Math.random() * 6) + 1;
-    let next = positions[player] + die;
-    if (next > 100) next = positions[player];
-    next = jumps[next] ?? next;
-    const updated = positions.map((position, index) => index === player ? next : position);
-    setRoll(die); setPositions(updated);
-    if (next === 100) setWinner(player);
-    else setTurn(player === 0 ? 1 : 0);
+    if (winner !== null || player !== turn || isRolling) return;
+    setIsRolling(true);
+
+    let rollCount = 0;
+    const rollInterval = setInterval(() => {
+      rollCount++;
+      playSfx('roll');
+      setRoll(Math.floor(Math.random() * 6) + 1);
+      if (rollCount > 6) {
+        clearInterval(rollInterval);
+        const die = Math.floor(Math.random() * 6) + 1;
+        setRoll(die);
+        setIsRolling(false);
+
+        let next = positions[player] + die;
+        if (next > 100) next = positions[player];
+
+        const jumpTarget = jumps[next];
+        if (jumpTarget) {
+          setTimeout(() => {
+            if (jumpTarget > next) playSfx('ladder');
+            else playSfx('chute');
+            setPositions(prev => prev.map((p, idx) => idx === player ? jumpTarget : p));
+            if (jumpTarget === 100) {
+              playSfx('win');
+              setWinner(player);
+            } else {
+              setTurn(player === 0 ? 1 : 0);
+            }
+          }, 600);
+        }
+
+        setPositions(prev => prev.map((p, idx) => idx === player ? next : p));
+
+        if (!jumpTarget) {
+          if (next === 100) {
+            playSfx('win');
+            setWinner(player);
+          } else {
+            setTurn(player === 0 ? 1 : 0);
+          }
+        }
+      }
+    }, 60);
   };
 
   React.useEffect(() => {
-    if (playMode === 'vsComputer' && turn === 1 && winner === null) {
-      const timer = window.setTimeout(() => move(1), 650);
+    if (playMode === 'vsComputer' && turn === 1 && winner === null && !isRolling) {
+      const timer = window.setTimeout(() => move(1), 700);
       return () => window.clearTimeout(timer);
     }
-  }, [playMode, turn, winner, positions]);
+  }, [playMode, turn, winner, isRolling]);
 
-  const reset = () => { setPositions([1, 1]); setTurn(0); setRoll(null); setWinner(null); };
+  const reset = () => { 
+    setPositions([1, 1]); 
+    setTurn(0); 
+    setRoll(null); 
+    setWinner(null); 
+    setIsRolling(false);
+  };
 
+  // Calculate precise % coordinates on the grid for square number
   const getPositionStyles = (position: number, playerIndex: number) => {
-    const index = 100 - position;
-    const x = (index % 10) * 10;
-    const y = Math.floor(index / 10) * 10;
-    // Add offset for players so they don't exactly overlap
-    const offset = playerIndex === 0 ? '20%' : '50%';
+    const zeroIndex = position - 1;
+    const row = Math.floor(zeroIndex / 10); // 0-9 from bottom
+    const colInRow = zeroIndex % 10;
+    const isEvenRow = row % 2 === 0;
+    const col = isEvenRow ? colInRow : 9 - colInRow;
+
+    const left = col * 10 + (playerIndex === 0 ? 2 : 5);
+    const top = (9 - row) * 10 + 2.5;
+
     return {
-      left: `calc(${x}% + ${offset})`,
-      top: `calc(${y}% + 30%)`,
-      transform: `translate(${x}%, ${y}%)`,
+      left: `${left}%`,
+      top: `${top}%`,
     };
   };
 
-  return <div className="flex w-full max-w-3xl flex-col items-center gap-4 px-2 text-white">
-    <h2 className="text-3xl font-black text-orange-200">Chutes &amp; Ladders</h2>
-    <p className="font-bold text-lg" aria-live="polite">{winner === null ? `${names[turn]}'s turn` : <span className="animate-pulse text-yellow-300">{`${names[winner]} wins!`}</span>}</p>
-    
-    <div className="relative grid w-full max-w-[560px] grid-cols-10 overflow-hidden rounded-xl border-4 border-orange-200/40 bg-slate-950 shadow-[0_0_40px_rgba(255,150,0,0.15)]">
-      {board.map((space) => (
-        <div key={space} className={`aspect-square border border-white/10 p-1 font-mono text-[9px] sm:text-xs ${space % 2 ? 'bg-emerald-900/70' : 'bg-orange-900/60'} ${jumps[space] > space ? 'bg-emerald-800/80 ring-2 ring-emerald-400/50 ring-inset shadow-[inset_0_0_15px_rgba(16,185,129,0.3)]' : jumps[space] < space ? 'bg-orange-950/80 ring-2 ring-red-500/50 ring-inset shadow-[inset_0_0_15px_rgba(239,68,68,0.3)]' : ''}`}><span>{space}</span></div>
-      ))}
-      
-      {/* Floating animated markers */}
-      {positions.map((position, player) => (
-        <span 
-          key={player} 
-          className={`absolute h-5 w-5 sm:h-6 sm:w-6 transition-all duration-[600ms] cubic-bezier(0.34, 1.56, 0.64, 1) rounded-full shadow-xl border-2 border-slate-950 z-10 ${player === 0 ? 'bg-cyan-400 outline outline-2 outline-cyan-200/50' : 'bg-pink-500 outline outline-2 outline-pink-200/50'}`} 
-          style={getPositionStyles(position, player)} 
-          aria-label={`${names[player]} token`} 
-        />
-      ))}
+  return (
+    <div className="flex w-full max-w-3xl flex-col items-center gap-4 px-2 text-white">
+      <div className="flex w-full max-w-[560px] justify-between items-center px-2">
+        <h2 className="text-3xl font-black text-orange-300 drop-shadow-[0_0_10px_rgba(251,146,60,0.5)]">Chutes &amp; Ladders</h2>
+        <div className="text-sm font-bold bg-slate-800/80 px-3 py-1.5 rounded-xl text-amber-300">
+          {winner === null ? `${names[turn]}'s turn` : `${names[winner]} WINS!`}
+        </div>
+      </div>
+
+      <div className="relative w-full max-w-[560px] aspect-square overflow-hidden rounded-2xl border-4 border-orange-400/40 bg-slate-950 shadow-[0_0_50px_rgba(251,146,60,0.2)] p-1">
+        <div className="grid grid-cols-10 grid-rows-10 w-full h-full">
+          {boardGrid.flat().map((space) => {
+            const isLadder = jumps[space] && jumps[space] > space;
+            const isChute = jumps[space] && jumps[space] < space;
+            return (
+              <div 
+                key={space} 
+                className={`relative border border-slate-800/60 p-1 font-mono text-[10px] sm:text-xs font-bold transition-all flex flex-col justify-between ${
+                  space % 2 ? 'bg-slate-900/80' : 'bg-slate-950/80'
+                } ${
+                  isLadder 
+                    ? 'bg-emerald-950/90 text-emerald-300 border-emerald-500/50 shadow-[inset_0_0_10px_rgba(16,185,129,0.3)]' 
+                    : isChute 
+                    ? 'bg-red-950/90 text-red-300 border-red-500/50 shadow-[inset_0_0_10px_rgba(239,68,68,0.3)]' 
+                    : 'text-slate-400'
+                }`}
+              >
+                <span>{space}</span>
+                {isLadder && <span className="self-end text-[10px] text-emerald-400 font-extrabold">🪜 {jumps[space]}</span>}
+                {isChute && <span className="self-end text-[10px] text-red-400 font-extrabold">🐍 {jumps[space]}</span>}
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Floating Player Tokens */}
+        {positions.map((position, player) => (
+          <span 
+            key={player} 
+            className={`absolute h-6 w-6 sm:h-7 sm:w-7 transition-all duration-[500ms] cubic-bezier(0.34, 1.56, 0.64, 1) rounded-full shadow-2xl border-2 border-slate-950 z-20 flex items-center justify-center font-black text-[10px] ${
+              player === 0 
+                ? 'bg-cyan-400 text-slate-950 ring-2 ring-cyan-200' 
+                : 'bg-fuchsia-500 text-white ring-2 ring-fuchsia-300'
+            }`} 
+            style={getPositionStyles(position, player)} 
+          >
+            P{player + 1}
+          </span>
+        ))}
+
+        {winner !== null && (
+          <div className="absolute inset-0 bg-black/80 flex flex-col items-center justify-center z-30 animate-in fade-in duration-300">
+            <h3 className="text-4xl font-black text-amber-300 mb-2 drop-shadow-[0_0_15px_rgba(252,211,77,0.6)] animate-pulse">🎉 VICTORY! 🎉</h3>
+            <p className="text-xl font-bold text-white mb-6">{names[winner]} reached Tile 100!</p>
+            <GlassButton onClick={reset} className="px-8 py-4 text-lg">PLAY AGAIN</GlassButton>
+          </div>
+        )}
+      </div>
+
+      <div className="flex items-center gap-4 mt-2">
+        <div className={`w-14 h-14 rounded-2xl bg-slate-800 border border-slate-600 flex items-center justify-center text-3xl font-black text-amber-300 shadow-inner ${isRolling ? 'animate-spin' : ''}`}>
+          {roll ?? '🎲'}
+        </div>
+        <GlassButton 
+          onClick={() => move(turn)} 
+          disabled={winner !== null || isRolling || (playMode === 'vsComputer' && turn === 1)}
+          className="px-6 py-3 text-lg font-black"
+        >
+          {isRolling ? 'ROLLING...' : 'ROLL DICE'}
+        </GlassButton>
+        <GlassButton onClick={reset} className="px-4 py-3 text-sm opacity-80 hover:opacity-100">
+          RESET
+        </GlassButton>
+      </div>
+
+      <p className="text-center text-xs text-orange-200/80 max-w-sm mt-1">
+        🪜 Green tiles slide you UP ladders. 🐍 Red tiles slide you DOWN chutes. Land on tile 100 to win!
+      </p>
     </div>
-    
-    <div className="flex items-center gap-4 mt-2">
-      <span className="rounded-xl flex items-center justify-center w-14 h-14 bg-white/10 font-black text-2xl shadow-inner border border-white/5">{roll ?? '?'}</span>
-      <GlassButton onClick={() => move(turn)} disabled={winner !== null || (playMode === 'vsComputer' && turn === 1)}>ROLL</GlassButton>
-      <GlassButton onClick={reset}>RESET</GlassButton>
-    </div>
-    <p className="text-center text-xs text-orange-100/70 max-w-sm mt-2">Green glowing squares are ladders; red square are chutes. Reach exactly 100 to win.</p>
-  </div>;
+  );
 };
 
 export default ChutesAndLaddersGame;

@@ -759,6 +759,51 @@ const WormGame: React.FC<WormGameProps> = ({ playMode, playerNames }) => {
          ))}
       </div>
 
+      {/* Mobile Touch Steer Controls */}
+      <div className="absolute bottom-4 left-4 right-4 flex justify-between items-center z-10 sm:hidden pointer-events-auto">
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onTouchStart={() => { gameState.current.keys['ArrowLeft'] = true; }}
+            onTouchEnd={() => { gameState.current.keys['ArrowLeft'] = false; }}
+            onMouseDown={() => { gameState.current.keys['ArrowLeft'] = true; }}
+            onMouseUp={() => { gameState.current.keys['ArrowLeft'] = false; }}
+            className="w-16 h-16 bg-slate-800/90 border border-emerald-500/50 rounded-2xl flex items-center justify-center text-3xl font-black text-emerald-300 active:bg-emerald-500 active:text-slate-950 shadow-2xl backdrop-blur-md"
+          >
+            ◄
+          </button>
+          <button
+            type="button"
+            onTouchStart={() => { gameState.current.keys['ArrowRight'] = true; }}
+            onTouchEnd={() => { gameState.current.keys['ArrowRight'] = false; }}
+            onMouseDown={() => { gameState.current.keys['ArrowRight'] = true; }}
+            onMouseUp={() => { gameState.current.keys['ArrowRight'] = false; }}
+            className="w-16 h-16 bg-slate-800/90 border border-emerald-500/50 rounded-2xl flex items-center justify-center text-3xl font-black text-emerald-300 active:bg-emerald-500 active:text-slate-950 shadow-2xl backdrop-blur-md"
+          >
+            ►
+          </button>
+        </div>
+
+        <button
+          type="button"
+          onTouchStart={() => {
+            if (gameState.current.worms[0]) gameState.current.worms[0].isBoosting = true;
+          }}
+          onTouchEnd={() => {
+            if (gameState.current.worms[0]) gameState.current.worms[0].isBoosting = false;
+          }}
+          onMouseDown={() => {
+            if (gameState.current.worms[0]) gameState.current.worms[0].isBoosting = true;
+          }}
+          onMouseUp={() => {
+            if (gameState.current.worms[0]) gameState.current.worms[0].isBoosting = false;
+          }}
+          className="w-20 h-16 bg-gradient-to-r from-amber-500 to-yellow-500 border border-yellow-300/50 rounded-2xl flex items-center justify-center text-lg font-black text-slate-950 active:scale-95 shadow-[0_0_20px_rgba(234,179,8,0.5)]"
+        >
+          ⚡ BOOST
+        </button>
+      </div>
+
       {gameOver && (
           <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/80 backdrop-blur-sm animate-pop-in z-20">
               <h2 className="text-6xl font-black text-transparent bg-clip-text bg-gradient-to-b from-yellow-300 to-yellow-600 mb-6 drop-shadow-lg">GAME OVER</h2>
