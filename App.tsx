@@ -19,6 +19,9 @@ import AestheticShopPage from './components/shop/AestheticShopPage';
 import GlobalChat from './components/ui/GlobalChat';
 import ArcadeLobby from './components/ArcadeLobby';
 import SupportPage from './components/SupportPage';
+import HeadToHeadLobby from './components/games/HeadToHeadLobby';
+import HeadToHeadArena from './components/games/HeadToHeadArena';
+import { H2HMatchRoom } from './types';
 import { AdminSettingsProvider } from './context/AdminSettingsContext';
 import { recordSiteEvent } from './lib/analytics';
 
@@ -50,12 +53,14 @@ const AppContent: React.FC = () => {
     }
   }, [isAuthenticated]);
   
-  // View States for Auth/Profile/TradingBot
+  // View States for Auth/Profile/TradingBot/HeadToHead
   const [authView, setAuthView] = useState<'login' | 'signup' | 'forgot'>('login');
   const [showProfile, setShowProfile] = useState(false);
   const [showShop, setShowShop] = useState(false);
   const [showSupport, setShowSupport] = useState(false);
   const [showTradingBot, setShowTradingBot] = useState(false);
+  const [showH2H, setShowH2H] = useState(false);
+  const [activeH2HRoom, setActiveH2HRoom] = useState<H2HMatchRoom | null>(null);
 
   useEffect(() => {
     void recordSiteEvent('page_view', undefined, user && !user.isGuest ? user.id : undefined);
@@ -160,15 +165,17 @@ const AppContent: React.FC = () => {
       <Header 
         mode={mode} 
         setMode={handleSetMode} 
-        onProfileClick={() => { setShowProfile(true); setShowShop(false); setShowSupport(false); setShowTradingBot(false); setShowLobby(false); }}
-        onShopClick={() => { setShowShop(true); setShowProfile(false); setShowSupport(false); setShowTradingBot(false); setShowLobby(false); }}
-        onSupportClick={() => { setShowSupport(true); setShowShop(false); setShowProfile(false); setShowTradingBot(false); setShowLobby(false); }}
-        onBotClick={() => { setShowTradingBot(true); setShowShop(false); setShowProfile(false); setShowSupport(false); setShowLobby(false); }}
-        onHomeClick={() => { setShowProfile(false); setShowShop(false); setShowSupport(false); setShowTradingBot(false); setShowLobby(true); }}
+        onProfileClick={() => { setShowProfile(true); setShowShop(false); setShowSupport(false); setShowTradingBot(false); setShowH2H(false); setShowLobby(false); }}
+        onShopClick={() => { setShowShop(true); setShowProfile(false); setShowSupport(false); setShowTradingBot(false); setShowH2H(false); setShowLobby(false); }}
+        onSupportClick={() => { setShowSupport(true); setShowShop(false); setShowProfile(false); setShowTradingBot(false); setShowH2H(false); setShowLobby(false); }}
+        onBotClick={() => { setShowTradingBot(true); setShowShop(false); setShowProfile(false); setShowSupport(false); setShowH2H(false); setShowLobby(false); }}
+        onH2HClick={() => { setShowH2H(true); setShowProfile(false); setShowShop(false); setShowSupport(false); setShowTradingBot(false); setShowLobby(false); }}
+        onHomeClick={() => { setShowProfile(false); setShowShop(false); setShowSupport(false); setShowTradingBot(false); setShowH2H(false); setShowLobby(true); }}
         isProfileActive={showProfile}
         isShopActive={showShop}
         isSupportActive={showSupport}
         isBotActive={showTradingBot}
+        isH2HActive={showH2H || Boolean(activeH2HRoom)}
       />
       <main className="flex-grow flex flex-col items-center w-full">
         {notification && (
@@ -177,7 +184,11 @@ const AppContent: React.FC = () => {
                 <button onClick={clearNotification} className="bg-white/20 hover:bg-white/30 rounded-full w-6 h-6 flex items-center justify-center">✕</button>
             </div>
         )}
-        {showTradingBot ? (
+        {activeH2HRoom ? (
+            <HeadToHeadArena room={activeH2HRoom} games={[...UNDER18_GAMES, ...ADULT_GAMES]} onExitMatch={() => setActiveH2HRoom(null)} />
+        ) : showH2H ? (
+            <HeadToHeadLobby games={[...UNDER18_GAMES, ...ADULT_GAMES]} onStartMatch={(room) => setActiveH2HRoom(room)} onBack={() => setShowH2H(false)} />
+        ) : showTradingBot ? (
             <TradingBotDashboard />
         ) : showSupport ? (
             <SupportPage onBack={() => setShowSupport(false)} />

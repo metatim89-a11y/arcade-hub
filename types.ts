@@ -93,3 +93,19 @@ export interface AuthState {
   isAuthenticated: boolean;
   isLoading: boolean;
 }
+
+export interface H2HMatchRoom {
+  id: string;
+  roomCode: string;
+  gameId: string;
+  gameLabel: string;
+  hostUser: { id: string; username: string; avatar?: string };
+  guestUser?: { id: string; username: string; avatar?: string };
+  stakeGc: number;
+  status: 'waiting' | 'in_progress' | 'completed';
+  winnerId?: string;
+  hostScore: number;
+  guestScore: number;
+  createdAt: string;
+}
+

@@ -37,5 +37,13 @@
     2. **Kong Climber Touch Controls**: Upgraded ▲/UP touch button logic to climb ladders when positioned over a ladder, or execute a jump when tapped on open ground. Continuous touch holding on ◀/▶ enables running across the screen.
 - **Version Bump**: Bumped `package.json` & `constants.tsx` version to `0.0.37`.
 
+## [08/21/26 | 03:51 PM] Version 0.0.38 - Realtime Head-to-Head Multiplayer System
+- **Changes:**
+    1. **Head-to-Head Lobby (`HeadToHeadLobby.tsx`)**: Implemented live open challenges lobby, custom match creation with GC stakes (Free, 50 GC, 250 GC, 500 GC, 1000 GC), and direct Room Code join system (`HUB-xxxx`).
+    2. **Head-to-Head Arena (`HeadToHeadArena.tsx`)**: Created side-by-side battle HUD with live opponent score streaming, active game view, real-time emoji taunts (🔥, 💥, 🏆, 👑, 😱, 👏), and automatic winner payout/rewards.
+    3. **Navigation Integration**: Added **⚔️ HEAD-TO-HEAD** button to main header navigation in `Header.tsx` and `App.tsx`.
+- **Version Bump**: Bumped `package.json` & `constants.tsx` version to `0.0.38`.
+
+
 
 

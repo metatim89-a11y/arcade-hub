@@ -16,13 +16,15 @@ interface HeaderProps {
   onShopClick?: () => void;
   onSupportClick?: () => void;
   onBotClick?: () => void;
+  onH2HClick?: () => void;
   isProfileActive?: boolean;
   isShopActive?: boolean;
   isSupportActive?: boolean;
   isBotActive?: boolean;
+  isH2HActive?: boolean;
 }
 
-const Header: React.FC<HeaderProps> = ({ mode, setMode, simple = false, onProfileClick, onHomeClick, onShopClick, onSupportClick, onBotClick, isProfileActive, isShopActive, isSupportActive, isBotActive }) => {
+const Header: React.FC<HeaderProps> = ({ mode, setMode, simple = false, onProfileClick, onHomeClick, onShopClick, onSupportClick, onBotClick, onH2HClick, isProfileActive, isShopActive, isSupportActive, isBotActive, isH2HActive }) => {
   const { funCoins, realCoins, tickets, progression, currencyMode, resetCoins } = useCoinSystem();
   const { user, logout } = useAuth();
   const isCasinoMode = mode === GameMode.Adult;
@@ -159,18 +161,25 @@ const Header: React.FC<HeaderProps> = ({ mode, setMode, simple = false, onProfil
                 )}
             </div>
 
-            <div className="flex gap-2 ml-auto">
+            <div className="flex gap-2 ml-auto flex-wrap">
                 <button
                     type="button"
                     onClick={() => { onHomeClick?.(); setMode(GameMode.Under18); }}
-                    className={`${buttonClasses} ${!isCasinoMode && !isBotActive ? activeButtonClasses : ''}`}
+                    className={`${buttonClasses} ${!isCasinoMode && !isBotActive && !isH2HActive ? activeButtonClasses : ''}`}
                 >
                     Arcade
                 </button>
                 <button
                     type="button"
+                    onClick={onH2HClick}
+                    className={`${buttonClasses} ${isH2HActive ? 'bg-gradient-to-r from-red-500 to-amber-500 text-white font-black border-red-400 shadow-[0_0_15px_rgba(239,68,68,0.5)]' : ''}`}
+                >
+                    ⚔️ HEAD-TO-HEAD
+                </button>
+                <button
+                    type="button"
                     onClick={() => { onHomeClick?.(); setMode(GameMode.Adult); }}
-                    className={`${buttonClasses} ${isCasinoMode && !isBotActive ? activeButtonClasses : ''}`}
+                    className={`${buttonClasses} ${isCasinoMode && !isBotActive && !isH2HActive ? activeButtonClasses : ''}`}
                 >
                     Casino 18+
                 </button>
