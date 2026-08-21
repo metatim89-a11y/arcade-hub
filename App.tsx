@@ -35,7 +35,20 @@ const AppContent: React.FC = () => {
     const requested = new URLSearchParams(window.location.search).get('game');
     return games.find((game) => game.id === requested) ?? games[0];
   });
-  const [showLobby, setShowLobby] = useState(() => !new URLSearchParams(window.location.search).has('game'));
+  const [showLobby, setShowLobby] = useState(() => {
+    const requested = new URLSearchParams(window.location.search).get('game');
+    return !requested;
+  });
+
+  // Default to Arcade Lobby on authentication unless specific game query requested
+  useEffect(() => {
+    if (isAuthenticated) {
+      const params = new URLSearchParams(window.location.search);
+      if (!params.has('game')) {
+        setShowLobby(true);
+      }
+    }
+  }, [isAuthenticated]);
   
   // View States for Auth/Profile/TradingBot
   const [authView, setAuthView] = useState<'login' | 'signup' | 'forgot'>('login');

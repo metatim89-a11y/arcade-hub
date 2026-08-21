@@ -96,6 +96,58 @@ const CoinPusherGame: React.FC = () => {
     currencyRef.current = currencyMode;
   }, [currencyMode]);
 
+  const audioCtxRef = useRef<AudioContext | null>(null);
+
+  const playPusherSfx = useCallback((type: 'drop' | 'clink' | 'prize' | 'gutter') => {
+    try {
+      if (!audioCtxRef.current) {
+        audioCtxRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
+      }
+      const ctx = audioCtxRef.current;
+      if (ctx.state === 'suspended') void ctx.resume();
+
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      const now = ctx.currentTime;
+
+      if (type === 'drop') {
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(1200, now);
+        osc.frequency.setValueAtTime(1500, now + 0.04);
+        gain.gain.setValueAtTime(0.2, now);
+        gain.gain.linearRampToValueAtTime(0.01, now + 0.08);
+        osc.start(now);
+        osc.stop(now + 0.08);
+      } else if (type === 'clink') {
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(2400 + Math.random() * 800, now);
+        gain.gain.setValueAtTime(0.1, now);
+        gain.gain.linearRampToValueAtTime(0.01, now + 0.04);
+        osc.start(now);
+        osc.stop(now + 0.04);
+      } else if (type === 'prize') {
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(523, now);
+        osc.frequency.setValueAtTime(659, now + 0.08);
+        osc.frequency.setValueAtTime(783, now + 0.16);
+        gain.gain.setValueAtTime(0.25, now);
+        gain.gain.linearRampToValueAtTime(0.01, now + 0.28);
+        osc.start(now);
+        osc.stop(now + 0.28);
+      } else if (type === 'gutter') {
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(400, now);
+        osc.frequency.linearRampToValueAtTime(120, now + 0.15);
+        gain.gain.setValueAtTime(0.15, now);
+        gain.gain.linearRampToValueAtTime(0.01, now + 0.15);
+        osc.start(now);
+        osc.stop(now + 0.15);
+      }
+    } catch (e) {}
+  }, []);
+
   const flushPayouts = useCallback(async () => {
     if (payoutBusyRef.current) return;
     payoutBusyRef.current = true;
@@ -108,6 +160,7 @@ const CoinPusherGame: React.FC = () => {
       if (!mountedRef.current) break;
 
       if (credited) {
+        playPusherSfx('prize');
         setLastWin(payout);
         setFeedback(
           `${batch.count} coin${batch.count === 1 ? '' : 's'} reached the prize tray — won ${payout} ${batch.currency === 'fun' ? 'FC' : 'RC'}!`
@@ -118,7 +171,7 @@ const CoinPusherGame: React.FC = () => {
     }
 
     payoutBusyRef.current = false;
-  }, []);
+  }, [playPusherSfx]);
 
   const queuePayout = useCallback((count: number) => {
     if (count <= 0 || !hasPlayedRef.current) return;
@@ -221,7 +274,8 @@ const CoinPusherGame: React.FC = () => {
       if (prizeCoins.length > 0 || gutterCoins.length > 0) {
         Matter.World.remove(world, [...prizeCoins, ...gutterCoins]);
         queuePayout(prizeCoins.length);
-        if (!prizeCoins.length && gutterCoins.length) setFeedback(`${gutterCoins.length} coin${gutterCoins.length === 1 ? '' : 's'} slipped into the gutter.`);
+        if (gutterCoins.length) playPusherSfx('gutter');
+        if (!prizeCoins.length && gutterCoins.length) setFeedback(`${gutterCoins.length} coin${gutterCoins.length === 1 ? '' : 's'} slipped into the side gutter.`);
       }
 
       if (time - previousRender >= 33) {
@@ -316,6 +370,7 @@ const CoinPusherGame: React.FC = () => {
     });
     Matter.World.add(engine.world, coin);
     hasPlayedRef.current = true;
+    playPusherSfx('drop');
     setFeedback(`${COIN_SPECS[kind].label} dropped at ${Math.round(dropPercent)}%, safely in front of the pusher.`);
     setIsDropping(false);
     dropPendingRef.current = false;

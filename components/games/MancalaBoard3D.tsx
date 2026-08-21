@@ -45,10 +45,10 @@ const MancalaBoard3D: React.FC<MancalaBoard3DProps> = (props) => {
       renderer.shadowMap.enabled = true;
       renderer.shadowMap.type = THREE.PCFSoftShadowMap;
       const scene = new THREE.Scene();
-      const camera = new THREE.PerspectiveCamera(42, 1, .1, 70);
-      camera.up.set(0, 0, -1);
-      camera.position.set(0, 14, 0);
-      camera.lookAt(0, 0, 0);
+      const camera = new THREE.PerspectiveCamera(38, 1, .1, 70);
+      camera.up.set(0, 1, 0);
+      camera.position.set(0, 8.5, 7.5);
+      camera.lookAt(0, 0, -0.2);
       scene.add(new THREE.HemisphereLight(0xffe5bd, 0x09111c, 2.5));
       const key = new THREE.DirectionalLight(0xfff1d5, 5.4);
       key.position.set(-5, 9, 6);
@@ -59,7 +59,6 @@ const MancalaBoard3D: React.FC<MancalaBoard3DProps> = (props) => {
       scene.add(edge);
 
       const boardRoot = new THREE.Group();
-      boardRoot.rotation.y = -.035;
       scene.add(boardRoot);
       const boardMaterial = new THREE.MeshStandardMaterial({ color: 0x7b3517, roughness: .36, metalness: .18 });
       const board = new THREE.Mesh(new THREE.BoxGeometry(9.8, .48, 3.55, 5, 1, 2), boardMaterial);

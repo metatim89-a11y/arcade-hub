@@ -41,11 +41,8 @@ export const PlinkoBoard3D: React.FC<{
       const back = new THREE.Mesh(new THREE.BoxGeometry(10.8, 9.2, .38), backMaterial); back.position.z = -.42; back.receiveShadow = true; boardRoot.add(back);
       const railMaterial = new THREE.MeshStandardMaterial({ color: 0x263752, metalness: .72, roughness: .22 });
       [[-5.25, 0, .25, 8.8], [5.25, 0, .25, 8.8], [0, 4.35, 10.5, .24], [0, -4.35, 10.5, .24]].forEach(([x, y, width, height]) => { const rail = new THREE.Mesh(new THREE.BoxGeometry(width, height, .42), railMaterial); rail.position.set(x, y, .05); boardRoot.add(rail); });
-      for (let line = 0; line < 9; line += 1) { const guide = new THREE.Mesh(new THREE.BoxGeometry(9.8, .018, .025), new THREE.MeshBasicMaterial({ color: 0x4c7390, transparent: true, opacity: .15 })); guide.position.set(0, -3.35 + line * .84, -.19); boardRoot.add(guide); }
       const marqueeTexture = new THREE.CanvasTexture(labelCanvas('PLINKO', '#111c31', '#ffe274')); marqueeTexture.colorSpace = THREE.SRGBColorSpace;
       const marquee = new THREE.Mesh(new THREE.BoxGeometry(3.2, .62, .18), new THREE.MeshStandardMaterial({ map: marqueeTexture, emissive: 0xd39118, emissiveIntensity: .25, metalness: .25, roughness: .3 })); marquee.position.set(0, 4.68, .08); boardRoot.add(marquee);
-      const cabinetLights: Mesh[] = [];
-      for (let index = 0; index < 18; index += 1) { const bulb = new THREE.Mesh(new THREE.SphereGeometry(.075, 10, 7), new THREE.MeshStandardMaterial({ color: 0x69d9ff, emissive: 0x2cbfff, emissiveIntensity: .8 })); bulb.position.set(index < 9 ? -5.13 : 5.13, 3.7 - (index % 9) * .92, .35); boardRoot.add(bulb); cabinetLights.push(bulb); }
       const pegs = new Map<string, Mesh>(); const buckets = new THREE.Group(); boardRoot.add(buckets); let signature = '';
       const rebuild = () => {
         pegs.forEach((peg) => { boardRoot.remove(peg); dispose(peg); }); pegs.clear(); dispose(buckets); buckets.clear();
@@ -82,7 +79,6 @@ export const PlinkoBoard3D: React.FC<{
           const ballSmooth = 1 - Math.exp(-26 * delta); mesh.position.x += (targetX - mesh.position.x) * ballSmooth; mesh.position.y += (targetY - mesh.position.y) * ballSmooth; mesh.position.z += (.42 - mesh.position.z) * ballSmooth; mesh.rotation.x += delta * 3.4; mesh.rotation.y += delta * 2.1;
         });
         pegs.forEach((peg, key) => { const [row, col] = key.split('-').map(Number); const glow = glowingPegRef.current.some((item) => item.r === row && item.c === col && item.life > 0); const material = peg.material as InstanceType<typeof THREE.MeshStandardMaterial>; material.emissive.setHex(glow ? 0xffffff : 0x000000); material.emissiveIntensity = glow ? 1.2 : 0; peg.scale.setScalar(glow ? 1.25 : 1); });
-        cabinetLights.forEach((bulb, index) => { (bulb.material as InstanceType<typeof THREE.MeshStandardMaterial>).emissiveIntensity = .75 + Math.sin(now * .006 + index * .7) * .48; });
         const averageX = ballsRef.current.length ? ballsRef.current.reduce((sum, ball) => sum + (ball.x / width - .5) * 10, 0) / ballsRef.current.length : 0; cameraX += (averageX * .025 - cameraX) * (1 - Math.exp(-3 * delta)); camera.position.x = cameraX; camera.lookAt(cameraX * .25, 0, 0);
         renderer.render(scene, camera); frame = requestAnimationFrame(animate);
       };

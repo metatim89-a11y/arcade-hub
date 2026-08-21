@@ -33,6 +33,8 @@ const BlockDropGame: React.FC = () => {
   const [gameOver, setGameOver] = useState(false);
 
   const audioCtxRef = useRef<AudioContext | null>(null);
+  const holdIntervalRef = useRef<number | null>(null);
+  const holdTimeoutRef = useRef<number | null>(null);
 
   const playSfx = (type: 'move' | 'rotate' | 'drop' | 'clear' | 'gameover') => {
     try {
@@ -148,12 +150,71 @@ const BlockDropGame: React.FC = () => {
     }
   }, [board, gameOver, lock, piece]);
 
+  const moveLeft = useCallback(() => {
+    if (gameOver) return;
+    setPiece((p) => {
+      if (!collides(board, { ...p, x: p.x - 1 })) {
+        playSfx('move');
+        return { ...p, x: p.x - 1 };
+      }
+      return p;
+    });
+  }, [board, gameOver]);
+
+  const moveRight = useCallback(() => {
+    if (gameOver) return;
+    setPiece((p) => {
+      if (!collides(board, { ...p, x: p.x + 1 })) {
+        playSfx('move');
+        return { ...p, x: p.x + 1 };
+      }
+      return p;
+    });
+  }, [board, gameOver]);
+
+  const rotatePiece = useCallback(() => {
+    if (gameOver) return;
+    setPiece((p) => {
+      const turned = { ...p, shape: rotate(p.shape) };
+      if (!collides(board, turned)) {
+        playSfx('rotate');
+        return turned;
+      }
+      return p;
+    });
+  }, [board, gameOver]);
+
   const hardDrop = useCallback(() => {
     if (gameOver) return;
     const targetY = getGhostY();
     const droppedPiece = { ...piece, y: targetY };
     lock(droppedPiece);
   }, [gameOver, getGhostY, lock, piece]);
+
+  const stopHold = useCallback(() => {
+    if (holdTimeoutRef.current) {
+      clearTimeout(holdTimeoutRef.current);
+      holdTimeoutRef.current = null;
+    }
+    if (holdIntervalRef.current) {
+      clearInterval(holdIntervalRef.current);
+      holdIntervalRef.current = null;
+    }
+  }, []);
+
+  const startHold = useCallback((action: () => void) => {
+    stopHold();
+    action();
+    holdTimeoutRef.current = window.setTimeout(() => {
+      holdIntervalRef.current = window.setInterval(() => {
+        action();
+      }, 85);
+    }, 180);
+  }, [stopHold]);
+
+  useEffect(() => {
+    return () => stopHold();
+  }, [stopHold]);
 
   // Dynamic speed based on score/lines
   const speedMs = Math.max(250, 650 - lines * 25);
@@ -166,35 +227,26 @@ const BlockDropGame: React.FC = () => {
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => { 
       if (gameOver) return; 
-      if ((event.key === 'ArrowLeft' || event.key === 'a') && !collides(board, { ...piece, x: piece.x - 1 })) {
-        playSfx('move');
-        setPiece({ ...piece, x: piece.x - 1 }); 
-      }
-      if ((event.key === 'ArrowRight' || event.key === 'd') && !collides(board, { ...piece, x: piece.x + 1 })) {
-        playSfx('move');
-        setPiece({ ...piece, x: piece.x + 1 }); 
-      }
-      if (event.key === 'ArrowDown' || event.key === 's') {
+      if (event.key === 'ArrowLeft' || event.key === 'a') {
+        moveLeft();
+      } else if (event.key === 'ArrowRight' || event.key === 'd') {
+        moveRight();
+      } else if (event.key === 'ArrowDown' || event.key === 's') {
         playSfx('move');
         step(); 
-      }
-      if (event.key === 'ArrowUp' || event.key === 'w') { 
-        const turned = { ...piece, shape: rotate(piece.shape) }; 
-        if (!collides(board, turned)) {
-          playSfx('rotate');
-          setPiece(turned); 
-        }
-      }
-      if (event.key === ' ') {
+      } else if (event.key === 'ArrowUp' || event.key === 'w') { 
+        rotatePiece();
+      } else if (event.key === ' ') {
         event.preventDefault();
         hardDrop();
       }
     };
     window.addEventListener('keydown', onKey); 
     return () => window.removeEventListener('keydown', onKey);
-  }, [board, gameOver, hardDrop, piece, step]);
+  }, [gameOver, hardDrop, moveLeft, moveRight, rotatePiece, step]);
 
   const reset = () => { 
+    stopHold();
     setBoard(emptyBoard()); 
     setPiece(randomPiece()); 
     setScore(0); 
@@ -202,66 +254,12 @@ const BlockDropGame: React.FC = () => {
     setGameOver(false); 
   };
 
-  const touchStartRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
-
-  const handleTouchStart = (e: React.TouchEvent) => {
-    const touch = e.touches[0];
-    touchStartRef.current = { x: touch.clientX, y: touch.clientY };
-  };
-
-  const handleTouchEnd = (e: React.TouchEvent) => {
-    const touch = e.changedTouches[0];
-    const dx = touch.clientX - touchStartRef.current.x;
-    const dy = touch.clientY - touchStartRef.current.y;
-    const absDx = Math.abs(dx);
-    const absDy = Math.abs(dy);
-
-    if (absDx < 10 && absDy < 10) {
-      // Tap -> Rotate
-      const turned = { ...piece, shape: rotate(piece.shape) };
-      if (!collides(board, turned)) {
-        playSfx('rotate');
-        setPiece(turned);
-      }
-      return;
-    }
-
-    if (absDx > absDy && absDx > 25) {
-      if (dx > 0) {
-        // Swipe Right
-        if (!collides(board, { ...piece, x: piece.x + 1 })) {
-          playSfx('move');
-          setPiece((p) => ({ ...p, x: p.x + 1 }));
-        }
-      } else {
-        // Swipe Left
-        if (!collides(board, { ...piece, x: piece.x - 1 })) {
-          playSfx('move');
-          setPiece((p) => ({ ...p, x: p.x - 1 }));
-        }
-      }
-    } else if (absDy > absDx && absDy > 25) {
-      if (dy > 0) {
-        // Swipe Down -> Soft Drop
-        playSfx('move');
-        step();
-      } else {
-        // Swipe Up -> Rotate
-        const turned = { ...piece, shape: rotate(piece.shape) };
-        if (!collides(board, turned)) {
-          playSfx('rotate');
-          setPiece(turned);
-        }
-      }
-    }
-  };
-
   const ghostY = getGhostY();
   
   return (
-    <div className="flex w-full max-w-md flex-col items-center gap-4 px-2 text-white">
+    <div className="flex w-full max-w-md flex-col items-center gap-4 px-2 text-white select-none">
       <div className="flex w-full items-center justify-between">
-        <h2 className="text-3xl font-black text-fuchsia-200">Block Drop</h2>
+        <h2 className="text-3xl font-black text-fuchsia-200 drop-shadow-[0_0_12px_rgba(232,121,249,0.4)]">Block Drop</h2>
         <div className="flex gap-2">
           <span className="rounded-xl bg-white/10 px-3 py-1.5 text-xs font-black text-yellow-300">Score {score}</span>
           <span className="rounded-xl bg-white/10 px-3 py-1.5 text-xs font-black text-amber-400">Best {highScore}</span>
@@ -269,11 +267,9 @@ const BlockDropGame: React.FC = () => {
       </div>
 
       <div 
-        className="relative grid w-full max-w-[300px] grid-cols-10 gap-px rounded-2xl border-4 border-fuchsia-400/30 bg-slate-950 p-1.5 shadow-[0_0_40px_rgba(217,70,239,0.15)] touch-none select-none" 
+        className="relative grid w-full max-w-[300px] grid-cols-10 gap-px rounded-2xl border-4 border-fuchsia-400/30 bg-slate-950 p-1.5 shadow-[0_0_40px_rgba(217,70,239,0.15)] touch-none" 
         role="grid" 
         aria-label="Block Drop board"
-        onTouchStart={handleTouchStart}
-        onTouchEnd={handleTouchEnd}
       >
         {/* Background Grid & Settled Blocks */}
         {board.map((row, y) => row.map((_, x) => { 
@@ -329,68 +325,63 @@ const BlockDropGame: React.FC = () => {
         }))}
       </div>
       
-      {/* Mobile-Responsive Arcade Controls */}
-      <div className="mt-2 flex w-full max-w-[320px] justify-between gap-2 items-center">
-        {/* Directional Pad */}
-        <div className="flex gap-1.5 rounded-2xl bg-slate-900/80 p-2 border border-white/10 shadow-lg">
+      {/* Spacious Mobile Arcade Controller Pad */}
+      <div className="mt-2 flex w-full max-w-[380px] justify-between items-center gap-4 px-1 touch-none">
+        {/* Directional Movement Cluster */}
+        <div className="flex gap-2.5 rounded-2xl bg-slate-900/90 p-2.5 border border-white/10 shadow-xl">
           <button 
-            className="flex h-12 w-11 items-center justify-center rounded-xl bg-slate-800 text-lg text-fuchsia-300 active:bg-fuchsia-600 active:text-white transition-all shadow-md active:scale-95" 
-            onClick={() => { 
-              if (!collides(board, { ...piece, x: piece.x - 1 })) {
-                playSfx('move');
-                setPiece({ ...piece, x: piece.x - 1 }); 
-              }
-            }}
+            type="button"
+            className="flex h-13 w-13 sm:h-14 sm:w-14 items-center justify-center rounded-xl bg-slate-800 text-xl font-bold text-fuchsia-300 active:bg-fuchsia-600 active:text-white transition-all shadow-md active:scale-95" 
+            onPointerDown={(e) => { e.preventDefault(); startHold(moveLeft); }}
+            onPointerUp={(e) => { e.preventDefault(); stopHold(); }}
+            onPointerCancel={stopHold}
+            onPointerLeave={stopHold}
             aria-label="Move Left"
           >
             ◀
           </button>
           <button 
-            className="flex h-12 w-11 items-center justify-center rounded-xl bg-slate-800 text-lg text-fuchsia-300 active:bg-fuchsia-600 active:text-white transition-all shadow-md active:scale-95" 
-            onClick={() => {
-              playSfx('move');
-              step();
-            }}
+            type="button"
+            className="flex h-13 w-13 sm:h-14 sm:w-14 items-center justify-center rounded-xl bg-slate-800 text-xl font-bold text-fuchsia-300 active:bg-fuchsia-600 active:text-white transition-all shadow-md active:scale-95" 
+            onPointerDown={(e) => { e.preventDefault(); startHold(step); }}
+            onPointerUp={(e) => { e.preventDefault(); stopHold(); }}
+            onPointerCancel={stopHold}
+            onPointerLeave={stopHold}
             aria-label="Soft Drop"
           >
             ▼
           </button>
           <button 
-            className="flex h-12 w-11 items-center justify-center rounded-xl bg-slate-800 text-lg text-fuchsia-300 active:bg-fuchsia-600 active:text-white transition-all shadow-md active:scale-95" 
-            onClick={() => { 
-              if (!collides(board, { ...piece, x: piece.x + 1 })) {
-                playSfx('move');
-                setPiece({ ...piece, x: piece.x + 1 }); 
-              }
-            }}
+            type="button"
+            className="flex h-13 w-13 sm:h-14 sm:w-14 items-center justify-center rounded-xl bg-slate-800 text-xl font-bold text-fuchsia-300 active:bg-fuchsia-600 active:text-white transition-all shadow-md active:scale-95" 
+            onPointerDown={(e) => { e.preventDefault(); startHold(moveRight); }}
+            onPointerUp={(e) => { e.preventDefault(); stopHold(); }}
+            onPointerCancel={stopHold}
+            onPointerLeave={stopHold}
             aria-label="Move Right"
           >
             ▶
           </button>
         </div>
         
-        {/* Rotate & Hard Drop Actions */}
-        <div className="flex gap-2 items-center">
+        {/* Action Cluster (Rotate & Instant Drop) */}
+        <div className="flex gap-3 items-center">
           <button 
-            className="flex h-12 w-12 rounded-2xl items-center justify-center bg-cyan-600 text-base font-black text-white shadow-lg active:scale-95 transition-all hover:bg-cyan-500"
-            onClick={hardDrop}
-            title="Instant Drop"
-            aria-label="Instant Drop"
-          >
-            ⚡
-          </button>
-          <button 
-            className="flex h-13 w-13 rounded-2xl items-center justify-center bg-fuchsia-500 text-xl font-bold text-white shadow-[0_0_15px_rgba(217,70,239,0.5)] active:scale-95 transition-all hover:bg-fuchsia-400"
-            onClick={() => { 
-              const turned = { ...piece, shape: rotate(piece.shape) }; 
-              if (!collides(board, turned)) {
-                playSfx('rotate');
-                setPiece(turned); 
-              }
-            }}
+            type="button"
+            className="flex h-13 w-13 sm:h-14 sm:w-14 rounded-2xl items-center justify-center bg-fuchsia-600 text-2xl font-bold text-white shadow-[0_0_15px_rgba(217,70,239,0.5)] active:scale-95 transition-all hover:bg-fuchsia-500 border border-fuchsia-300/40"
+            onPointerDown={(e) => { e.preventDefault(); rotatePiece(); }}
             aria-label="Rotate Piece"
           >
             ↻
+          </button>
+          <button 
+            type="button"
+            className="flex h-13 w-13 sm:h-14 sm:w-14 rounded-2xl items-center justify-center bg-cyan-600 text-xl font-black text-white shadow-[0_0_15px_rgba(6,182,212,0.5)] active:scale-95 transition-all hover:bg-cyan-500 border border-cyan-300/40"
+            onPointerDown={(e) => { e.preventDefault(); hardDrop(); }}
+            aria-label="Instant Drop"
+            title="Instant Drop"
+          >
+            ⚡
           </button>
         </div>
       </div>
@@ -398,7 +389,6 @@ const BlockDropGame: React.FC = () => {
       <div className="mt-1 text-center w-full max-w-[300px]">
         <GlassButton onClick={reset} className="w-full justify-center text-sm py-2">{gameOver ? 'PLAY AGAIN' : 'RESET BOARD'}</GlassButton>
       </div>
-      {gameOver && <p className="animate-bounce text-xl font-black text-yellow-300 drop-shadow-[0_0_10px_rgba(253,224,71,0.5)]">Game Over! Score: {score}</p>}
     </div>
   );
 };

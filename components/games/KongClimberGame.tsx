@@ -75,15 +75,21 @@ export default function KongClimberGame({ playMode, playerNames }: KongClimberPr
   };
 
   const gameState = useRef({
-    px: 60, py: 510,
-    vx: 0, vy: 0,
+    px: 60,
+    py: 526,
+    vx: 0,
+    vy: 0,
     isGrounded: true,
     isClimbing: false,
     barrels: [] as any[],
     particles: [] as any[],
     spawnTimer: 0,
     lastTime: performance.now(),
-    keys: {} as Record<string, boolean>,
+    keys: { left: false, right: false, up: false, down: false },
+    touchLeft: false,
+    touchRight: false,
+    touchUp: false,
+    touchDown: false,
   });
 
   // Platforms / Girders
@@ -109,35 +115,68 @@ export default function KongClimberGame({ playMode, playerNames }: KongClimberPr
     setHasWon(false);
 
     gameState.current = {
-      px: 60, py: 510,
-      vx: 0, vy: 0,
+      px: 60,
+      py: 526,
+      vx: 0,
+      vy: 0,
       isGrounded: true,
       isClimbing: false,
       barrels: [],
       particles: [],
       spawnTimer: 0,
       lastTime: performance.now(),
-      keys: {},
+      keys: { left: false, right: false, up: false, down: false },
+      touchLeft: false,
+      touchRight: false,
+      touchUp: false,
+      touchDown: false,
     };
   };
 
-  useEffect(() => { initGame(); }, []);
+  const doJump = () => {
+    const s = gameState.current;
+    if (s.isGrounded || s.isClimbing) {
+      s.isClimbing = false;
+      s.vy = -10.5;
+      s.isGrounded = false;
+      playSfx('jump');
+    }
+  };
+
+  useEffect(() => {
+    initGame();
+  }, []);
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
-      gameState.current.keys[e.key] = true;
-      if (e.key === ' ' || e.key === 'ArrowUp' || e.key === 'w' || e.key === 'W') {
-        const s = gameState.current;
-        if (s.isGrounded && !s.isClimbing) {
-          s.vy = -10.5;
-          s.isGrounded = false;
-          playSfx('jump');
-        }
+      const k = e.key.toLowerCase();
+      if (e.key === ' ' || k === 'k' || k === 'j') {
+        e.preventDefault();
+        doJump();
+      } else if (e.key === 'ArrowLeft' || k === 'a') {
+        gameState.current.keys.left = true;
+      } else if (e.key === 'ArrowRight' || k === 'd') {
+        gameState.current.keys.right = true;
+      } else if (e.key === 'ArrowUp' || k === 'w') {
+        gameState.current.keys.up = true;
+      } else if (e.key === 'ArrowDown' || k === 's') {
+        gameState.current.keys.down = true;
       }
     };
+
     const onKeyUp = (e: KeyboardEvent) => {
-      gameState.current.keys[e.key] = false;
+      const k = e.key.toLowerCase();
+      if (e.key === 'ArrowLeft' || k === 'a') {
+        gameState.current.keys.left = false;
+      } else if (e.key === 'ArrowRight' || k === 'd') {
+        gameState.current.keys.right = false;
+      } else if (e.key === 'ArrowUp' || k === 'w') {
+        gameState.current.keys.up = false;
+      } else if (e.key === 'ArrowDown' || k === 's') {
+        gameState.current.keys.down = false;
+      }
     };
+
     window.addEventListener('keydown', onKeyDown);
     window.addEventListener('keyup', onKeyUp);
     return () => {
@@ -145,37 +184,6 @@ export default function KongClimberGame({ playMode, playerNames }: KongClimberPr
       window.removeEventListener('keyup', onKeyUp);
     };
   }, []);
-
-  const triggerAction = (action: 'left' | 'right' | 'up' | 'down' | 'jump') => {
-    const s = gameState.current;
-    if (action === 'jump') {
-      if (s.isGrounded && !s.isClimbing) {
-        s.vy = -10.5;
-        s.isGrounded = false;
-        playSfx('jump');
-      }
-    } else if (action === 'left') {
-      s.vx = -4;
-    } else if (action === 'right') {
-      s.vx = 4;
-    } else if (action === 'up') {
-      const nearLadder = LADDERS.find(l => Math.abs(s.px - l.x) < 25 && s.py >= l.y1 - 20 && s.py <= l.y2 + 20);
-      if (nearLadder) {
-        s.isClimbing = true;
-        s.py -= 4;
-        s.px = nearLadder.x;
-        playSfx('climb');
-      }
-    } else if (action === 'down') {
-      const nearLadder = LADDERS.find(l => Math.abs(s.px - l.x) < 25 && s.py >= l.y1 - 20 && s.py <= l.y2 + 20);
-      if (nearLadder) {
-        s.isClimbing = true;
-        s.py += 4;
-        s.px = nearLadder.x;
-        playSfx('climb');
-      }
-    }
-  };
 
   useEffect(() => {
     const cvs = canvasRef.current;
@@ -191,78 +199,127 @@ export default function KongClimberGame({ playMode, playerNames }: KongClimberPr
       ctx.clearRect(0, 0, cvs.width, cvs.height);
 
       if (!gameOver && !hasWon) {
-        // Player Controls
-        if (s.keys['ArrowLeft'] || s.keys['a'] || s.keys['A']) s.vx = -4;
-        else if (s.keys['ArrowRight'] || s.keys['d'] || s.keys['D']) s.vx = 4;
-        else s.vx = 0;
+        const wantsLeft = s.keys.left || s.touchLeft;
+        const wantsRight = s.keys.right || s.touchRight;
+        const wantsUp = s.keys.up || s.touchUp;
+        const wantsDown = s.keys.down || s.touchDown;
 
-        // Ladder Climb Check
-        const nearLadder = LADDERS.find(l => Math.abs(s.px - l.x) < 20 && s.py >= l.y1 - 10 && s.py <= l.y2 + 10);
-        if (nearLadder && (s.keys['ArrowUp'] || s.keys['w'] || s.keys['W'])) {
-          s.isClimbing = true;
-          s.py -= 3;
-          s.px = nearLadder.x;
-          s.vy = 0;
-        } else if (nearLadder && (s.keys['ArrowDown'] || s.keys['s'] || s.keys['S'])) {
-          s.isClimbing = true;
-          s.py += 3;
-          s.px = nearLadder.x;
-          s.vy = 0;
-        } else {
-          s.isClimbing = false;
-        }
+        // Ladder Check
+        const nearLadder = LADDERS.find(
+          (l) => Math.abs(s.px - l.x) < 28 && s.py >= l.y1 - 20 && s.py <= l.y2 + 20
+        );
 
-        // Apply Physics
-        s.px += s.vx;
         if (!s.isClimbing) {
-          s.vy += 0.55; // Gravity
-          s.py += s.vy;
-        }
-
-        // Check Girder Collisions
-        s.isGrounded = false;
-        GIRDERS.forEach(g => {
-          if (s.px >= g.x1 && s.px <= g.x2 && s.py + 25 >= g.y - 10 && s.py + 25 <= g.y + 15 && s.vy >= 0) {
-            s.py = g.y - 25;
+          if (wantsUp && nearLadder) {
+            s.isClimbing = true;
+            s.px = nearLadder.x;
             s.vy = 0;
-            s.isGrounded = true;
+            s.py -= 3.5;
+            playSfx('climb');
+          } else if (wantsDown && nearLadder) {
+            s.isClimbing = true;
+            s.px = nearLadder.x;
+            s.vy = 0;
+            s.py += 3.5;
+            playSfx('climb');
+          } else {
+            // Horizontal movement
+            if (wantsLeft) s.vx = -4.5;
+            else if (wantsRight) s.vx = 4.5;
+            else s.vx *= 0.75;
+
+            // Apply physics
+            s.px += s.vx;
+            s.px = Math.max(20, Math.min(780, s.px));
+            s.vy += 0.55; // Gravity
+            s.py += s.vy;
+
+            // Check Girder Collisions
+            s.isGrounded = false;
+            GIRDERS.forEach((g) => {
+              if (
+                s.px >= g.x1 - 10 &&
+                s.px <= g.x2 + 10 &&
+                s.py + 14 >= g.y - 8 &&
+                s.py + 14 <= g.y + 16 &&
+                s.vy >= 0
+              ) {
+                s.py = g.y - 14;
+                s.vy = 0;
+                s.isGrounded = true;
+              }
+            });
           }
-        });
+        } else {
+          // Player is climbing
+          s.vx = 0;
+          s.vy = 0;
+
+          if (wantsUp) {
+            s.py -= 3.5;
+          } else if (wantsDown) {
+            s.py += 3.5;
+          }
+
+          if (nearLadder) {
+            if (s.py <= nearLadder.y1 - 14) {
+              s.py = nearLadder.y1 - 14;
+              s.isClimbing = false;
+              s.isGrounded = true;
+            } else if (s.py >= nearLadder.y2 - 14) {
+              s.py = nearLadder.y2 - 14;
+              s.isClimbing = false;
+              s.isGrounded = true;
+            }
+          } else {
+            s.isClimbing = false;
+          }
+
+          if (wantsLeft || wantsRight) {
+            s.isClimbing = false;
+          }
+        }
 
         // Spawn Barrels
         s.spawnTimer += dt;
         if (s.spawnTimer > 2.2) {
           s.spawnTimer = 0;
-          s.barrels.push({ x: 220, y: 85, vx: 2.8, vy: 0 });
+          s.barrels.push({ x: 220, y: 85, vx: 2.8, vy: 0, scored: false });
         }
 
         // Update Barrels
-        s.barrels.forEach(b => {
+        s.barrels.forEach((b) => {
           b.x += b.vx;
           b.vy += 0.4;
           b.y += b.vy;
 
           // Girder floor for barrels
-          GIRDERS.forEach(g => {
-            if (b.x >= g.x1 && b.x <= g.x2 && b.y + 12 >= g.y - 8 && b.y + 12 <= g.y + 12 && b.vy >= 0) {
+          GIRDERS.forEach((g) => {
+            if (
+              b.x >= g.x1 &&
+              b.x <= g.x2 &&
+              b.y + 12 >= g.y - 8 &&
+              b.y + 12 <= g.y + 12 &&
+              b.vy >= 0
+            ) {
               b.y = g.y - 12;
               b.vy = 0;
             }
           });
 
-          // Bounce off screen edges or reverse on girders
+          // Bounce off screen edges
           if (b.x > 760 && b.vx > 0) b.vx = -b.vx;
           if (b.x < 40 && b.vx < 0) b.vx = -b.vx;
 
-          // Check Player Collision
+          // Check Player Collision & Jumping over barrel
           const dist = Math.hypot(s.px - b.x, s.py - b.y);
           if (dist < 22) {
             playSfx('splat');
             setGameOver(true);
-          } else if (Math.abs(s.px - b.x) < 15 && s.py < b.y - 15 && !b.scored) {
+          } else if (Math.abs(s.px - b.x) < 18 && s.py < b.y - 15 && !b.scored) {
             b.scored = true;
             playSfx('score');
-            setScore(scr => {
+            setScore((scr) => {
               const newScore = scr + 100;
               if (newScore > highScore) {
                 setHighScore(newScore);
@@ -277,7 +334,7 @@ export default function KongClimberGame({ playMode, playerNames }: KongClimberPr
         if (s.py <= 100 && s.px >= 300 && s.px <= 400) {
           playSfx('win');
           setHasWon(true);
-          setScore(scr => {
+          setScore((scr) => {
             const newScore = scr + 1000;
             if (newScore > highScore) {
               setHighScore(newScore);
@@ -289,7 +346,7 @@ export default function KongClimberGame({ playMode, playerNames }: KongClimberPr
       }
 
       // Draw Girders (Steel Blue Platforms)
-      GIRDERS.forEach(g => {
+      GIRDERS.forEach((g) => {
         ctx.fillStyle = '#38bdf8';
         ctx.shadowColor = '#0284c7';
         ctx.shadowBlur = 8;
@@ -298,16 +355,19 @@ export default function KongClimberGame({ playMode, playerNames }: KongClimberPr
       });
 
       // Draw Ladders (Yellow Rungs)
-      LADDERS.forEach(l => {
+      LADDERS.forEach((l) => {
         ctx.strokeStyle = '#facc15';
         ctx.lineWidth = 4;
         ctx.beginPath();
-        ctx.moveTo(l.x - 10, l.y1); ctx.lineTo(l.x - 10, l.y2);
-        ctx.moveTo(l.x + 10, l.y1); ctx.lineTo(l.x + 10, l.y2);
+        ctx.moveTo(l.x - 10, l.y1);
+        ctx.lineTo(l.x - 10, l.y2);
+        ctx.moveTo(l.x + 10, l.y1);
+        ctx.lineTo(l.x + 10, l.y2);
         ctx.stroke();
         for (let y = l.y1 + 10; y < l.y2; y += 15) {
           ctx.beginPath();
-          ctx.moveTo(l.x - 10, y); ctx.lineTo(l.x + 10, y);
+          ctx.moveTo(l.x - 10, y);
+          ctx.lineTo(l.x + 10, y);
           ctx.stroke();
         }
       });
@@ -321,7 +381,7 @@ export default function KongClimberGame({ playMode, playerNames }: KongClimberPr
       ctx.shadowBlur = 0;
 
       // Draw Barrels
-      s.barrels.forEach(b => {
+      s.barrels.forEach((b) => {
         ctx.fillStyle = '#f97316';
         ctx.shadowColor = '#fb923c';
         ctx.shadowBlur = 10;
@@ -350,79 +410,166 @@ export default function KongClimberGame({ playMode, playerNames }: KongClimberPr
   }, [hasWon, gameOver]);
 
   return (
-    <div className="flex w-full flex-col items-center gap-4 text-white">
-      <div className="flex w-full max-w-xl justify-between items-center px-4">
-        <h2 className="text-3xl font-black text-amber-300 drop-shadow-[0_0_10px_rgba(252,211,77,0.5)]">Kong Climber</h2>
-        <div className="flex gap-3">
-          <div className="text-sm font-bold bg-slate-800/80 px-3 py-1.5 rounded-xl text-yellow-300">Score: {score}</div>
-          <div className="text-sm font-bold bg-slate-800/80 px-3 py-1.5 rounded-xl text-amber-400">High: {highScore}</div>
+    <div className="flex w-full flex-col items-center gap-4 text-white select-none">
+      <div className="flex w-full max-w-xl justify-between items-center px-2">
+        <h2 className="text-2xl sm:text-3xl font-black text-amber-300 drop-shadow-[0_0_10px_rgba(252,211,77,0.5)]">
+          Kong Climber
+        </h2>
+        <div className="flex gap-2">
+          <div className="text-xs sm:text-sm font-bold bg-slate-800/80 px-3 py-1.5 rounded-xl text-yellow-300">
+            Score: {score}
+          </div>
+          <div className="text-xs sm:text-sm font-bold bg-slate-800/80 px-3 py-1.5 rounded-xl text-amber-400">
+            High: {highScore}
+          </div>
         </div>
       </div>
 
-      <div className="relative w-full max-w-xl aspect-[4/3] rounded-2xl overflow-hidden shadow-[0_0_50px_rgba(245,158,11,0.2)] bg-slate-950 border border-slate-700">
+      <div className="relative w-full max-w-xl aspect-[4/3] rounded-2xl overflow-hidden shadow-[0_0_50px_rgba(245,158,11,0.2)] bg-slate-950 border border-slate-700 touch-none">
         <canvas ref={canvasRef} width={800} height={600} className="w-full h-full object-cover" />
 
         {gameOver && (
           <div className="absolute inset-0 bg-black/80 flex items-center justify-center flex-col animate-in fade-in duration-300 z-20">
-            <h3 className="text-4xl font-black text-red-500 mb-2 drop-shadow-[0_0_15px_rgba(239,68,68,0.6)] animate-pulse">BARREL SMASH!</h3>
+            <h3 className="text-3xl sm:text-4xl font-black text-red-500 mb-2 drop-shadow-[0_0_15px_rgba(239,68,68,0.6)] animate-pulse">
+              BARREL SMASH!
+            </h3>
             <p className="text-slate-300 font-bold mb-6">Final Score: {score}</p>
-            <GlassButton onClick={initGame} className="px-8 py-4 text-xl">TRY AGAIN</GlassButton>
+            <GlassButton onClick={initGame} className="px-8 py-4 text-xl">
+              TRY AGAIN
+            </GlassButton>
           </div>
         )}
 
         {hasWon && (
           <div className="absolute inset-0 bg-black/80 flex items-center justify-center flex-col animate-in fade-in duration-300 z-20">
-            <h3 className="text-4xl font-black text-amber-300 mb-2 drop-shadow-[0_0_15px_rgba(252,211,77,0.6)] animate-pulse">RESCUED! 🎉</h3>
+            <h3 className="text-3xl sm:text-4xl font-black text-amber-300 mb-2 drop-shadow-[0_0_15px_rgba(252,211,77,0.6)] animate-pulse">
+              RESCUED! 🎉
+            </h3>
             <p className="text-slate-300 font-bold mb-6">Bonus +1000! Final Score: {score}</p>
-            <GlassButton onClick={initGame} className="px-8 py-4 text-xl">PLAY AGAIN</GlassButton>
+            <GlassButton onClick={initGame} className="px-8 py-4 text-xl">
+              PLAY AGAIN
+            </GlassButton>
           </div>
         )}
       </div>
 
-      {/* On-Screen Touch D-Pad & Jump Buttons */}
-      <div className="flex w-full max-w-xl justify-between items-center px-4 mt-1 sm:hidden">
-        <div className="flex gap-2">
+      {/* Modern Mobile Arcade Controller Layout */}
+      <div className="flex w-full max-w-xl justify-between items-center px-2 mt-1 gap-3 touch-none">
+        {/* Directional Pad */}
+        <div className="grid grid-cols-3 gap-2 bg-slate-900/90 p-2.5 rounded-2xl border border-slate-700/80 shadow-xl">
+          <div />
           <button
             type="button"
-            onTouchStart={() => triggerAction('left')}
-            className="w-14 h-12 bg-slate-800 active:bg-amber-500 rounded-xl border border-slate-600 flex items-center justify-center text-xl font-bold text-yellow-300 shadow-lg"
-          >
-            ◄
-          </button>
-          <button
-            type="button"
-            onTouchStart={() => triggerAction('right')}
-            className="w-14 h-12 bg-slate-800 active:bg-amber-500 rounded-xl border border-slate-600 flex items-center justify-center text-xl font-bold text-yellow-300 shadow-lg"
-          >
-            ►
-          </button>
-          <button
-            type="button"
-            onTouchStart={() => triggerAction('up')}
-            className="w-14 h-12 bg-slate-800 active:bg-amber-500 rounded-xl border border-slate-600 flex items-center justify-center text-xl font-bold text-yellow-300 shadow-lg"
+            onPointerDown={(e) => {
+              e.preventDefault();
+              const s = gameState.current;
+              s.touchUp = true;
+              const nearLadder = LADDERS.find(
+                (l) => Math.abs(s.px - l.x) < 28 && s.py >= l.y1 - 20 && s.py <= l.y2 + 20
+              );
+              if (!nearLadder && s.isGrounded && !s.isClimbing) {
+                doJump();
+              }
+            }}
+            onPointerUp={(e) => {
+              e.preventDefault();
+              gameState.current.touchUp = false;
+            }}
+            onPointerCancel={() => {
+              gameState.current.touchUp = false;
+            }}
+            onPointerLeave={() => {
+              gameState.current.touchUp = false;
+            }}
+            className="w-13 h-12 sm:w-14 sm:h-13 bg-slate-800 active:bg-amber-500 rounded-xl border border-slate-600 flex items-center justify-center text-xl font-black text-yellow-300 shadow-md active:scale-95 transition-all"
+            aria-label="Climb Up"
           >
             ▲
           </button>
+          <div />
+
           <button
             type="button"
-            onTouchStart={() => triggerAction('down')}
-            className="w-14 h-12 bg-slate-800 active:bg-amber-500 rounded-xl border border-slate-600 flex items-center justify-center text-xl font-bold text-yellow-300 shadow-lg"
+            onPointerDown={(e) => {
+              e.preventDefault();
+              gameState.current.touchLeft = true;
+            }}
+            onPointerUp={(e) => {
+              e.preventDefault();
+              gameState.current.touchLeft = false;
+            }}
+            onPointerCancel={() => {
+              gameState.current.touchLeft = false;
+            }}
+            onPointerLeave={() => {
+              gameState.current.touchLeft = false;
+            }}
+            className="w-13 h-12 sm:w-14 sm:h-13 bg-slate-800 active:bg-amber-500 rounded-xl border border-slate-600 flex items-center justify-center text-xl font-black text-yellow-300 shadow-md active:scale-95 transition-all"
+            aria-label="Move Left"
+          >
+            ◀
+          </button>
+          <button
+            type="button"
+            onPointerDown={(e) => {
+              e.preventDefault();
+              gameState.current.touchDown = true;
+            }}
+            onPointerUp={(e) => {
+              e.preventDefault();
+              gameState.current.touchDown = false;
+            }}
+            onPointerCancel={() => {
+              gameState.current.touchDown = false;
+            }}
+            onPointerLeave={() => {
+              gameState.current.touchDown = false;
+            }}
+            className="w-13 h-12 sm:w-14 sm:h-13 bg-slate-800 active:bg-amber-500 rounded-xl border border-slate-600 flex items-center justify-center text-xl font-black text-yellow-300 shadow-md active:scale-95 transition-all"
+            aria-label="Climb Down"
           >
             ▼
           </button>
+          <button
+            type="button"
+            onPointerDown={(e) => {
+              e.preventDefault();
+              gameState.current.touchRight = true;
+            }}
+            onPointerUp={(e) => {
+              e.preventDefault();
+              gameState.current.touchRight = false;
+            }}
+            onPointerCancel={() => {
+              gameState.current.touchRight = false;
+            }}
+            onPointerLeave={() => {
+              gameState.current.touchRight = false;
+            }}
+            className="w-13 h-12 sm:w-14 sm:h-13 bg-slate-800 active:bg-amber-500 rounded-xl border border-slate-600 flex items-center justify-center text-xl font-black text-yellow-300 shadow-md active:scale-95 transition-all"
+            aria-label="Move Right"
+          >
+            ▶
+          </button>
         </div>
 
+        {/* Action Jump Button */}
         <button
           type="button"
-          onTouchStart={() => triggerAction('jump')}
-          className="w-20 h-12 bg-gradient-to-r from-purple-600 to-indigo-600 active:scale-95 rounded-xl border border-purple-400 flex items-center justify-center text-base font-black text-white shadow-lg"
+          onPointerDown={(e) => {
+            e.preventDefault();
+            doJump();
+          }}
+          className="h-28 w-28 sm:w-32 bg-gradient-to-br from-amber-500 via-purple-600 to-indigo-600 active:scale-95 rounded-2xl border-2 border-amber-300 flex flex-col items-center justify-center text-lg font-black text-white shadow-xl active:brightness-125 transition-all"
+          aria-label="Jump"
         >
-          🦘 JUMP
+          <span className="text-2xl mb-1">🦘</span>
+          <span>JUMP</span>
         </button>
       </div>
 
-      <p className="text-slate-400 text-xs max-w-lg text-center mt-1 hidden sm:block">
-        Use A/D or Arrow Keys to run, W/S to climb ladders, and SPACE / Arrow Up to jump over rolling barrels!
+      <p className="text-slate-400 text-xs max-w-lg text-center mt-1 px-2">
+        A/D or ◀/▶ to run • W/S or ▲/▼ to climb ladders • SPACE or 🦘 JUMP to leap over barrels!
       </p>
     </div>
   );

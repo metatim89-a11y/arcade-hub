@@ -11,7 +11,7 @@ const BlockDropGame = React.lazy(() => import('./components/games/BlockDropGame'
 const ConnectFourGame = React.lazy(() => import('./components/games/ConnectFourGame'));
 const FishingGame = React.lazy(() => import('./components/games/FishingGame'));
 const ColorRecallGame = React.lazy(() => import('./components/games/ColorRecallGame'));
-const CrashGame = React.lazy(() => import('./components/games/CrashGame'));
+const JetPilotGame = React.lazy(() => import('./components/games/JetPilotGame'));
 const SlotsGame = React.lazy(() => import('./components/games/SlotsGame'));
 const MancalaGame = React.lazy(() => import('./components/games/MancalaGame'));
 const BlackjackGame = React.lazy(() => import('./components/games/BlackjackGame'));
@@ -21,12 +21,12 @@ const CoinPusherGame = React.lazy(() => import('./components/games/CoinPusherGam
 const NeonHopperGame = React.lazy(() => import('./components/games/NeonHopperGame'));
 const KongClimberGame = React.lazy(() => import('./components/games/KongClimberGame'));
 
-export const APP_VERSION = '0.0.34';
+export const APP_VERSION = '0.0.37';
 
 export const ADULT_GAMES: Game[] = [
     { id: 'fishing', label: 'Ocean Hunter', component: FishingGame },
     { id: 'coinpusher', label: 'Coin Pusher 3D', component: CoinPusherGame },
-    { id: 'crash', label: 'Crash Velocity', component: CrashGame },
+    { id: 'jetpilot', label: 'Jet Pilot Lander', component: JetPilotGame },
     { id: 'plinko', label: 'Peg Plinko', component: PlinkoGame },
     { id: 'slots', label: 'Volt Vault Slots', component: SlotsGame },
 ];
