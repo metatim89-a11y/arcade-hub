@@ -9,6 +9,7 @@ This changelog starts with v0.0.35. Earlier history remains available in the Git
 - Added continuous touch-state handling for ladder up/down controls.
 - Switched Kong's mobile D-pad to pointer controls so touch, stylus and compatible pointer input use the same hold/release behavior.
 - Added movement bounds so the Kong player cannot run completely off the canvas.
+- Fixed Neon Hopper water-carried movement so the player is rounded back onto the game grid before the next hop.
 
 ### Changed
 - Merged the secure admin ticket-control work into master.
