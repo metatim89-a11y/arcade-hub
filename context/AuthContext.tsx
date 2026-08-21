@@ -114,12 +114,28 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const login = useCallback(async (identifier: string, password: string) => {
     setIsLoading(true);
     try {
-      const normalized = identifier.trim().toLowerCase();
-      if (normalized === 'admin' && !ADMIN_LOGIN_EMAIL) {
-        throw new Error('The administrator login alias is not configured.');
+      const raw = identifier.trim();
+      if (!raw) throw new Error('Please enter your email or username.');
+      const normalized = raw.toLowerCase();
+      let email = raw;
+
+      if (normalized === 'admin') {
+        if (!ADMIN_LOGIN_EMAIL) {
+          throw new Error('The administrator login alias is not configured.');
+        }
+        email = ADMIN_LOGIN_EMAIL;
+      } else if (!raw.includes('@')) {
+        const supabase = getSupabase();
+        const { data: lookedUpEmail, error: rpcError } = await supabase.rpc('lookup_login_email', { p_username: raw });
+        if (rpcError) {
+          console.warn('Username lookup error:', rpcError);
+        }
+        if (lookedUpEmail && typeof lookedUpEmail === 'string' && lookedUpEmail.includes('@')) {
+          email = lookedUpEmail;
+        } else {
+          throw new Error(`No account found with username "${raw}". Try signing in with your email.`);
+        }
       }
-      const email = normalized === 'admin' ? ADMIN_LOGIN_EMAIL : normalized;
-      if (!email.includes('@')) throw new Error('Use your email address to sign in. The administrator may use “admin”.');
 
       const { data, error } = await getSupabase().auth.signInWithPassword({ email, password });
       if (error) throw error;

@@ -47,13 +47,13 @@ const LoginPage: React.FC<LoginPageProps> = ({ onSwitchToSignup, onForgotPasswor
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
           <div>
-            <label className="block text-gray-400 text-sm mb-1">Email</label>
+            <label className="block text-gray-400 text-sm mb-1">Email or Username</label>
             <input 
               type="text" 
               value={identifier}
               onChange={(e) => setIdentifier(e.target.value)}
               className="w-full bg-gray-800 border border-gray-700 rounded-lg p-3 text-white focus:outline-none focus:border-yellow-400 transition-colors"
-              placeholder="player@example.com (or admin)"
+              placeholder="Email, username, or admin"
               required
             />
           </div>
