@@ -1,8 +1,8 @@
-import React from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import type { Game, GameMode } from '../types';
 import { useCoinSystem } from '../context/CoinContext';
 import { useAuth } from '../context/AuthContext';
-import { useEffect, useState } from 'react';
+import { getSupabase } from '../lib/supabase';
 
 type ArcadeLobbyProps = {
   games: Game[];
@@ -122,16 +122,56 @@ const gameBadges: Record<string, { tag: string; blurb: string; iconSvg: React.Re
   }
 };
 
+type LandingComment = {
+  id: number;
+  display_name: string;
+  body: string;
+  created_at: string;
+};
+
+const GAME_META: Record<string, { icon: string; tag: string; blurb: string }> = {
+  fishing: { icon: '🌊', tag: 'Ocean Action', blurb: 'Hunt targets, chain combos, face bosses and push deeper into the ocean.' },
+  coinpusher: { icon: '🪙', tag: 'Physics Arcade', blurb: 'Drop coins, build pressure and trigger satisfying cascades off the edge.' },
+  crash: { icon: '🚀', tag: 'Timing', blurb: 'Ride the multiplier and decide when to cash out before the run ends.' },
+  plinko: { icon: '🔻', tag: 'Drop Game', blurb: 'Choose your risk, release the ball and watch it bounce through the peg field.' },
+  slots: { icon: '⚡', tag: 'Reels', blurb: 'Spin themed reels with bonuses, free spins, power meters and special features.' },
+  neonhopper: { icon: '🟢', tag: 'Reflex', blurb: 'Dodge traffic, ride moving logs and climb the neon course one hop at a time.' },
+  kongclimber: { icon: '🦍', tag: 'Platform', blurb: 'Climb girders, dodge barrels and reach the top without getting knocked back.' },
+  blockdrop: { icon: '🧱', tag: 'Puzzle', blurb: 'Stack clean lines, use fast drops and keep the board alive as speed increases.' },
+  mancala: { icon: '🟡', tag: 'Strategy', blurb: 'Plan captures, extra turns and long sequences in a classic head-to-head board game.' },
+  chutes: { icon: '🪜', tag: 'Race', blurb: 'Race to the finish while ladders launch you forward and chutes send you back.' },
+  connect4: { icon: '🔴', tag: 'Strategy', blurb: 'Build four in a row while blocking your opponent and planning several moves ahead.' },
+  blackjack: { icon: '🂡', tag: 'Cards', blurb: 'Play a clean virtual blackjack table using entertainment-only arcade currency.' },
+  poker: { icon: '♠️', tag: 'Cards', blurb: 'Take a seat at the Hold’em table and play against other people when tables are available.' },
+  keno: { icon: '🎯', tag: 'Numbers', blurb: 'Pick numbers, set your entertainment wager and reveal the draw.' },
+  wheel: { icon: '🎡', tag: 'Spin', blurb: 'Choose a sector and spin a fast arcade wheel with mixed outcomes.' },
+};
+
+const fallbackMeta = { icon: '🎮', tag: 'Arcade Original', blurb: 'A playable Arcade Hub original built for quick browser sessions.' };
+
 const ArcadeLobby: React.FC<ArcadeLobbyProps> = ({ games, mode, onPlay }) => {
   const { progression, claimLevelFaucet } = useCoinSystem();
   const { user } = useAuth();
-  const [faucetReadyStr, setFaucetReadyStr] = useState<string>('');
   const [faucetReady, setFaucetReady] = useState(false);
+  const [faucetLabel, setFaucetLabel] = useState('Checking faucet…');
+  const [leaderboardGameId, setLeaderboardGameId] = useState(games[0]?.id ?? '');
+  const [leaderboard, setLeaderboard] = useState<LeaderboardRow[]>([]);
+  const [leaderboardLoading, setLeaderboardLoading] = useState(false);
+  const [leaderboardError, setLeaderboardError] = useState('');
+  const [comments, setComments] = useState<LandingComment[]>([]);
+  const [commentText, setCommentText] = useState('');
+  const [commentLoading, setCommentLoading] = useState(false);
+  const [commentError, setCommentError] = useState('');
 
-  useEffect(() => {
+  const isAdult = String(mode) === 'Adult';
+  const commentMode = isAdult ? 'adult' : 'regular';
+  const featured = games.find((game) => game.id === (isAdult ? 'fishing' : 'neonhopper')) ?? games[0];
+  const featuredMeta = GAME_META[featured?.id] ?? fallbackMeta;
+
+  const updateFaucetState = () => {
     if (!progression.nextFaucetAt) {
       setFaucetReady(true);
-      setFaucetReadyStr('CLAIM FREE GC NOW');
+      setFaucetLabel(`CLAIM ${progression.faucetAmount.toLocaleString()} FREE GC`);
       return;
     }
     const interval = setInterval(() => {
@@ -159,9 +199,114 @@ const ArcadeLobby: React.FC<ArcadeLobbyProps> = ({ games, mode, onPlay }) => {
     }
   };
 
-  const featured = games.find((game) => game.id === (mode === 'Adult' ? 'fishing' : 'nim')) ?? games[0];
-  const art = gameBadges[featured.id] ?? { tag: 'ORIGINAL', blurb: 'Featured Arcade Hub Title', iconSvg: null };
-  const originals = games.slice(0, 6);
+  useEffect(() => {
+    updateFaucetState();
+    const timer = window.setInterval(updateFaucetState, 1000);
+    return () => window.clearInterval(timer);
+  }, [progression.nextFaucetAt, progression.faucetAmount]);
+
+  useEffect(() => {
+    if (!games.some((game) => game.id === leaderboardGameId)) {
+      setLeaderboardGameId(games[0]?.id ?? '');
+    }
+  }, [games, leaderboardGameId]);
+
+  useEffect(() => {
+    if (!leaderboardGameId || !user || user.isGuest) {
+      setLeaderboard([]);
+      return;
+    }
+    let cancelled = false;
+    const load = async () => {
+      setLeaderboardLoading(true);
+      setLeaderboardError('');
+      try {
+        const { data, error } = await getSupabase().rpc('get_game_activity_leaderboard', { p_game_id: leaderboardGameId });
+        if (error) throw error;
+        if (!cancelled) {
+          setLeaderboard((data ?? []).map((row: any) => ({
+            display_name: String(row.display_name || 'Player'),
+            play_count: Number(row.play_count || 0),
+            coins_spent: Number(row.coins_spent || 0),
+          })));
+        }
+      } catch (error: any) {
+        if (!cancelled) {
+          setLeaderboard([]);
+          setLeaderboardError(error?.message || 'Leaderboard unavailable.');
+        }
+      } finally {
+        if (!cancelled) setLeaderboardLoading(false);
+      }
+    };
+    void load();
+    return () => { cancelled = true; };
+  }, [leaderboardGameId, user?.id]);
+
+  const loadComments = async () => {
+    setCommentLoading(true);
+    setCommentError('');
+    try {
+      const { data, error } = await getSupabase().rpc('get_landing_comments', { p_mode: commentMode });
+      if (error) throw error;
+      setComments((data ?? []).map((row: any) => ({
+        id: Number(row.id),
+        display_name: String(row.display_name || 'Player'),
+        body: String(row.body || ''),
+        created_at: String(row.created_at || ''),
+      })));
+    } catch (error: any) {
+      setComments([]);
+      setCommentError(error?.message || 'Comments are unavailable right now.');
+    } finally {
+      setCommentLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    void loadComments();
+  }, [commentMode]);
+
+  const handlePostComment = async () => {
+    const body = commentText.trim();
+    if (!user || user.isGuest || !body || body.length > 500) return;
+    setCommentLoading(true);
+    setCommentError('');
+    try {
+      const { error } = await getSupabase().rpc('post_landing_comment', { p_mode: commentMode, p_body: body });
+      if (error) throw error;
+      setCommentText('');
+      await loadComments();
+    } catch (error: any) {
+      setCommentError(error?.message || 'Could not post that comment.');
+    } finally {
+      setCommentLoading(false);
+    }
+  };
+
+  const handleDeleteComment = async (id: number) => {
+    if (!user?.isAdmin) return;
+    setCommentError('');
+    try {
+      const { error } = await getSupabase().rpc('admin_delete_landing_comment', { p_comment_id: id });
+      if (error) throw error;
+      setComments((current) => current.filter((comment) => comment.id !== id));
+    } catch (error: any) {
+      setCommentError(error?.message || 'Could not remove that comment.');
+    }
+  };
+
+  const handleClaim = async () => {
+    if (!faucetReady) return;
+    await claimLevelFaucet();
+  };
+
+  const economyCards = useMemo(() => [
+    ['GC', 'Free play currency', 'GC is given away through the faucet and play systems. You do not need to buy GC to enjoy Arcade Hub.'],
+    ['Tickets', 'Competitive rewards', 'Tickets are earned through eligible head-to-head and real-player competition and can be used in the shop or traded toward XP.'],
+    ['XP + Levels', 'Long-term progression', 'Trade eligible GC and tickets for XP to raise your level, improve progression rewards and build your arcade profile.'],
+    ['RC', 'Virtual arcade credits', 'RC is a virtual entertainment balance. Ticket-shop systems can award RC, but RC is not cash and currently cannot be withdrawn.'],
+  ], []);
 
   const titleWord1 = ['A', 'R', 'C', 'A', 'D', 'E'];
   const titleWord2 = ['H', 'U', 'B'];

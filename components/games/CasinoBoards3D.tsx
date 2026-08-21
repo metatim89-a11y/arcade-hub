@@ -1,7 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import type { Mesh, Object3D } from 'three';
 
-type PlinkoBall = { id: number; x: number; y: number; color: string };
+type PlinkoBall = { id: number; x: number; y: number; color: string; vy?: number };
 type PegGlow = { r: number; c: number; life: number };
 
 const dispose = (root: Object3D) => root.traverse((child) => {
@@ -33,12 +33,24 @@ export const PlinkoBoard3D: React.FC<{
     let cancelled = false; let teardown = () => undefined;
     void import('three').then((THREE) => {
       if (cancelled) return;
-      const renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true }); renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5)); renderer.outputColorSpace = THREE.SRGBColorSpace; renderer.shadowMap.enabled = true;
-      const scene = new THREE.Scene(); const camera = new THREE.PerspectiveCamera(36, 1, .1, 40); camera.position.set(0, .25, 13.5); camera.lookAt(0, 0, 0);
-      scene.add(new THREE.HemisphereLight(0xdff4ff, 0x080912, 2.5)); const key = new THREE.DirectionalLight(0xffffff, 4.5); key.position.set(-4, 7, 8); key.castShadow = true; scene.add(key);
-      const boardRoot = new THREE.Group(); scene.add(boardRoot);
+      const renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true });
+      renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5));
+      renderer.outputColorSpace = THREE.SRGBColorSpace;
+      renderer.shadowMap.enabled = true;
+      renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+      renderer.toneMapping = THREE.ACESFilmicToneMapping;
+      renderer.toneMappingExposure = 1.12;
+
+      const scene = new THREE.Scene();
+      const camera = new THREE.PerspectiveCamera(34, 1, .1, 40); camera.position.set(0, .35, 14.2); camera.lookAt(0, -.15, 0);
+      scene.add(new THREE.HemisphereLight(0xdff4ff, 0x080912, 2.25));
+      const key = new THREE.DirectionalLight(0xffffff, 4.8); key.position.set(-4, 7, 8); key.castShadow = true; scene.add(key);
+      const fill = new THREE.PointLight(0x79cfff, 2.1, 22); fill.position.set(4.5, 1.5, 7); scene.add(fill);
+      const rim = new THREE.PointLight(0xffc36a, 1.35, 18); rim.position.set(-5, -2.5, 5.5); scene.add(rim);
+
+      const boardRoot = new THREE.Group(); boardRoot.rotation.x = -.022; boardRoot.rotation.y = .03; scene.add(boardRoot);
       const backMaterial = new THREE.MeshStandardMaterial({ color: 0x10182b, metalness: .5, roughness: .32 });
-      const back = new THREE.Mesh(new THREE.BoxGeometry(10.8, 9.2, .38), backMaterial); back.position.z = -.42; back.receiveShadow = true; boardRoot.add(back);
+      const back = new THREE.Mesh(new THREE.BoxGeometry(10.8, 9.2, .55), backMaterial); back.position.z = -.55; back.receiveShadow = true; boardRoot.add(back);
       const railMaterial = new THREE.MeshStandardMaterial({ color: 0x263752, metalness: .72, roughness: .22 });
       [[-5.25, 0, .25, 8.8], [5.25, 0, .25, 8.8], [0, 4.35, 10.5, .24], [0, -4.35, 10.5, .24]].forEach(([x, y, width, height]) => { const rail = new THREE.Mesh(new THREE.BoxGeometry(width, height, .42), railMaterial); rail.position.set(x, y, .05); boardRoot.add(rail); });
       const marqueeTexture = new THREE.CanvasTexture(labelCanvas('PLINKO', '#111c31', '#ffe274')); marqueeTexture.colorSpace = THREE.SRGBColorSpace;
@@ -51,32 +63,55 @@ export const PlinkoBoard3D: React.FC<{
           const count = row + 3; const span = 8.9 * ((row + 2) / (liveRows + 1));
           for (let col = 0; col < count; col += 1) {
             const x = count === 1 ? 0 : -span / 2 + col * span / (count - 1); const y = 3.72 - row * (7.05 / Math.max(1, liveRows - 1));
-            const peg = new THREE.Mesh(new THREE.CylinderGeometry(.1, .125, .38, 20), new THREE.MeshStandardMaterial({ color: 0xc1d3df, metalness: .86, roughness: .14, emissive: 0x000000 })); peg.rotation.x = Math.PI / 2; peg.position.set(x, y, .09); peg.castShadow = true; boardRoot.add(peg); pegs.set(`${row}-${col}`, peg);
+            const peg = new THREE.Mesh(
+              new THREE.CylinderGeometry(.12, .17, .72, 28),
+              new THREE.MeshPhysicalMaterial({ color: 0xd9e8f2, metalness: .88, roughness: .12, clearcoat: 1, clearcoatRoughness: .08, emissive: 0x000000 })
+            );
+            peg.rotation.x = Math.PI / 2; peg.position.set(x, y, .18); peg.castShadow = true; peg.receiveShadow = true; boardRoot.add(peg); pegs.set(`${row}-${col}`, peg);
           }
         }
         stateRef.current.multipliers.forEach((multiplier, index) => {
           const color = multiplier >= 10 ? '#d92d48' : multiplier >= 2 ? '#d78b18' : multiplier >= 1 ? '#168b60' : '#283246';
           const texture = new THREE.CanvasTexture(labelCanvas(`${multiplier}×`, color)); texture.colorSpace = THREE.SRGBColorSpace;
           const width = 9.7 / stateRef.current.multipliers.length;
-          const bucket = new THREE.Mesh(new THREE.BoxGeometry(width * .91, .55, .32), new THREE.MeshStandardMaterial({ map: texture, emissive: 0x000000 })); bucket.position.set(-4.85 + width * (index + .5), -3.92, .05); bucket.userData.index = index; buckets.add(bucket);
-          if (index < stateRef.current.multipliers.length - 1) { const divider = new THREE.Mesh(new THREE.BoxGeometry(.045, .9, .62), railMaterial); divider.position.set(-4.85 + width * (index + 1), -3.68, .12); buckets.add(divider); }
+          const bucket = new THREE.Mesh(new THREE.BoxGeometry(width * .91, .55, .48), new THREE.MeshStandardMaterial({ map: texture, emissive: 0x000000, metalness: .16, roughness: .28 })); bucket.position.set(-4.85 + width * (index + .5), -3.92, .14); bucket.userData.index = index; bucket.castShadow = true; buckets.add(bucket);
+          if (index < stateRef.current.multipliers.length - 1) { const divider = new THREE.Mesh(new THREE.BoxGeometry(.045, .9, .82), railMaterial); divider.position.set(-4.85 + width * (index + 1), -3.68, .18); divider.castShadow = true; buckets.add(divider); }
         });
       };
-      const balls = new Map<number, Mesh>();
+      const balls = new Map<number, { mesh: Mesh; shadow: Mesh }>();
       const observer = new ResizeObserver(() => { const rect = canvas.getBoundingClientRect(); if (!rect.width || !rect.height) return; renderer.setSize(rect.width, rect.height, false); camera.aspect = rect.width / rect.height; camera.updateProjectionMatrix(); }); observer.observe(canvas);
       let frame = 0; let last = performance.now(); let cameraX = 0;
       const animate = (now: number) => {
-        const delta = Math.min(.04, (now - last) / 1000); last = now; const smooth = 1 - Math.exp(-17 * delta);
+        const delta = Math.min(.04, (now - last) / 1000); last = now;
         const live = stateRef.current; const next = `${live.rows}:${live.theme}:${live.multipliers.join(',')}`; if (next !== signature) { signature = next; rebuild(); }
         backMaterial.color.setHex(live.theme === 'Candy' ? 0x3a153f : live.theme === 'Neon' ? 0x062d38 : 0x10182b);
         const physicsCanvas = physicsCanvasRef.current; const width = physicsCanvas?.width || 800; const height = physicsCanvas?.height || 600;
         const liveIds = new Set(ballsRef.current.map((ball) => ball.id));
-        balls.forEach((ball, id) => { if (!liveIds.has(id)) { boardRoot.remove(ball); dispose(ball); balls.delete(id); } });
+        balls.forEach((visual, id) => { if (!liveIds.has(id)) { boardRoot.remove(visual.mesh); boardRoot.remove(visual.shadow); dispose(visual.mesh); dispose(visual.shadow); balls.delete(id); } });
         ballsRef.current.forEach((ball) => {
-          let mesh = balls.get(ball.id);
+          let visual = balls.get(ball.id);
           const targetX = (ball.x / width - .5) * 10; const targetY = (.5 - ball.y / height) * 8.5;
-          if (!mesh) { const color = new THREE.Color(ball.color); mesh = new THREE.Mesh(new THREE.SphereGeometry(.16, 24, 18), new THREE.MeshPhysicalMaterial({ color, emissive: color, emissiveIntensity: .35, metalness: .42, roughness: .14, clearcoat: 1 })); mesh.position.set(targetX, targetY, .42); mesh.castShadow = true; boardRoot.add(mesh); balls.set(ball.id, mesh); }
-          const ballSmooth = 1 - Math.exp(-26 * delta); mesh.position.x += (targetX - mesh.position.x) * ballSmooth; mesh.position.y += (targetY - mesh.position.y) * ballSmooth; mesh.position.z += (.42 - mesh.position.z) * ballSmooth; mesh.rotation.x += delta * 3.4; mesh.rotation.y += delta * 2.1;
+          const targetZ = .82 + Math.min(.1, Math.abs(ball.vy ?? 0) * .006);
+          if (!visual) {
+            const color = new THREE.Color(ball.color);
+            const mesh = new THREE.Mesh(
+              new THREE.SphereGeometry(.235, 32, 24),
+              new THREE.MeshPhysicalMaterial({ color, emissive: color, emissiveIntensity: .2, metalness: .18, roughness: .08, clearcoat: 1, clearcoatRoughness: .035, reflectivity: .9 })
+            );
+            mesh.position.set(targetX, targetY, targetZ); mesh.castShadow = true; mesh.receiveShadow = true;
+            const shadow = new THREE.Mesh(new THREE.CircleGeometry(.255, 24), new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: .26, depthWrite: false }));
+            shadow.position.set(targetX + .095, targetY - .105, -.245);
+            boardRoot.add(shadow); boardRoot.add(mesh); visual = { mesh, shadow }; balls.set(ball.id, visual);
+          }
+          const ballSmooth = 1 - Math.exp(-26 * delta);
+          visual.mesh.position.x += (targetX - visual.mesh.position.x) * ballSmooth;
+          visual.mesh.position.y += (targetY - visual.mesh.position.y) * ballSmooth;
+          visual.mesh.position.z += (targetZ - visual.mesh.position.z) * ballSmooth;
+          visual.mesh.rotation.x += delta * 4.1; visual.mesh.rotation.y += delta * 2.8;
+          visual.shadow.position.x += (targetX + .095 - visual.shadow.position.x) * ballSmooth;
+          visual.shadow.position.y += (targetY - .105 - visual.shadow.position.y) * ballSmooth;
+          const shadowScale = .9 + (targetZ - .72) * .9; visual.shadow.scale.setScalar(shadowScale);
+          (visual.shadow.material as InstanceType<typeof THREE.MeshBasicMaterial>).opacity = Math.max(.14, .31 - (targetZ - .72) * .6);
         });
         pegs.forEach((peg, key) => { const [row, col] = key.split('-').map(Number); const glow = glowingPegRef.current.some((item) => item.r === row && item.c === col && item.life > 0); const material = peg.material as InstanceType<typeof THREE.MeshStandardMaterial>; material.emissive.setHex(glow ? 0xffffff : 0x000000); material.emissiveIntensity = glow ? 1.2 : 0; peg.scale.setScalar(glow ? 1.25 : 1); });
         const averageX = ballsRef.current.length ? ballsRef.current.reduce((sum, ball) => sum + (ball.x / width - .5) * 10, 0) / ballsRef.current.length : 0; cameraX += (averageX * .025 - cameraX) * (1 - Math.exp(-3 * delta)); camera.position.x = cameraX; camera.lookAt(cameraX * .25, 0, 0);

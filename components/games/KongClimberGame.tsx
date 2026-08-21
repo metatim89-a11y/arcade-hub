@@ -92,16 +92,14 @@ export default function KongClimberGame({ playMode, playerNames }: KongClimberPr
     touchDown: false,
   });
 
-  // Platforms / Girders
   const GIRDERS = [
     { y: 540, x1: 20, x2: 780 },
     { y: 430, x1: 40, x2: 740 },
     { y: 320, x1: 60, x2: 720 },
     { y: 210, x1: 80, x2: 700 },
-    { y: 100, x1: 200, x2: 500 }, // Top goal
+    { y: 100, x1: 200, x2: 500 },
   ];
 
-  // Ladders connecting girders
   const LADDERS = [
     { x: 680, y1: 430, y2: 540 },
     { x: 120, y1: 320, y2: 430 },
@@ -280,7 +278,6 @@ export default function KongClimberGame({ playMode, playerNames }: KongClimberPr
           }
         }
 
-        // Spawn Barrels
         s.spawnTimer += dt;
         if (s.spawnTimer > 2.2) {
           s.spawnTimer = 0;
@@ -330,7 +327,6 @@ export default function KongClimberGame({ playMode, playerNames }: KongClimberPr
           }
         });
 
-        // Check Victory Goal (Top Platform)
         if (s.py <= 100 && s.px >= 300 && s.px <= 400) {
           playSfx('win');
           setHasWon(true);
@@ -372,7 +368,6 @@ export default function KongClimberGame({ playMode, playerNames }: KongClimberPr
         }
       });
 
-      // Draw Goal Trophy (Pauline / Princess)
       ctx.fillStyle = '#f43f5e';
       ctx.shadowColor = '#fb7185';
       ctx.shadowBlur = 15;
@@ -393,7 +388,6 @@ export default function KongClimberGame({ playMode, playerNames }: KongClimberPr
         ctx.shadowBlur = 0;
       });
 
-      // Draw Player (Neon Climber Hero)
       ctx.fillStyle = '#a855f7';
       ctx.shadowColor = '#c084fc';
       ctx.shadowBlur = 12;
@@ -408,6 +402,17 @@ export default function KongClimberGame({ playMode, playerNames }: KongClimberPr
     req = requestAnimationFrame(draw);
     return () => cancelAnimationFrame(req);
   }, [hasWon, gameOver]);
+
+  const holdProps = (action: 'left' | 'right' | 'up' | 'down') => ({
+    onPointerDown: (event: React.PointerEvent<HTMLButtonElement>) => {
+      event.preventDefault();
+      event.currentTarget.setPointerCapture?.(event.pointerId);
+      triggerAction(action);
+    },
+    onPointerUp: () => releaseAction(action),
+    onPointerCancel: () => releaseAction(action),
+    onPointerLeave: () => releaseAction(action),
+  });
 
   return (
     <div className="flex w-full flex-col items-center gap-4 text-white select-none">

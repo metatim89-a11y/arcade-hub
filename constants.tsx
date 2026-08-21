@@ -1,5 +1,5 @@
 
-// constants.tsx v0.0.34 - Lazy Game Registry
+// constants.tsx v0.0.36 - Lazy Game Registry
 import React from 'react';
 import { Game } from './types';
 
