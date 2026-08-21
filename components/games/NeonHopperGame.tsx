@@ -102,7 +102,11 @@ export default function NeonHopperGame({ playMode, playerNames }: { playMode: Pl
   const act = (dx: number, dy: number) => {
     const s = gameState.current;
     if (s.dead) return;
-    let nx = s.x + dx;
+    // Water logs carry the player continuously between columns. Snap that
+    // carried position back to the nearest lane cell before the next hop so
+    // touch/keyboard movement stays aligned with collision tiles.
+    const gridX = Math.round(s.x);
+    let nx = gridX + dx;
     let ny = s.y + dy;
     if (nx >= 0 && nx < COLS && ny >= 0 && ny < ROWS) {
         s.x = nx;
