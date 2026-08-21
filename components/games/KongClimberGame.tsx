@@ -86,16 +86,14 @@ export default function KongClimberGame({ playMode, playerNames }: KongClimberPr
     keys: {} as Record<string, boolean>,
   });
 
-  // Platforms / Girders
   const GIRDERS = [
     { y: 540, x1: 20, x2: 780 },
     { y: 430, x1: 40, x2: 740 },
     { y: 320, x1: 60, x2: 720 },
     { y: 210, x1: 80, x2: 700 },
-    { y: 100, x1: 200, x2: 500 }, // Top goal
+    { y: 100, x1: 200, x2: 500 },
   ];
 
-  // Ladders connecting girders
   const LADDERS = [
     { x: 680, y1: 430, y2: 540 },
     { x: 120, y1: 320, y2: 430 },
@@ -154,27 +152,13 @@ export default function KongClimberGame({ playMode, playerNames }: KongClimberPr
         s.isGrounded = false;
         playSfx('jump');
       }
-    } else if (action === 'left') {
-      s.vx = -4;
-    } else if (action === 'right') {
-      s.vx = 4;
-    } else if (action === 'up') {
-      const nearLadder = LADDERS.find(l => Math.abs(s.px - l.x) < 25 && s.py >= l.y1 - 20 && s.py <= l.y2 + 20);
-      if (nearLadder) {
-        s.isClimbing = true;
-        s.py -= 4;
-        s.px = nearLadder.x;
-        playSfx('climb');
-      }
-    } else if (action === 'down') {
-      const nearLadder = LADDERS.find(l => Math.abs(s.px - l.x) < 25 && s.py >= l.y1 - 20 && s.py <= l.y2 + 20);
-      if (nearLadder) {
-        s.isClimbing = true;
-        s.py += 4;
-        s.px = nearLadder.x;
-        playSfx('climb');
-      }
+      return;
     }
+    s.keys[`touch:${action}`] = true;
+  };
+
+  const releaseAction = (action: 'left' | 'right' | 'up' | 'down') => {
+    gameState.current.keys[`touch:${action}`] = false;
   };
 
   useEffect(() => {
@@ -191,19 +175,17 @@ export default function KongClimberGame({ playMode, playerNames }: KongClimberPr
       ctx.clearRect(0, 0, cvs.width, cvs.height);
 
       if (!gameOver && !hasWon) {
-        // Player Controls
-        if (s.keys['ArrowLeft'] || s.keys['a'] || s.keys['A']) s.vx = -4;
-        else if (s.keys['ArrowRight'] || s.keys['d'] || s.keys['D']) s.vx = 4;
+        if (s.keys['ArrowLeft'] || s.keys['a'] || s.keys['A'] || s.keys['touch:left']) s.vx = -4;
+        else if (s.keys['ArrowRight'] || s.keys['d'] || s.keys['D'] || s.keys['touch:right']) s.vx = 4;
         else s.vx = 0;
 
-        // Ladder Climb Check
         const nearLadder = LADDERS.find(l => Math.abs(s.px - l.x) < 20 && s.py >= l.y1 - 10 && s.py <= l.y2 + 10);
-        if (nearLadder && (s.keys['ArrowUp'] || s.keys['w'] || s.keys['W'])) {
+        if (nearLadder && (s.keys['ArrowUp'] || s.keys['w'] || s.keys['W'] || s.keys['touch:up'])) {
           s.isClimbing = true;
           s.py -= 3;
           s.px = nearLadder.x;
           s.vy = 0;
-        } else if (nearLadder && (s.keys['ArrowDown'] || s.keys['s'] || s.keys['S'])) {
+        } else if (nearLadder && (s.keys['ArrowDown'] || s.keys['s'] || s.keys['S'] || s.keys['touch:down'])) {
           s.isClimbing = true;
           s.py += 3;
           s.px = nearLadder.x;
@@ -212,14 +194,13 @@ export default function KongClimberGame({ playMode, playerNames }: KongClimberPr
           s.isClimbing = false;
         }
 
-        // Apply Physics
         s.px += s.vx;
+        s.px = Math.max(28, Math.min(772, s.px));
         if (!s.isClimbing) {
-          s.vy += 0.55; // Gravity
+          s.vy += 0.55;
           s.py += s.vy;
         }
 
-        // Check Girder Collisions
         s.isGrounded = false;
         GIRDERS.forEach(g => {
           if (s.px >= g.x1 && s.px <= g.x2 && s.py + 25 >= g.y - 10 && s.py + 25 <= g.y + 15 && s.vy >= 0) {
@@ -229,20 +210,17 @@ export default function KongClimberGame({ playMode, playerNames }: KongClimberPr
           }
         });
 
-        // Spawn Barrels
         s.spawnTimer += dt;
         if (s.spawnTimer > 2.2) {
           s.spawnTimer = 0;
           s.barrels.push({ x: 220, y: 85, vx: 2.8, vy: 0 });
         }
 
-        // Update Barrels
         s.barrels.forEach(b => {
           b.x += b.vx;
           b.vy += 0.4;
           b.y += b.vy;
 
-          // Girder floor for barrels
           GIRDERS.forEach(g => {
             if (b.x >= g.x1 && b.x <= g.x2 && b.y + 12 >= g.y - 8 && b.y + 12 <= g.y + 12 && b.vy >= 0) {
               b.y = g.y - 12;
@@ -250,11 +228,9 @@ export default function KongClimberGame({ playMode, playerNames }: KongClimberPr
             }
           });
 
-          // Bounce off screen edges or reverse on girders
           if (b.x > 760 && b.vx > 0) b.vx = -b.vx;
           if (b.x < 40 && b.vx < 0) b.vx = -b.vx;
 
-          // Check Player Collision
           const dist = Math.hypot(s.px - b.x, s.py - b.y);
           if (dist < 22) {
             playSfx('splat');
@@ -273,7 +249,6 @@ export default function KongClimberGame({ playMode, playerNames }: KongClimberPr
           }
         });
 
-        // Check Victory Goal (Top Platform)
         if (s.py <= 100 && s.px >= 300 && s.px <= 400) {
           playSfx('win');
           setHasWon(true);
@@ -288,7 +263,6 @@ export default function KongClimberGame({ playMode, playerNames }: KongClimberPr
         }
       }
 
-      // Draw Girders (Steel Blue Platforms)
       GIRDERS.forEach(g => {
         ctx.fillStyle = '#38bdf8';
         ctx.shadowColor = '#0284c7';
@@ -297,7 +271,6 @@ export default function KongClimberGame({ playMode, playerNames }: KongClimberPr
         ctx.shadowBlur = 0;
       });
 
-      // Draw Ladders (Yellow Rungs)
       LADDERS.forEach(l => {
         ctx.strokeStyle = '#facc15';
         ctx.lineWidth = 4;
@@ -312,7 +285,6 @@ export default function KongClimberGame({ playMode, playerNames }: KongClimberPr
         }
       });
 
-      // Draw Goal Trophy (Pauline / Princess)
       ctx.fillStyle = '#f43f5e';
       ctx.shadowColor = '#fb7185';
       ctx.shadowBlur = 15;
@@ -320,7 +292,6 @@ export default function KongClimberGame({ playMode, playerNames }: KongClimberPr
       ctx.fillText('👸🏼', 340, 95);
       ctx.shadowBlur = 0;
 
-      // Draw Barrels
       s.barrels.forEach(b => {
         ctx.fillStyle = '#f97316';
         ctx.shadowColor = '#fb923c';
@@ -333,7 +304,6 @@ export default function KongClimberGame({ playMode, playerNames }: KongClimberPr
         ctx.shadowBlur = 0;
       });
 
-      // Draw Player (Neon Climber Hero)
       ctx.fillStyle = '#a855f7';
       ctx.shadowColor = '#c084fc';
       ctx.shadowBlur = 12;
@@ -348,6 +318,17 @@ export default function KongClimberGame({ playMode, playerNames }: KongClimberPr
     req = requestAnimationFrame(draw);
     return () => cancelAnimationFrame(req);
   }, [hasWon, gameOver]);
+
+  const holdProps = (action: 'left' | 'right' | 'up' | 'down') => ({
+    onPointerDown: (event: React.PointerEvent<HTMLButtonElement>) => {
+      event.preventDefault();
+      event.currentTarget.setPointerCapture?.(event.pointerId);
+      triggerAction(action);
+    },
+    onPointerUp: () => releaseAction(action),
+    onPointerCancel: () => releaseAction(action),
+    onPointerLeave: () => releaseAction(action),
+  });
 
   return (
     <div className="flex w-full flex-col items-center gap-4 text-white">
@@ -379,43 +360,18 @@ export default function KongClimberGame({ playMode, playerNames }: KongClimberPr
         )}
       </div>
 
-      {/* On-Screen Touch D-Pad & Jump Buttons */}
-      <div className="flex w-full max-w-xl justify-between items-center px-4 mt-1 sm:hidden">
+      <div className="flex w-full max-w-xl justify-between items-center px-4 mt-1 sm:hidden touch-none select-none">
         <div className="flex gap-2">
-          <button
-            type="button"
-            onTouchStart={() => triggerAction('left')}
-            className="w-14 h-12 bg-slate-800 active:bg-amber-500 rounded-xl border border-slate-600 flex items-center justify-center text-xl font-bold text-yellow-300 shadow-lg"
-          >
-            ◄
-          </button>
-          <button
-            type="button"
-            onTouchStart={() => triggerAction('right')}
-            className="w-14 h-12 bg-slate-800 active:bg-amber-500 rounded-xl border border-slate-600 flex items-center justify-center text-xl font-bold text-yellow-300 shadow-lg"
-          >
-            ►
-          </button>
-          <button
-            type="button"
-            onTouchStart={() => triggerAction('up')}
-            className="w-14 h-12 bg-slate-800 active:bg-amber-500 rounded-xl border border-slate-600 flex items-center justify-center text-xl font-bold text-yellow-300 shadow-lg"
-          >
-            ▲
-          </button>
-          <button
-            type="button"
-            onTouchStart={() => triggerAction('down')}
-            className="w-14 h-12 bg-slate-800 active:bg-amber-500 rounded-xl border border-slate-600 flex items-center justify-center text-xl font-bold text-yellow-300 shadow-lg"
-          >
-            ▼
-          </button>
+          <button type="button" {...holdProps('left')} className="w-14 h-12 bg-slate-800 active:bg-amber-500 rounded-xl border border-slate-600 flex items-center justify-center text-xl font-bold text-yellow-300 shadow-lg touch-none">◄</button>
+          <button type="button" {...holdProps('right')} className="w-14 h-12 bg-slate-800 active:bg-amber-500 rounded-xl border border-slate-600 flex items-center justify-center text-xl font-bold text-yellow-300 shadow-lg touch-none">►</button>
+          <button type="button" {...holdProps('up')} className="w-14 h-12 bg-slate-800 active:bg-amber-500 rounded-xl border border-slate-600 flex items-center justify-center text-xl font-bold text-yellow-300 shadow-lg touch-none">▲</button>
+          <button type="button" {...holdProps('down')} className="w-14 h-12 bg-slate-800 active:bg-amber-500 rounded-xl border border-slate-600 flex items-center justify-center text-xl font-bold text-yellow-300 shadow-lg touch-none">▼</button>
         </div>
 
         <button
           type="button"
-          onTouchStart={() => triggerAction('jump')}
-          className="w-20 h-12 bg-gradient-to-r from-purple-600 to-indigo-600 active:scale-95 rounded-xl border border-purple-400 flex items-center justify-center text-base font-black text-white shadow-lg"
+          onPointerDown={(event) => { event.preventDefault(); triggerAction('jump'); }}
+          className="w-20 h-12 bg-gradient-to-r from-purple-600 to-indigo-600 active:scale-95 rounded-xl border border-purple-400 flex items-center justify-center text-base font-black text-white shadow-lg touch-none"
         >
           🦘 JUMP
         </button>
