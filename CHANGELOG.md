@@ -2,6 +2,14 @@
 
 This changelog starts with v0.0.35. Earlier history remains available in the Git commit and pull-request history.
 
+## v0.0.37 - 2026-08-21
+
+### Changed
+- Raised the free GC faucet minimum to 535 GC for levels 1 through 5.
+- Preserved the existing higher progression rewards for levels 6 and above.
+- Added the matching Supabase migration so the server-backed faucet amount and the UI use the same reward schedule.
+- Bumped the visible Arcade Hub version from v0.0.36 to v0.0.37.
+
 ## v0.0.36 - 2026-08-21
 
 ### Fixed
