@@ -19,7 +19,7 @@ const ChutesAndLaddersGame: React.FC<Props> = ({ playMode, playerNames }) => {
   
   const audioCtxRef = useRef<AudioContext | null>(null);
 
-  const playSfx = (type: 'roll' | 'ladder' | 'chute' | 'win') => {
+  const playSfx = (type: 'roll' | 'step' | 'ladder' | 'chute' | 'win') => {
     try {
       if (!audioCtxRef.current) {
         audioCtxRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
@@ -40,22 +40,29 @@ const ChutesAndLaddersGame: React.FC<Props> = ({ playMode, playerNames }) => {
         gain.gain.linearRampToValueAtTime(0.01, now + 0.08);
         osc.start(now);
         osc.stop(now + 0.08);
+      } else if (type === 'step') {
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(440 + Math.random() * 100, now);
+        gain.gain.setValueAtTime(0.12, now);
+        gain.gain.linearRampToValueAtTime(0.01, now + 0.06);
+        osc.start(now);
+        osc.stop(now + 0.06);
       } else if (type === 'ladder') {
         osc.type = 'sine';
         osc.frequency.setValueAtTime(300, now);
-        osc.frequency.exponentialRampToValueAtTime(800, now + 0.25);
+        osc.frequency.exponentialRampToValueAtTime(900, now + 0.3);
         gain.gain.setValueAtTime(0.2, now);
-        gain.gain.linearRampToValueAtTime(0.01, now + 0.25);
+        gain.gain.linearRampToValueAtTime(0.01, now + 0.3);
         osc.start(now);
-        osc.stop(now + 0.25);
+        osc.stop(now + 0.3);
       } else if (type === 'chute') {
         osc.type = 'sawtooth';
-        osc.frequency.setValueAtTime(600, now);
-        osc.frequency.linearRampToValueAtTime(150, now + 0.25);
+        osc.frequency.setValueAtTime(700, now);
+        osc.frequency.linearRampToValueAtTime(150, now + 0.3);
         gain.gain.setValueAtTime(0.2, now);
-        gain.gain.linearRampToValueAtTime(0.01, now + 0.25);
+        gain.gain.linearRampToValueAtTime(0.01, now + 0.3);
         osc.start(now);
-        osc.stop(now + 0.25);
+        osc.stop(now + 0.3);
       } else if (type === 'win') {
         osc.type = 'triangle';
         osc.frequency.setValueAtTime(523, now);
@@ -97,38 +104,60 @@ const ChutesAndLaddersGame: React.FC<Props> = ({ playMode, playerNames }) => {
         clearInterval(rollInterval);
         const die = Math.floor(Math.random() * 6) + 1;
         setRoll(die);
-        setIsRolling(false);
 
-        let next = positions[player] + die;
-        if (next > 100) next = positions[player];
+        const currentPos = positions[player];
+        let targetPos = currentPos + die;
+        if (targetPos > 100) targetPos = currentPos;
 
-        const jumpTarget = jumps[next];
-        if (jumpTarget) {
-          setTimeout(() => {
-            if (jumpTarget > next) playSfx('ladder');
-            else playSfx('chute');
-            setPositions(prev => prev.map((p, idx) => idx === player ? jumpTarget : p));
-            if (jumpTarget === 100) {
-              playSfx('win');
-              setWinner(player);
+        // Step-by-step hopping animation
+        let stepCount = 0;
+        const totalSteps = targetPos - currentPos;
+
+        if (totalSteps <= 0) {
+          setIsRolling(false);
+          setTurn(player === 0 ? 1 : 0);
+          return;
+        }
+
+        const stepInterval = setInterval(() => {
+          stepCount++;
+          playSfx('step');
+          const nextStepPos = currentPos + stepCount;
+          setPositions(prev => prev.map((p, idx) => idx === player ? nextStepPos : p));
+
+          if (stepCount >= totalSteps) {
+            clearInterval(stepInterval);
+
+            // Check if landed on a chute or ladder
+            const jumpTarget = jumps[nextStepPos];
+            if (jumpTarget) {
+              setTimeout(() => {
+                if (jumpTarget > nextStepPos) playSfx('ladder');
+                else playSfx('chute');
+
+                setPositions(prev => prev.map((p, idx) => idx === player ? jumpTarget : p));
+                setIsRolling(false);
+
+                if (jumpTarget === 100) {
+                  playSfx('win');
+                  setWinner(player);
+                } else {
+                  setTurn(player === 0 ? 1 : 0);
+                }
+              }, 400);
             } else {
-              setTurn(player === 0 ? 1 : 0);
+              setIsRolling(false);
+              if (nextStepPos === 100) {
+                playSfx('win');
+                setWinner(player);
+              } else {
+                setTurn(player === 0 ? 1 : 0);
+              }
             }
-          }, 600);
-        }
-
-        setPositions(prev => prev.map((p, idx) => idx === player ? next : p));
-
-        if (!jumpTarget) {
-          if (next === 100) {
-            playSfx('win');
-            setWinner(player);
-          } else {
-            setTurn(player === 0 ? 1 : 0);
           }
-        }
+        }, 220); // 220ms per tile step hop
       }
-    }, 60);
+    }, 80);
   };
 
   React.useEffect(() => {
