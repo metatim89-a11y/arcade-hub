@@ -293,41 +293,43 @@ export default function NeonHopperGame({ playMode, playerNames }: { playMode: Pl
         )}
       </div>
 
-      {/* On-Screen Touch D-Pad for Mobile */}
-      <div className="flex flex-col items-center gap-2 mt-2 sm:hidden">
+      {/* Permanent Touch / Click On-Screen D-Pad Controls for All Devices */}
+      <div className="flex flex-col items-center gap-2 mt-2">
         <button
           type="button"
           onClick={() => act(0, -1)}
-          className="w-16 h-12 bg-slate-800 active:bg-amber-500 rounded-xl border border-slate-600 flex items-center justify-center text-xl font-bold text-yellow-300 shadow-lg"
+          className="w-20 h-14 bg-gradient-to-b from-slate-700 to-slate-900 active:bg-amber-500 rounded-2xl border-2 border-slate-500 flex items-center justify-center text-2xl font-black text-amber-300 shadow-xl hover:scale-105 transition-all"
         >
-          ▲
+          ▲ UP
         </button>
-        <div className="flex gap-4">
+        <div className="flex gap-3">
           <button
             type="button"
             onClick={() => act(-1, 0)}
-            className="w-16 h-12 bg-slate-800 active:bg-amber-500 rounded-xl border border-slate-600 flex items-center justify-center text-xl font-bold text-yellow-300 shadow-lg"
+            className="w-20 h-14 bg-gradient-to-b from-slate-700 to-slate-900 active:bg-amber-500 rounded-2xl border-2 border-slate-500 flex items-center justify-center text-2xl font-black text-amber-300 shadow-xl hover:scale-105 transition-all"
           >
-            ◄
+            ◄ LEFT
           </button>
           <button
             type="button"
             onClick={() => act(0, 1)}
-            className="w-16 h-12 bg-slate-800 active:bg-amber-500 rounded-xl border border-slate-600 flex items-center justify-center text-xl font-bold text-yellow-300 shadow-lg"
+            className="w-20 h-14 bg-gradient-to-b from-slate-700 to-slate-900 active:bg-amber-500 rounded-2xl border-2 border-slate-500 flex items-center justify-center text-2xl font-black text-amber-300 shadow-xl hover:scale-105 transition-all"
           >
-            ▼
+            DOWN ▼
           </button>
           <button
             type="button"
             onClick={() => act(1, 0)}
-            className="w-16 h-12 bg-slate-800 active:bg-amber-500 rounded-xl border border-slate-600 flex items-center justify-center text-xl font-bold text-yellow-300 shadow-lg"
+            className="w-20 h-14 bg-gradient-to-b from-slate-700 to-slate-900 active:bg-amber-500 rounded-2xl border-2 border-slate-500 flex items-center justify-center text-2xl font-black text-amber-300 shadow-xl hover:scale-105 transition-all"
           >
-            ►
+            RIGHT ►
           </button>
         </div>
       </div>
 
-      <p className="text-slate-400 text-xs max-w-lg text-center mt-1 hidden sm:block">Use W/A/S/D or Arrow Keys to hop across the road and the river. Look both ways!</p>
+      <p className="text-slate-400 text-xs max-w-lg text-center mt-1">
+        Tap buttons above or use W/A/S/D / Arrow Keys to hop across the road and river!
+      </p>
     </div>
   );
 }

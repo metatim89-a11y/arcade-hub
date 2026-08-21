@@ -111,12 +111,12 @@ const gameBadges: Record<string, { tag: string; blurb: string; iconSvg: React.Re
       </svg>
     )
   },
-  worm: {
-    tag: '3D ARENA',
-    blurb: 'Slither, grow, and trap opponent worms in 3D space',
+  kongclimber: {
+    tag: 'RETRO CLIMBER',
+    blurb: 'Dodge rolling barrels and climb steel girders to victory',
     iconSvg: (
-      <svg className="w-8 h-8 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M14 10l-2 1m0 0l-2-1m2 1v2.5M20 7l-2 1m2-1l-2-1m2 1v2.5M14 4l-2 1m2-1l-2-1m2 1v2.5M4 7l2-1M4 7l2 1M4 7v2.5M12 21l-2-1m2 1l2-1m-2 1v-2.5" />
+      <svg className="w-8 h-8 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M5 3v18M19 3v18M5 7h14M5 12h14M5 17h14" />
       </svg>
     )
   },

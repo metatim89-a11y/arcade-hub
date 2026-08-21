@@ -19,7 +19,7 @@ const TexasHoldemLobby = React.lazy(() => import('./components/games/TexasHoldem
 const SpinWheelGame = React.lazy(() => import('./components/games/SpinWheelGame'));
 const CoinPusherGame = React.lazy(() => import('./components/games/CoinPusherGame'));
 const NeonHopperGame = React.lazy(() => import('./components/games/NeonHopperGame'));
-const WormGame = React.lazy(() => import('./components/games/WormGame'));
+const KongClimberGame = React.lazy(() => import('./components/games/KongClimberGame'));
 
 export const APP_VERSION = '0.0.34';
 
@@ -33,7 +33,7 @@ export const ADULT_GAMES: Game[] = [
 
 export const UNDER18_GAMES: Game[] = [
     { id: 'neonhopper', label: 'Neon Hopper', component: NeonHopperGame },
-    { id: 'worm', label: 'Worm Arena 3D', component: WormGame },
+    { id: 'kongclimber', label: 'Kong Climber', component: KongClimberGame },
     { id: 'blockdrop', label: 'Block Drop', component: BlockDropGame },
     { id: 'mancala', label: 'Mancala 3D', component: MancalaGame },
     { id: 'chutes', label: 'Chutes & Ladders', component: ChutesAndLaddersGame },
