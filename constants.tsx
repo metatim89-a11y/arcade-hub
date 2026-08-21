@@ -1,5 +1,5 @@
 
-// constants.tsx v0.0.33 - Lazy Game Registry
+// constants.tsx v0.0.34 - Lazy Game Registry
 import React from 'react';
 import { Game } from './types';
 
@@ -21,7 +21,7 @@ const CoinPusherGame = React.lazy(() => import('./components/games/CoinPusherGam
 const RPSCardGame = React.lazy(() => import('./components/games/RPSCardGame'));
 const TicTacToeGame = React.lazy(() => import('./components/games/TicTacToeGame'));
 
-export const APP_VERSION = '0.0.33';
+export const APP_VERSION = '0.0.34';
 
 export const ADULT_GAMES: Game[] = [
     { id: 'wheel', label: 'Spin Wheel', component: SpinWheelGame },

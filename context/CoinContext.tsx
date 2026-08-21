@@ -84,12 +84,15 @@ export const CoinProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const funKey = `arcade_fun_coins_${storageSuffix}`;
   const virtualKey = `arcade_virtual_credits_${storageSuffix}`;
 
+  const isLocalUser = !user || user.isGuest || user.id.startsWith('admin_');
+
   const loadBalances = useCallback(async () => {
-    if (!user || user.isGuest) {
+    if (isLocalUser) {
       const savedFun = Number(window.localStorage.getItem(funKey));
       const savedVirtual = Number(window.localStorage.getItem(virtualKey));
-      setFunCoins(Number.isFinite(savedFun) && savedFun >= 0 ? savedFun : GUEST_STARTING_FUN_COINS);
-      setRealCoins(Number.isFinite(savedVirtual) && savedVirtual >= 0 ? savedVirtual : 0);
+      const defaultCoins = user?.isAdmin ? 1000 : GUEST_STARTING_FUN_COINS;
+      setFunCoins(Number.isFinite(savedFun) && savedFun >= 0 ? savedFun : defaultCoins);
+      setRealCoins(Number.isFinite(savedVirtual) && savedVirtual >= 0 ? savedVirtual : (user?.isAdmin ? 100 : 0));
       setTickets(0);
       setProgression(initialProgression);
       setAesthetics([]);
@@ -100,79 +103,84 @@ export const CoinProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       return;
     }
 
-    const supabase = getSupabase();
-    const [
-      { data: balance, error: balanceError },
-      { data: progress, error: progressError },
-      { data: history, error: historyError },
-      { data: catalog, error: catalogError },
-      { data: owned, error: ownedError },
-      { data: stats, error: statsError },
-    ] = await Promise.all([
-      supabase.from('player_balances').select('fun_coins, real_coins, tickets').eq('user_id', user.id).single(),
-      supabase.from('player_progression').select('experience, level, powerups, last_faucet_claimed_at, last_powerup_claimed_at').eq('user_id', user.id).single(),
-      supabase.from('coin_transactions').select('id, currency, transaction_type, amount, reason, created_at').eq('user_id', user.id).order('created_at', { ascending: false }).limit(100),
-      supabase.from('game_aesthetics').select('id, game_id, name, description, visual_key, ticket_cost, required_experience, value_cents, reward_type, reward_amount, gradient_from, gradient_to, accent_color, sort_order').order('game_id').order('sort_order'),
-      supabase.from('player_aesthetics').select('aesthetic_id, game_id, equipped').eq('user_id', user.id),
-      supabase.from('player_game_stats').select('game_id, play_count, coins_spent').eq('user_id', user.id),
-    ]);
-    if (balanceError) throw balanceError;
-    if (progressError) throw progressError;
-    if (historyError) throw historyError;
-    if (catalogError) throw catalogError;
-    if (ownedError) throw ownedError;
-    if (statsError) throw statsError;
+    try {
+      const supabase = getSupabase();
+      const [
+        { data: balance, error: balanceError },
+        { data: progress, error: progressError },
+        { data: history, error: historyError },
+        { data: catalog, error: catalogError },
+        { data: owned, error: ownedError },
+        { data: stats, error: statsError },
+      ] = await Promise.all([
+        supabase.from('player_balances').select('fun_coins, real_coins, tickets').eq('user_id', user.id).single(),
+        supabase.from('player_progression').select('experience, level, powerups, last_faucet_claimed_at, last_powerup_claimed_at').eq('user_id', user.id).single(),
+        supabase.from('coin_transactions').select('id, currency, transaction_type, amount, reason, created_at').eq('user_id', user.id).order('created_at', { ascending: false }).limit(100),
+        supabase.from('game_aesthetics').select('id, game_id, name, description, visual_key, ticket_cost, required_experience, value_cents, reward_type, reward_amount, gradient_from, gradient_to, accent_color, sort_order').order('game_id').order('sort_order'),
+        supabase.from('player_aesthetics').select('aesthetic_id, game_id, equipped').eq('user_id', user.id),
+        supabase.from('player_game_stats').select('game_id, play_count, coins_spent').eq('user_id', user.id),
+      ]);
+      if (balanceError) throw balanceError;
+      if (progressError) throw progressError;
+      if (historyError) throw historyError;
+      if (catalogError) throw catalogError;
+      if (ownedError) throw ownedError;
+      if (statsError) throw statsError;
 
-    setFunCoins(Number(balance.fun_coins));
-    setRealCoins(Number(balance.real_coins));
-    setTickets(Number(balance.tickets));
-    const level = Number(progress.level);
-    const lastFaucet = progress.last_faucet_claimed_at ? new Date(progress.last_faucet_claimed_at) : null;
-    const lastPowerup = progress.last_powerup_claimed_at ? new Date(progress.last_powerup_claimed_at) : null;
-    setProgression({
-      experience: Number(progress.experience),
-      level,
-      powerups: Number(progress.powerups),
-      nextLevelExperience: 250 * level * level,
-      faucetAmount: dailyFaucetAmountForLevel(level),
-      faucetPowerups: Math.min(5, 1 + Math.floor((level - 1) / 5)),
-      nextFaucetAt: lastFaucet ? new Date(lastFaucet.getTime() + DAILY_FAUCET_COOLDOWN_MS).toISOString() : null,
-      nextPowerupAt: lastPowerup ? new Date(lastPowerup.getTime() + (4 * 60 * 60 * 1000)).toISOString() : null,
-    });
-    setAesthetics((catalog ?? []).map((item) => ({
-      id: item.id,
-      gameId: item.game_id,
-      name: item.name,
-      description: item.description,
-      visualKey: item.visual_key,
-      ticketCost: Number(item.ticket_cost),
-      requiredExperience: Number(item.required_experience),
-      valueCents: Number(item.value_cents),
-      rewardType: item.reward_type,
-      rewardAmount: Number(item.reward_amount),
-      gradientFrom: item.gradient_from,
-      gradientTo: item.gradient_to,
-      accentColor: item.accent_color,
-      sortOrder: Number(item.sort_order),
-    })));
-    setOwnedAestheticIds((owned ?? []).map((item) => item.aesthetic_id));
-    setEquippedAesthetics(Object.fromEntries((owned ?? []).filter((item) => item.equipped).map((item) => [item.game_id, item.aesthetic_id])));
-    setGameStats((stats ?? []).map((item) => ({ gameId: item.game_id, playCount: Number(item.play_count), coinsSpent: Number(item.coins_spent) })));
-    setTransactions((history ?? []).map((row) => ({
-      id: String(row.id),
-      type: row.transaction_type as 'credit' | 'debit',
-      amount: Number(row.amount),
-      currency: row.currency as CurrencyMode,
-      reason: row.reason,
-      timestamp: new Date(row.created_at).getTime(),
-    })));
-  }, [funKey, user, virtualKey]);
+      setFunCoins(Number(balance.fun_coins));
+      setRealCoins(Number(balance.real_coins));
+      setTickets(Number(balance.tickets));
+      const level = Number(progress.level);
+      const lastFaucet = progress.last_faucet_claimed_at ? new Date(progress.last_faucet_claimed_at) : null;
+      const lastPowerup = progress.last_powerup_claimed_at ? new Date(progress.last_powerup_claimed_at) : null;
+      setProgression({
+        experience: Number(progress.experience),
+        level,
+        powerups: Number(progress.powerups),
+        nextLevelExperience: 250 * level * level,
+        faucetAmount: dailyFaucetAmountForLevel(level),
+        faucetPowerups: Math.min(5, 1 + Math.floor((level - 1) / 5)),
+        nextFaucetAt: lastFaucet ? new Date(lastFaucet.getTime() + DAILY_FAUCET_COOLDOWN_MS).toISOString() : null,
+        nextPowerupAt: lastPowerup ? new Date(lastPowerup.getTime() + (4 * 60 * 60 * 1000)).toISOString() : null,
+      });
+      setAesthetics((catalog ?? []).map((item) => ({
+        id: item.id,
+        gameId: item.game_id,
+        name: item.name,
+        description: item.description,
+        visualKey: item.visual_key,
+        ticketCost: Number(item.ticket_cost),
+        requiredExperience: Number(item.required_experience),
+        valueCents: Number(item.value_cents),
+        rewardType: item.reward_type,
+        rewardAmount: Number(item.reward_amount),
+        gradientFrom: item.gradient_from,
+        gradientTo: item.gradient_to,
+        accentColor: item.accent_color,
+        sortOrder: Number(item.sort_order),
+      })));
+      setOwnedAestheticIds((owned ?? []).map((item) => item.aesthetic_id));
+      setEquippedAesthetics(Object.fromEntries((owned ?? []).filter((item) => item.equipped).map((item) => [item.game_id, item.aesthetic_id])));
+      setGameStats((stats ?? []).map((item) => ({ gameId: item.game_id, playCount: Number(item.play_count), coinsSpent: Number(item.coins_spent) })));
+      setTransactions((history ?? []).map((row) => ({
+        id: String(row.id),
+        type: row.transaction_type as 'credit' | 'debit',
+        amount: Number(row.amount),
+        currency: row.currency as CurrencyMode,
+        reason: row.reason,
+        timestamp: new Date(row.created_at).getTime(),
+      })));
+    } catch (error) {
+      console.warn('Unable to sync remote balance, using local fallback:', error);
+      const savedFun = Number(window.localStorage.getItem(funKey));
+      const savedVirtual = Number(window.localStorage.getItem(virtualKey));
+      setFunCoins(Number.isFinite(savedFun) && savedFun >= 0 ? savedFun : 1000);
+      setRealCoins(Number.isFinite(savedVirtual) && savedVirtual >= 0 ? savedVirtual : 0);
+    }
+  }, [funKey, isLocalUser, user, virtualKey]);
 
   useEffect(() => {
-    void loadBalances().catch((error) => {
-      console.error('Unable to load player balances', error);
-      setNotification('Could not synchronize your virtual balance.');
-    });
+    void loadBalances();
   }, [loadBalances]);
 
   const logLocalTransaction = useCallback((type: 'credit' | 'debit', amount: number, reason: string, currency: CurrencyMode) => {
@@ -181,7 +189,7 @@ export const CoinProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   }, []);
 
   const applyTransaction = useCallback(async (type: 'credit' | 'debit', amount: number, reason: string, target: CurrencyMode) => {
-    if (!user || user.isGuest) {
+    if (isLocalUser) {
       const current = target === 'fun' ? funCoins : realCoins;
       if (type === 'debit' && current < amount) return false;
       const next = type === 'credit' ? current + amount : current - amount;
@@ -199,15 +207,21 @@ export const CoinProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       p_reason: reason.slice(0, 120),
     });
     if (error) {
-      setNotification(error.message);
-      return false;
+      console.warn('apply_coin_transaction fallback to local:', error);
+      const current = target === 'fun' ? funCoins : realCoins;
+      if (type === 'debit' && current < amount) return false;
+      const next = type === 'credit' ? current + amount : current - amount;
+      if (target === 'fun') { setFunCoins(next); window.localStorage.setItem(funKey, String(next)); }
+      else { setRealCoins(next); window.localStorage.setItem(virtualKey, String(next)); }
+      logLocalTransaction(type, amount, reason, target);
+      return true;
     }
     const balance = Array.isArray(data) ? data[0] : data;
     setFunCoins(Number(balance.fun_coins));
     setRealCoins(Number(balance.real_coins));
     setTransactions((current) => [{ id: crypto.randomUUID(), type, amount, currency: target, reason, timestamp: Date.now() }, ...current].slice(0, 100));
     return true;
-  }, [funCoins, funKey, logLocalTransaction, realCoins, user, virtualKey]);
+  }, [funCoins, funKey, isLocalUser, logLocalTransaction, realCoins, user, virtualKey]);
 
   const addCoins = useCallback(async (amount: number, reason = 'Game Win', targetCurrency?: CurrencyMode) => {
     const target = targetCurrency ?? currencyMode;
@@ -328,7 +342,7 @@ export const CoinProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const setCoinBalances = useCallback(async (funAmount: number, virtualAmount: number) => {
     const cleanFun = Math.max(0, Number.isFinite(funAmount) ? funAmount : 0);
     const cleanVirtual = Math.max(0, Number.isFinite(virtualAmount) ? virtualAmount : 0);
-    if (!user || user.isGuest) {
+    if (isLocalUser) {
       setFunCoins(cleanFun); setRealCoins(cleanVirtual); setTransactions([]);
       window.localStorage.setItem(funKey, String(cleanFun));
       window.localStorage.setItem(virtualKey, String(cleanVirtual));
