@@ -155,7 +155,7 @@ const GameArea: React.FC<GameAreaProps> = ({ games, selectedGame, onSelectGame, 
   };
 
   const handleGameKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
-    if (event.target instanceof HTMLInputElement || event.target instanceof HTMLSelectElement || event.target instanceof HTMLTextAreaElement) return;
+    if (event.target instanceof HTMLElement && (event.target.isContentEditable || event.target instanceof HTMLInputElement || event.target instanceof HTMLSelectElement || event.target instanceof HTMLTextAreaElement)) return;
 
     const stage = stageRef.current;
     if (!stage) return;
