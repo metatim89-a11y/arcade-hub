@@ -159,7 +159,7 @@ const GameArea: React.FC<GameAreaProps> = ({ games, selectedGame, onSelectGame, 
 
     const stage = stageRef.current;
     if (!stage) return;
-    const controls: HTMLButtonElement[] = Array.from(stage.querySelectorAll('button:not(:disabled)')).filter((button): button is HTMLButtonElement => {
+    const controls = (Array.from(stage.querySelectorAll('button:not(:disabled)')) as HTMLButtonElement[]).filter((button) => {
       const style = window.getComputedStyle(button);
       return style.display !== 'none' && style.visibility !== 'hidden';
     });

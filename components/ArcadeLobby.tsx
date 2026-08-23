@@ -399,7 +399,7 @@ const ArcadeLobby: React.FC<ArcadeLobbyProps> = ({ games, mode, onPlay }) => {
         </div>
 
         <div className="relative w-32 h-32 sm:w-44 sm:h-44 rounded-3xl bg-slate-900/80 border-2 border-amber-400/40 flex items-center justify-center shadow-[0_0_35px_rgba(245,158,11,0.25)]">
-          <div className="p-5 rounded-2xl bg-black/60 border border-amber-400/30">{art.iconSvg}</div>
+          <div className="p-5 rounded-2xl bg-black/60 border border-amber-400/30">{gameBadges[featured?.id ?? '']?.iconSvg}</div>
         </div>
       </div>
 

@@ -141,6 +141,20 @@ export default function KongClimberGame({ playMode, playerNames }: KongClimberPr
     }
   };
 
+  const triggerAction = (action: 'left' | 'right' | 'up' | 'down') => {
+    if (action === 'left') gameState.current.touchLeft = true;
+    if (action === 'right') gameState.current.touchRight = true;
+    if (action === 'up') gameState.current.touchUp = true;
+    if (action === 'down') gameState.current.touchDown = true;
+  };
+
+  const releaseAction = (action: 'left' | 'right' | 'up' | 'down') => {
+    if (action === 'left') gameState.current.touchLeft = false;
+    if (action === 'right') gameState.current.touchRight = false;
+    if (action === 'up') gameState.current.touchUp = false;
+    if (action === 'down') gameState.current.touchDown = false;
+  };
+
   useEffect(() => {
     initGame();
   }, []);
