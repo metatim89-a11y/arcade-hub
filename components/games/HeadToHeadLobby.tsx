@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useCoinSystem } from '../../context/CoinContext';
 import { H2HMatchRoom, Game } from '../../types';
+import { getSupabase } from '../../lib/supabase';
 import GlassButton from '../ui/GlassButton';
 
 interface HeadToHeadLobbyProps {
@@ -10,136 +11,197 @@ interface HeadToHeadLobbyProps {
   onBack: () => void;
 }
 
-const INITIAL_DEMO_ROOMS: H2HMatchRoom[] = [
-  {
-    id: 'room-101',
-    roomCode: 'HUB-8821',
-    gameId: 'mancala',
-    gameLabel: 'Mancala 3D',
-    hostUser: { id: 'user-apex', username: 'ApexChallenger', avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=120&q=80' },
-    stakeGc: 250,
-    status: 'waiting',
-    hostScore: 0,
-    guestScore: 0,
-    createdAt: new Date(Date.now() - 120000).toISOString(),
-  },
-  {
-    id: 'room-102',
-    roomCode: 'HUB-4412',
-    gameId: 'kongclimber',
-    gameLabel: 'Kong Climber',
-    hostUser: { id: 'user-retro', username: 'PixelKing99', avatar: 'https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?auto=format&fit=crop&w=120&q=80' },
-    stakeGc: 100,
-    status: 'waiting',
-    hostScore: 0,
-    guestScore: 0,
-    createdAt: new Date(Date.now() - 300000).toISOString(),
-  },
-  {
-    id: 'room-103',
-    roomCode: 'HUB-9011',
-    gameId: 'blockdrop',
-    gameLabel: 'Block Drop',
-    hostUser: { id: 'user-cyber', username: 'CyberMaster', avatar: 'https://images.unsplash.com/photo-1580489944761-15a19d654956?auto=format&fit=crop&w=120&q=80' },
-    stakeGc: 500,
-    status: 'waiting',
-    hostScore: 0,
-    guestScore: 0,
-    createdAt: new Date(Date.now() - 450000).toISOString(),
-  }
-];
-
 const STAKE_OPTIONS = [0, 50, 250, 500, 1000];
 
 const HeadToHeadLobby: React.FC<HeadToHeadLobbyProps> = ({ games, onStartMatch, onBack }) => {
   const { user } = useAuth();
   const { funCoins } = useCoinSystem();
+  const supabase = getSupabase();
 
-  const [rooms, setRooms] = useState<H2HMatchRoom[]>(() => {
-    const stored = localStorage.getItem('arcade_h2h_rooms');
-    if (stored) {
-      try { return JSON.parse(stored); } catch (e) {}
-    }
-    return INITIAL_DEMO_ROOMS;
-  });
-
+  const [rooms, setRooms] = useState<H2HMatchRoom[]>([]);
   const [selectedGameId, setSelectedGameId] = useState<string>(games[0]?.id || 'mancala');
   const [selectedStake, setSelectedStake] = useState<number>(100);
   const [joinCodeInput, setJoinCodeInput] = useState<string>('');
   const [isCreating, setIsCreating] = useState<boolean>(false);
   const [activeWaitingRoom, setActiveWaitingRoom] = useState<H2HMatchRoom | null>(null);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
 
+  // Fetch active matches from Supabase
+  const fetchMatches = async () => {
+    try {
+      setError(null);
+      const { data, error: fetchError } = await supabase.rpc('get_h2h_active_matches');
+      
+      if (fetchError) throw fetchError;
+
+      const convertedRooms: H2HMatchRoom[] = (data || []).map((m: any) => ({
+        id: m.id,
+        roomCode: m.room_code,
+        gameId: m.game_id,
+        gameLabel: m.game_label,
+        hostUser: {
+          id: m.host_user_id,
+          username: m.host_username || 'Unknown',
+          avatar: m.host_avatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=120&q=80',
+        },
+        guestUser: m.guest_user_id ? {
+          id: m.guest_user_id,
+          username: m.guest_username || 'Unknown',
+          avatar: 'https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?auto=format&fit=crop&w=120&q=80',
+        } : undefined,
+        stakeGc: m.stake_gc,
+        status: m.status as 'waiting' | 'in_progress',
+        hostScore: 0,
+        guestScore: 0,
+        createdAt: m.created_at,
+      }));
+
+      setRooms(convertedRooms);
+    } catch (err) {
+      console.error('Failed to fetch matches:', err);
+      setError('Failed to load matches. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Initial fetch
   useEffect(() => {
-    localStorage.setItem('arcade_h2h_rooms', JSON.stringify(rooms));
-  }, [rooms]);
+    fetchMatches();
+  }, []);
 
-  const handleCreateRoom = () => {
+  // Subscribe to real-time updates
+  useEffect(() => {
+    const subscription = supabase
+      .channel('h2h_matches_changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'h2h_matches' }, () => {
+        fetchMatches();
+      })
+      .subscribe();
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, []);
+
+  const handleCreateRoom = async () => {
     if (selectedStake > funCoins) {
-      alert(`Insufficient GC balance (${Math.floor(funCoins)} GC). Claim free GC from the faucet or choose a lower stake!`);
+      setError(`Insufficient GC balance (${Math.floor(funCoins)} GC). Claim free GC from the faucet or choose a lower stake!`);
       return;
     }
 
-    const chosenGame = games.find(g => g.id === selectedGameId) || games[0];
-    const code = `HUB-${Math.floor(1000 + Math.random() * 9000)}`;
-    const newRoom: H2HMatchRoom = {
-      id: `room-${Date.now()}`,
-      roomCode: code,
-      gameId: chosenGame.id,
-      gameLabel: chosenGame.label,
-      hostUser: {
-        id: user?.id || 'guest',
-        username: user?.username || 'Challenger',
-        avatar: user?.avatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=120&q=80',
-      },
-      stakeGc: selectedStake,
-      status: 'waiting',
-      hostScore: 0,
-      guestScore: 0,
-      createdAt: new Date().toISOString(),
-    };
+    try {
+      setError(null);
+      const chosenGame = games.find(g => g.id === selectedGameId) || games[0];
 
-    setRooms(prev => [newRoom, ...prev]);
-    setActiveWaitingRoom(newRoom);
-    setIsCreating(false);
+      const { data, error: createError } = await supabase.rpc('create_h2h_match', {
+        p_game_id: chosenGame.id,
+        p_game_label: chosenGame.label,
+        p_stake_gc: selectedStake,
+        p_match_duration_seconds: 60,
+      });
+
+      if (createError) throw createError;
+      if (!data || data.length === 0) throw new Error('Failed to create match');
+
+      const matchId = data[0].id;
+      const roomCode = data[0].room_code;
+
+      // Create local representation for waiting room display
+      const newRoom: H2HMatchRoom = {
+        id: matchId,
+        roomCode: roomCode,
+        gameId: chosenGame.id,
+        gameLabel: chosenGame.label,
+        hostUser: {
+          id: user?.id || 'guest',
+          username: user?.username || 'Challenger',
+          avatar: user?.avatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=120&q=80',
+        },
+        stakeGc: selectedStake,
+        status: 'waiting',
+        hostScore: 0,
+        guestScore: 0,
+        createdAt: new Date().toISOString(),
+      };
+
+      setActiveWaitingRoom(newRoom);
+      setIsCreating(false);
+      
+      // Refresh matches
+      await fetchMatches();
+    } catch (err: any) {
+      console.error('Failed to create match:', err);
+      setError(err.message || 'Failed to create match room. Please try again.');
+    }
   };
 
-  const handleJoinRoom = (room: H2HMatchRoom) => {
+  const handleJoinRoom = async (room: H2HMatchRoom) => {
     if (room.hostUser.id === user?.id) {
-      alert("You are the host of this match! Waiting for an opponent to enter.");
+      setError("You are the host of this match! Waiting for an opponent to enter.");
       return;
     }
     if (room.stakeGc > funCoins) {
-      alert(`Insufficient GC balance (${Math.floor(funCoins)} GC) to join this ${room.stakeGc} GC stake match.`);
+      setError(`Insufficient GC balance (${Math.floor(funCoins)} GC) to join this ${room.stakeGc} GC stake match.`);
       return;
     }
 
-    const updatedRoom: H2HMatchRoom = {
-      ...room,
-      guestUser: {
-        id: user?.id || 'guest-2',
-        username: user?.username || 'RivalPlayer',
-        avatar: user?.avatar || 'https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?auto=format&fit=crop&w=120&q=80',
-      },
-      status: 'in_progress',
-    };
+    try {
+      setError(null);
+      const { data, error: joinError } = await supabase.rpc('join_h2h_match', {
+        p_match_id: room.id,
+      });
 
-    setRooms(prev => prev.map(r => r.id === room.id ? updatedRoom : r));
-    onStartMatch(updatedRoom);
+      if (joinError) throw joinError;
+
+      // Update local room state
+      const updatedRoom: H2HMatchRoom = {
+        ...room,
+        guestUser: {
+          id: user?.id || 'guest-2',
+          username: user?.username || 'RivalPlayer',
+          avatar: user?.avatar || 'https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?auto=format&fit=crop&w=120&q=80',
+        },
+        status: 'in_progress',
+      };
+
+      onStartMatch(updatedRoom);
+    } catch (err: any) {
+      console.error('Failed to join match:', err);
+      setError(err.message || 'Failed to join match. Please try again.');
+    }
   };
 
-  const handleJoinByCode = (e: React.FormEvent) => {
+  const handleJoinByCode = async (e: React.FormEvent) => {
     e.preventDefault();
     const cleanCode = joinCodeInput.trim().toUpperCase();
     const found = rooms.find(r => r.roomCode === cleanCode);
     if (!found) {
-      alert(`Match room '${cleanCode}' not found. Please check the code and try again.`);
+      setError(`Match room '${cleanCode}' not found. Please check the code and try again.`);
       return;
     }
-    handleJoinRoom(found);
+    await handleJoinRoom(found);
   };
 
   return (
     <div className="w-full max-w-5xl px-4 py-6 text-white select-none">
+      {/* Error Alert */}
+      {error && (
+        <div className="mb-6 p-4 rounded-2xl bg-red-950/80 border border-red-500/60 flex items-start gap-3 shadow-lg">
+          <span className="text-xl mt-0.5">⚠️</span>
+          <div className="flex-1">
+            <p className="text-sm font-semibold text-red-100">{error}</p>
+          </div>
+          <button
+            onClick={() => setError(null)}
+            className="text-red-400 hover:text-red-300 font-bold text-xl leading-none"
+          >
+            ✕
+          </button>
+        </div>
+      )}
+
       {/* Top Banner */}
       <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-red-950/80 via-slate-900/90 to-amber-950/80 p-6 sm:p-8 border border-red-500/30 shadow-[0_0_50px_rgba(239,68,68,0.2)] mb-8 flex flex-col md:flex-row items-center justify-between gap-6">
         <div className="space-y-2 text-center md:text-left">
@@ -294,11 +356,27 @@ const HeadToHeadLobby: React.FC<HeadToHeadLobbyProps> = ({ games, onStartMatch, 
       <div className="space-y-4">
         <div className="flex justify-between items-center px-1">
           <h3 className="text-xl font-black text-yellow-300 uppercase tracking-tight">OPEN CHALLENGE ROOMS</h3>
-          <span className="text-xs font-bold text-slate-400">{rooms.filter(r => r.status === 'waiting').length} WAITING</span>
+          <span className="text-xs font-bold text-slate-400">
+            {isLoading ? 'LOADING...' : `${rooms.filter(r => r.status === 'waiting').length} WAITING`}
+          </span>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {rooms.map((room) => {
+        {isLoading ? (
+          <div className="col-span-full flex items-center justify-center py-12">
+            <div className="text-center">
+              <div className="w-8 h-8 rounded-full border-2 border-amber-400 border-t-transparent animate-spin mx-auto mb-3"></div>
+              <p className="text-sm text-slate-400 font-semibold">Loading match rooms...</p>
+            </div>
+          </div>
+        ) : rooms.filter(r => r.status === 'waiting').length === 0 ? (
+          <div className="col-span-full text-center py-12 px-4 rounded-2xl bg-slate-900/60 border border-slate-800">
+            <span className="text-4xl mb-3 block">🎮</span>
+            <p className="text-slate-300 font-semibold">No open challenge rooms right now.</p>
+            <p className="text-xs text-slate-400 mt-1">Be the first to create one and get matched with opponents!</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {rooms.filter(r => r.status === 'waiting').map((room) => {
             const isMyRoom = room.hostUser.id === user?.id;
             return (
               <div
@@ -344,10 +422,7 @@ const HeadToHeadLobby: React.FC<HeadToHeadLobbyProps> = ({ games, onStartMatch, 
               </div>
             );
           })}
-        </div>
-      </div>
-    </div>
-  );
-};
+          </div>
+        )}
 
 export default HeadToHeadLobby;

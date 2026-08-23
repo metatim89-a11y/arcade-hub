@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { H2HMatchRoom, Game } from '../../types';
 import { useAuth } from '../../context/AuthContext';
 import { useCoinSystem } from '../../context/CoinContext';
+import { getSupabase } from '../../lib/supabase';
 import GlassButton from '../ui/GlassButton';
 
 interface HeadToHeadArenaProps {
@@ -15,22 +16,48 @@ const TAUNT_EMOJIS = ['🔥', '💥', '🏆', '👑', '😱', '👏', '⚡', '�
 const HeadToHeadArena: React.FC<HeadToHeadArenaProps> = ({ room, games, onExitMatch }) => {
   const { user } = useAuth();
   const { awardLevelExperience, setFunCoins, setTickets } = useCoinSystem();
+  const supabase = getSupabase();
 
   const activeGame = games.find(g => g.id === room.gameId) || games[0];
   const GameComponent = activeGame.component;
 
   const [hostScore, setHostScore] = useState(0);
   const [guestScore, setGuestScore] = useState(0);
-  const [matchTime, setMatchTime] = useState(60); // 60s match timer
+  const [matchTime, setMatchTime] = useState(room.hostScore || 60);
   const [gameOver, setGameOver] = useState(false);
   const [winner, setWinner] = useState<{ username: string; avatar?: string; rewardGc: number } | null>(null);
   const [recentTaunt, setRecentTaunt] = useState<{ emoji: string; sender: string } | null>(null);
+  const [isSyncing, setIsSyncing] = useState(false);
 
   const isHost = user?.id === room.hostUser.id;
-  const myUser = isHost ? room.hostUser : (room.guestUser || { id: 'guest-2', username: 'RivalPlayer' });
-  const opponentUser = isHost ? (room.guestUser || { id: 'guest-bot', username: 'ArcadeBot' }) : room.hostUser;
+  const myUser = isHost ? room.hostUser : (room.guestUser || { id: 'guest', username: 'Guest' });
+  const opponentUser = isHost ? (room.guestUser || { id: 'guest', username: 'Guest' }) : room.hostUser;
+  const matchDuration = room.hostScore || 60; // Use hostScore as a placeholder for duration if set
 
-  // Simulate opponent score progress during live match
+  // Subscribe to real-time score updates
+  useEffect(() => {
+    const subscription = supabase
+      .channel(`match_${room.id}`)
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'h2h_score_events', filter: `match_id=eq.${room.id}` },
+        (payload: any) => {
+          const { user_id, current_score } = payload.new;
+          if (user_id === room.hostUser.id) {
+            setHostScore(current_score);
+          } else if (user_id === room.guestUser?.id) {
+            setGuestScore(current_score);
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, [room.id, room.hostUser.id, room.guestUser?.id, supabase]);
+
+  // Timer countdown
   useEffect(() => {
     if (gameOver) return;
     const interval = setInterval(() => {
@@ -41,45 +68,88 @@ const HeadToHeadArena: React.FC<HeadToHeadArenaProps> = ({ room, games, onExitMa
         }
         return t - 1;
       });
-
-      // Opponent score progression
-      if (Math.random() < 0.6) {
-        if (isHost) {
-          setGuestScore((s) => s + Math.floor(Math.random() * 80 + 20));
-        } else {
-          setHostScore((s) => s + Math.floor(Math.random() * 80 + 20));
-        }
-      }
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [gameOver, isHost]);
+  }, [gameOver]);
 
   // Handle Match Finish & Rewards
   useEffect(() => {
     if (!gameOver) return;
 
-    const myScore = isHost ? hostScore : guestScore;
-    const oppScore = isHost ? guestScore : hostScore;
-    const prizePool = room.stakeGc * 2;
+    const finishMatch = async () => {
+      try {
+        setIsSyncing(true);
+        const { data, error } = await supabase.rpc('finish_h2h_match', {
+          p_match_id: room.id,
+          p_forfeit: false,
+        });
 
-    if (myScore >= oppScore) {
-      setWinner({ username: myUser.username, avatar: myUser.avatar, rewardGc: prizePool });
-      if (prizePool > 0) {
-        setFunCoins(c => c + prizePool);
+        if (error) throw error;
+        if (!data || data.length === 0) throw new Error('Match completion failed');
+
+        const [result] = data;
+        const { winner_id, host_reward_gc, guest_reward_gc } = result;
+
+        const isWinner = winner_id === user?.id;
+        const winnerUser = winner_id === room.hostUser.id ? room.hostUser : room.guestUser || { id: '', username: 'Unknown' };
+        const rewardAmount = winner_id === room.hostUser.id ? host_reward_gc : guest_reward_gc;
+
+        setWinner({ username: winnerUser.username, avatar: winnerUser.avatar, rewardGc: rewardAmount });
+
+        if (isWinner) {
+          if (rewardAmount > 0) setFunCoins(c => c + rewardAmount);
+          setTickets(t => t + 50);
+          void awardLevelExperience(150);
+        } else {
+          void awardLevelExperience(30);
+        }
+      } catch (err) {
+        console.error('Failed to finish match:', err);
+        // Fallback winner determination based on scores
+        const isWinner = hostScore >= guestScore ? isHost : !isHost;
+        const winnerUser = isWinner ? myUser : opponentUser;
+        const prizePool = room.stakeGc * 2;
+        setWinner({ username: winnerUser.username, avatar: winnerUser.avatar, rewardGc: prizePool });
+      } finally {
+        setIsSyncing(false);
       }
-      setTickets(t => t + 50);
-      void awardLevelExperience(150);
-    } else {
-      setWinner({ username: opponentUser.username, avatar: opponentUser.avatar, rewardGc: prizePool });
-      void awardLevelExperience(30);
-    }
+    };
+
+    finishMatch();
   }, [gameOver]);
 
   const sendTaunt = (emoji: string) => {
     setRecentTaunt({ emoji, sender: myUser.username });
     setTimeout(() => setRecentTaunt(null), 2500);
   };
+
+  // Function to submit current score to Supabase
+  const submitScore = useCallback(async (score: number) => {
+    try {
+      const { error } = await supabase.rpc('submit_h2h_score', {
+        p_match_id: room.id,
+        p_score: score,
+        p_game_data: null,
+      });
+
+      if (error) {
+        console.error('Failed to submit score:', error);
+      }
+    } catch (err) {
+      console.error('Score submission error:', err);
+    }
+  }, [room.id, supabase]);
+
+  // Function to be called by game components to update score
+  const updateGameScore = useCallback((newScore: number) => {
+    if (isHost) {
+      setHostScore(newScore);
+    } else {
+      setGuestScore(newScore);
+    }
+    submitScore(newScore);
+  }, [isHost, submitScore]);
 
   return (
     <div className="w-full max-w-6xl px-2 py-4 text-white select-none flex flex-col items-center">
@@ -131,7 +201,7 @@ const HeadToHeadArena: React.FC<HeadToHeadArenaProps> = ({ room, games, onExitMa
         {/* Main Active Play Area (3 Cols) */}
         <div className="lg:col-span-3 flex flex-col items-center justify-center bg-slate-950/80 p-4 rounded-3xl border border-slate-800 shadow-2xl min-h-[500px]">
           <React.Suspense fallback={<div className="text-amber-300 font-bold">Loading Arena Game...</div>}>
-            <GameComponent />
+            <GameComponent h2hMode={true} onScoreUpdate={updateGameScore} />
           </React.Suspense>
         </div>
 

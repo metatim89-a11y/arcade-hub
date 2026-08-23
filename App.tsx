@@ -18,6 +18,8 @@ import ArcadeLobby from './components/ArcadeLobby';
 import SupportPage from './components/SupportPage';
 import HeadToHeadLobby from './components/games/HeadToHeadLobby';
 import HeadToHeadArena from './components/games/HeadToHeadArena';
+import H2HLeaderboard from './components/games/H2HLeaderboard';
+import H2HMatchHistory from './components/games/H2HMatchHistory';
 import { H2HMatchRoom } from './types';
 import { AdminSettingsProvider } from './context/AdminSettingsContext';
 import { recordSiteEvent } from './lib/analytics';
@@ -72,6 +74,8 @@ const AppContent: React.FC = () => {
   const [showSupport, setShowSupport] = useState(false);
   const [showTradingBot, setShowTradingBot] = useState(false);
   const [showH2H, setShowH2H] = useState(false);
+  const [showH2HLeaderboard, setShowH2HLeaderboard] = useState(false);
+  const [showH2HHistory, setShowH2HHistory] = useState(false);
   const [activeH2HRoom, setActiveH2HRoom] = useState<H2HMatchRoom | null>(null);
 
   useEffect(() => {
@@ -173,17 +177,21 @@ const AppContent: React.FC = () => {
       <Header 
         mode={mode} 
         setMode={handleSetMode} 
-        onProfileClick={() => { setShowProfile(true); setShowShop(false); setShowSupport(false); setShowTradingBot(false); setShowH2H(false); setShowLobby(false); }}
-        onShopClick={() => { setShowShop(true); setShowProfile(false); setShowSupport(false); setShowTradingBot(false); setShowH2H(false); setShowLobby(false); }}
-        onSupportClick={() => { setShowSupport(true); setShowShop(false); setShowProfile(false); setShowTradingBot(false); setShowH2H(false); setShowLobby(false); }}
-        onBotClick={() => { setShowTradingBot(true); setShowShop(false); setShowProfile(false); setShowSupport(false); setShowH2H(false); setShowLobby(false); }}
-        onH2HClick={() => { setShowH2H(true); setShowProfile(false); setShowShop(false); setShowSupport(false); setShowTradingBot(false); setShowLobby(false); }}
-        onHomeClick={() => { setShowProfile(false); setShowShop(false); setShowSupport(false); setShowTradingBot(false); setShowH2H(false); setShowLobby(true); }}
+        onProfileClick={() => { setShowProfile(true); setShowShop(false); setShowSupport(false); setShowTradingBot(false); setShowH2H(false); setShowH2HLeaderboard(false); setShowH2HHistory(false); setShowLobby(false); }}
+        onShopClick={() => { setShowShop(true); setShowProfile(false); setShowSupport(false); setShowTradingBot(false); setShowH2H(false); setShowH2HLeaderboard(false); setShowH2HHistory(false); setShowLobby(false); }}
+        onSupportClick={() => { setShowSupport(true); setShowShop(false); setShowProfile(false); setShowTradingBot(false); setShowH2H(false); setShowH2HLeaderboard(false); setShowH2HHistory(false); setShowLobby(false); }}
+        onBotClick={() => { setShowTradingBot(true); setShowShop(false); setShowProfile(false); setShowSupport(false); setShowH2H(false); setShowH2HLeaderboard(false); setShowH2HHistory(false); setShowLobby(false); }}
+        onH2HClick={() => { setShowH2H(true); setShowProfile(false); setShowShop(false); setShowSupport(false); setShowTradingBot(false); setShowH2HLeaderboard(false); setShowH2HHistory(false); setShowLobby(false); }}
+        onH2HLeaderboardClick={() => { setShowH2HLeaderboard(true); setShowProfile(false); setShowShop(false); setShowSupport(false); setShowTradingBot(false); setShowH2H(false); setShowH2HHistory(false); setShowLobby(false); }}
+        onH2HHistoryClick={() => { setShowH2HHistory(true); setShowProfile(false); setShowShop(false); setShowSupport(false); setShowTradingBot(false); setShowH2H(false); setShowH2HLeaderboard(false); setShowLobby(false); }}
+        onHomeClick={() => { setShowProfile(false); setShowShop(false); setShowSupport(false); setShowTradingBot(false); setShowH2H(false); setShowH2HLeaderboard(false); setShowH2HHistory(false); setShowLobby(true); }}
         isProfileActive={showProfile}
         isShopActive={showShop}
         isSupportActive={showSupport}
         isBotActive={showTradingBot}
         isH2HActive={showH2H || Boolean(activeH2HRoom)}
+        isH2HLeaderboardActive={showH2HLeaderboard}
+        isH2HHistoryActive={showH2HHistory}
       />
       <main className="flex-grow flex flex-col items-center w-full">
         {notification && (
@@ -194,6 +202,10 @@ const AppContent: React.FC = () => {
         )}
         {activeH2HRoom ? (
             <HeadToHeadArena room={activeH2HRoom} games={[...UNDER18_GAMES, ...ADULT_GAMES]} onExitMatch={() => setActiveH2HRoom(null)} />
+        ) : showH2HHistory ? (
+            <H2HMatchHistory onBack={() => setShowH2HHistory(false)} />
+        ) : showH2HLeaderboard ? (
+            <H2HLeaderboard onBack={() => setShowH2HLeaderboard(false)} />
         ) : showH2H ? (
             <HeadToHeadLobby games={[...UNDER18_GAMES, ...ADULT_GAMES]} onStartMatch={(room) => setActiveH2HRoom(room)} onBack={() => setShowH2H(false)} />
         ) : showTradingBot ? (

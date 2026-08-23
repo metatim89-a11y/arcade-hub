@@ -17,14 +17,18 @@ interface HeaderProps {
   onSupportClick?: () => void;
   onBotClick?: () => void;
   onH2HClick?: () => void;
+  onH2HLeaderboardClick?: () => void;
+  onH2HHistoryClick?: () => void;
   isProfileActive?: boolean;
   isShopActive?: boolean;
   isSupportActive?: boolean;
   isBotActive?: boolean;
   isH2HActive?: boolean;
+  isH2HLeaderboardActive?: boolean;
+  isH2HHistoryActive?: boolean;
 }
 
-const Header: React.FC<HeaderProps> = ({ mode, setMode, simple = false, onProfileClick, onHomeClick, onShopClick, onSupportClick, onBotClick, onH2HClick, isProfileActive, isShopActive, isSupportActive, isBotActive, isH2HActive }) => {
+const Header: React.FC<HeaderProps> = ({ mode, setMode, simple = false, onProfileClick, onHomeClick, onShopClick, onSupportClick, onBotClick, onH2HClick, onH2HLeaderboardClick, onH2HHistoryClick, isProfileActive, isShopActive, isSupportActive, isBotActive, isH2HActive, isH2HLeaderboardActive, isH2HHistoryActive }) => {
   const { funCoins, realCoins, tickets, progression, currencyMode, resetCoins } = useCoinSystem();
   const { user, logout } = useAuth();
   const isCasinoMode = mode === GameMode.Adult;
@@ -175,6 +179,20 @@ const Header: React.FC<HeaderProps> = ({ mode, setMode, simple = false, onProfil
                     className={`${buttonClasses} ${isH2HActive ? 'bg-gradient-to-r from-red-500 to-amber-500 text-white font-black border-red-400 shadow-[0_0_15px_rgba(239,68,68,0.5)]' : ''}`}
                 >
                     ⚔️ HEAD-TO-HEAD
+                </button>
+                <button
+                    type="button"
+                    onClick={onH2HLeaderboardClick}
+                    className={`${buttonClasses} ${isH2HLeaderboardActive ? 'bg-gradient-to-r from-purple-500 to-indigo-500 text-white font-black border-purple-400 shadow-[0_0_15px_rgba(168,85,247,0.5)]' : ''}`}
+                >
+                    🏆 LEADERBOARD
+                </button>
+                <button
+                    type="button"
+                    onClick={onH2HHistoryClick}
+                    className={`${buttonClasses} ${isH2HHistoryActive ? 'bg-gradient-to-r from-cyan-500 to-blue-500 text-white font-black border-cyan-400 shadow-[0_0_15px_rgba(34,211,238,0.5)]' : ''}`}
+                >
+                    📊 HISTORY
                 </button>
                 <button
                     type="button"
