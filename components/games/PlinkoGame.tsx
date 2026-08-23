@@ -169,12 +169,12 @@ const PlinkoGame: React.FC = () => {
         const height = canvas.height;
         
         const maxPegs = rows + 2; 
-        const paddingX = width * 0.05;
+        const paddingX = width * 0.03;
         const usableWidth = width - (paddingX * 2);
         const spacingX = usableWidth / (maxPegs - 1);
-        const spacingY = spacingX * 0.9;
+        const spacingY = spacingX * 1.04;
         
-        const pegRadius = Math.max(2, spacingX * 0.12);
+        const pegRadius = Math.max(2, spacingX * 0.1);
         const ballRadius = Math.max(3, spacingX * 0.23);
 
         const boardHeight = rows * spacingY;
@@ -414,7 +414,7 @@ const PlinkoGame: React.FC = () => {
         if (!canvas) return;
 
         const maxPegs = rows + 2; 
-        const paddingX = canvas.width * 0.05;
+        const paddingX = canvas.width * 0.03;
         const usableWidth = canvas.width - (paddingX * 2);
         const spacingX = usableWidth / (maxPegs - 1);
         

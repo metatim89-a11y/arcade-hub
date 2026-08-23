@@ -62,9 +62,9 @@ export const PlinkoBoard3D: React.FC<{
         for (let row = 0; row < liveRows; row += 1) {
           const count = row + 3; const span = 8.9 * ((row + 2) / (liveRows + 1));
           for (let col = 0; col < count; col += 1) {
-            const x = count === 1 ? 0 : -span / 2 + col * span / (count - 1); const y = 3.72 - row * (7.05 / Math.max(1, liveRows - 1));
+            const x = count === 1 ? 0 : -span / 2 + col * span / (count - 1); const y = 3.72 - row * (7.05 / Math.max(1, liveRows - 1)) * 1.04;
             const peg = new THREE.Mesh(
-              new THREE.CylinderGeometry(.12, .17, .72, 28),
+              new THREE.CylinderGeometry(.1, .15, .72, 28),
               new THREE.MeshPhysicalMaterial({ color: 0xd9e8f2, metalness: .88, roughness: .12, clearcoat: 1, clearcoatRoughness: .08, emissive: 0x000000 })
             );
             peg.rotation.x = Math.PI / 2; peg.position.set(x, y, .18); peg.castShadow = true; peg.receiveShadow = true; boardRoot.add(peg); pegs.set(`${row}-${col}`, peg);
