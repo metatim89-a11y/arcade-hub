@@ -55,7 +55,7 @@ Casino (18+), still clearly virtual-play only:
 - Plinko — luminous pegs and falling ball.
 - Slots — premium five-reel cabinet.
 - Ocean Hunter — underwater creature hunt.
-- Coin Pusher — coins on a mechanical shelf.
+- Whack Attack 3D — fast target whacking with decoys, runners and combo scoring.
 
 ## UX and responsive requirements
 

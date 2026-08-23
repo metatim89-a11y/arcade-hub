@@ -111,12 +111,12 @@ const gameBadges: Record<string, { tag: string; blurb: string; iconSvg: React.Re
       </svg>
     )
   },
-  coinpusher: {
-    tag: 'PHYSICS DROPS',
-    blurb: 'Drop shiny coins to push massive token cascades',
+  whackattack: {
+    tag: 'TARGET RUSH',
+    blurb: 'Whack targets, dodge decoys and chase your best combo',
     iconSvg: (
       <svg className="w-8 h-8 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 3v18m9-9H3m3.5-5.5 11 11m0-11-11 11" />
       </svg>
     )
   }
@@ -131,7 +131,7 @@ type LandingComment = {
 
 const GAME_META: Record<string, { icon: string; tag: string; blurb: string }> = {
   fishing: { icon: '🌊', tag: 'Ocean Action', blurb: 'Hunt targets, chain combos, face bosses and push deeper into the ocean.' },
-  coinpusher: { icon: '🪙', tag: 'Physics Arcade', blurb: 'Drop coins, build pressure and trigger satisfying cascades off the edge.' },
+  whackattack: { icon: '🔨', tag: 'Target Rush', blurb: 'Whack targets, dodge red decoys and build a high-speed combo.' },
   crash: { icon: '🚀', tag: 'Timing', blurb: 'Ride the multiplier and decide when to cash out before the run ends.' },
   plinko: { icon: '🔻', tag: 'Drop Game', blurb: 'Choose your risk, release the ball and watch it bounce through the peg field.' },
   slots: { icon: '⚡', tag: 'Reels', blurb: 'Spin themed reels with bonuses, free spins, power meters and special features.' },

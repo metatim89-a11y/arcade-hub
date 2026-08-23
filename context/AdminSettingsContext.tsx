@@ -10,7 +10,7 @@ export const GAME_RTP_DEFAULTS: Record<string, number> = {
   plinko: 100,
   slots: 100,
   fishing: 100,
-  coinpusher: 100,
+  whackattack: 100,
   nim: 100,
   chutes: 100,
   blockdrop: 100,
@@ -38,7 +38,7 @@ const AdminSettingsContext = createContext<AdminSettingsContextType | undefined>
 const gameIdFromReason = (reason: string): string | null => {
   const normalized = reason.toLowerCase();
   if (normalized.includes('refund') || normalized.includes('push')) return null;
-  if (normalized.includes('coin pusher')) return 'coinpusher';
+  if (normalized.includes('whack attack') || normalized.includes('coin pusher')) return 'whackattack';
   if (normalized.includes('ocean hunter')) return 'fishing';
   if (normalized.includes('hold & spin') || normalized.includes('slots')) return 'slots';
   if (normalized.includes('plinko')) return 'plinko';
