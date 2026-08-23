@@ -19,18 +19,25 @@ const SYMBOL_POOL = SYMBOL_WEIGHTS.flatMap(([symbol, weight]) => Array.from({ le
 type SlotThemeId = 'volt' | 'pig' | 'chicken' | 'angels' | 'devil' | 'crypt';
 type SlotTheme = { name: string; kicker: string; symbols: string[]; accent: string; bonus: string; lines: number; payoutScale: number };
 const SLOT_THEMES: Record<SlotThemeId, SlotTheme> = {
-  volt: { name: 'Volt Vault', kicker: 'PREMIUM 5×3 SLOTS', symbols: ['🍋','🍇','🍒','🧠','🔔','🎰','💎','7️⃣'], accent: '#ec50ff', bonus: 'HOLD & SPIN VAULT', lines: 7, payoutScale: 1 },
-  pig: { name: 'Piggy Bank Bonanza', kicker: 'LUCKY 5×3 SLOTS', symbols: ['🐷','💰','🍀','🥓','🍎','🎩','💎','7️⃣'], accent: '#ff6d9e', bonus: 'PIGGY BANK BREAKER', lines: 5, payoutScale: 1.1 },
-  chicken: { name: 'Cluck & Cash', kicker: 'FARMYARD 5×3 SLOTS', symbols: ['🐔','🥚','🌽','🌾','🐣','🪶','💎','7️⃣'], accent: '#ffd34f', bonus: 'GOLDEN EGG PICK', lines: 6, payoutScale: 1.15 },
-  angels: { name: 'Angels & Aces', kicker: 'CELESTIAL 5×3 SLOTS', symbols: ['😇','👼','✨','☁️','💍','🪽','💎','7️⃣'], accent: '#8fdcff', bonus: 'HEAVENLY LADDER', lines: 7, payoutScale: 1.25 },
-  devil: { name: 'Devil’s Inferno', kicker: 'INFERNO 5×3 SLOTS', symbols: ['😈','🔥','🌋','🩸','🦂','⛓️','💎','7️⃣'], accent: '#ff4e5e', bonus: 'HELLFIRE RESPINS', lines: 5, payoutScale: 1.35 },
-  crypt: { name: 'Vampires vs Werewolves', kicker: 'BLOOD MOON 5×3 SLOTS', symbols: ['🧛','🐺','🌕','🩸','🦇','🐾','💎','7️⃣'], accent: '#b46cff', bonus: 'BLOOD MOON DUEL', lines: 6, payoutScale: 1.45 },
+  volt: { name: 'Volt Vault', kicker: 'PREMIUM 5×3 SLOTS', symbols: ['🍋','🍇','🍒','🧠','🔔','🎰','💎','7️⃣'], accent: '#ec50ff', bonus: 'HOLD & SPIN VAULT', lines: 7, payoutScale: 1, spinStyle: 'standard', bonusMode: 'vault' },
+  pig: { name: 'Piggy Bank Bonanza', kicker: 'LUCKY 5×3 SLOTS', symbols: ['🐷','💰','🍀','🥓','🍎','🎩','💎','7️⃣'], accent: '#ff6d9e', bonus: 'PIGGY BANK BREAKER', lines: 5, payoutScale: 1.1, spinStyle: 'bounce', bonusMode: 'breaker' },
+  chicken: { name: 'Cluck & Cash', kicker: 'FARMYARD 5×3 SLOTS', symbols: ['🐔','🥚','🌽','🌾','🐣','🪶','💎','7️⃣'], accent: '#ffd34f', bonus: 'GOLDEN EGG PICK', lines: 6, payoutScale: 1.15, spinStyle: 'cascade', bonusMode: 'egg' },
+  angels: { name: 'Angels & Aces', kicker: 'CELESTIAL 5×3 SLOTS', symbols: ['😇','👼','✨','☁️','💍','🪽','💎','7️⃣'], accent: '#8fdcff', bonus: 'HEAVENLY LADDER', lines: 7, payoutScale: 1.25, spinStyle: 'pulse', bonusMode: 'ladder' },
+  devil: { name: 'Devil’s Inferno', kicker: 'INFERNO 5×3 SLOTS', symbols: ['😈','🔥','🌋','🩸','🦂','⛓️','💎','7️⃣'], accent: '#ff4e5e', bonus: 'HELLFIRE RESPINS', lines: 5, payoutScale: 1.35, spinStyle: 'rush', bonusMode: 'respin' },
+  crypt: { name: 'Vampires vs Werewolves', kicker: 'BLOOD MOON 5×3 SLOTS', symbols: ['🧛','🐺','🌕','🩸','🦇','🐾','💎','7️⃣'], accent: '#b46cff', bonus: 'BLOOD MOON DUEL', lines: 6, payoutScale: 1.45, spinStyle: 'duel', bonusMode: 'duel' },
 };
 
-const PAYLINES = [
-  [1, 1, 1, 1, 1], [0, 0, 0, 0, 0], [2, 2, 2, 2, 2],
-  [0, 1, 2, 1, 0], [2, 1, 0, 1, 2], [0, 0, 1, 2, 2], [2, 2, 1, 0, 0]
-];
+const PAYLINE_SETS: Record<SlotThemeId, number[][]> = {
+  volt: [
+    [1, 1, 1, 1, 1], [0, 0, 0, 0, 0], [2, 2, 2, 2, 2],
+    [0, 1, 2, 1, 0], [2, 1, 0, 1, 2], [0, 0, 1, 2, 2], [2, 2, 1, 0, 0],
+  ],
+  pig: [[1, 1, 1, 1, 1], [0, 0, 0, 0, 0], [2, 2, 2, 2, 2], [0, 1, 1, 1, 0], [2, 1, 1, 1, 2]],
+  chicken: [[1, 1, 1, 1, 1], [0, 0, 0, 0, 0], [2, 2, 2, 2, 2], [0, 1, 2, 1, 0], [2, 1, 0, 1, 2], [0, 0, 1, 2, 2]],
+  angels: [[1, 1, 1, 1, 1], [0, 0, 0, 0, 0], [2, 2, 2, 2, 2], [0, 1, 2, 1, 0], [2, 1, 0, 1, 2], [0, 0, 1, 2, 2], [2, 2, 1, 0, 0]],
+  devil: [[1, 1, 1, 1, 1], [0, 0, 0, 0, 0], [2, 2, 2, 2, 2], [0, 1, 1, 1, 0], [2, 1, 1, 1, 2]],
+  crypt: [[1, 1, 1, 1, 1], [0, 0, 0, 0, 0], [2, 2, 2, 2, 2], [0, 1, 2, 1, 0], [2, 1, 0, 1, 2], [1, 0, 1, 2, 1]],
+};
 
 const PAYOUTS: Record<string, Record<number, number>> = {
   [WILD]: { 3: 81, 4: 337.5, 5: 1687.5 }, '7️⃣': { 3: 54, 4: 202.5, 5: 810 },
@@ -82,7 +89,9 @@ const SlotsGame: React.FC = () => {
   const balance = currencyMode === 'fun' ? funCoins : realCoins;
   const slotTheme = SLOT_THEMES[themeId];
   const themePool = useMemo(() => slotTheme.symbols.flatMap((item, index) => Array.from({ length: Math.max(4, 20 - index * 2) }, () => item)).concat([WILD, BONUS, SCATTER]), [slotTheme]);
-  const activePaylines = PAYLINES.slice(0, slotTheme.lines);
+  const activePaylines = PAYLINE_SETS[themeId].slice(0, slotTheme.lines);
+  const bonusTitle = slotTheme.bonusMode === 'breaker' ? 'PIGGY BANK BREAKER' : slotTheme.bonusMode === 'egg' ? 'GOLDEN EGG PICK' : slotTheme.bonusMode === 'ladder' ? 'HEAVENLY LADDER' : slotTheme.bonusMode === 'respin' ? 'HELLFIRE RESPINS' : slotTheme.bonusMode === 'duel' ? 'BLOOD MOON DUEL' : 'HOLD & SPIN VAULT';
+  const bonusInstruction = slotTheme.bonusMode === 'breaker' ? 'Break through the bank for faster coin drops.' : slotTheme.bonusMode === 'egg' ? 'Golden eggs are rarer, but every hit can hatch a bigger prize.' : slotTheme.bonusMode === 'ladder' ? 'Each quiet respin climbs the value ladder.' : slotTheme.bonusMode === 'respin' ? 'Four respins give the inferno more chances to fill.' : slotTheme.bonusMode === 'duel' ? 'The blood moon duel adds a 1.35× feature multiplier.' : 'Fill all 15 spaces to double the entire vault.';
   const activePayouts = useMemo(() => {
     const baseKeys = Object.keys(PAYOUTS);
     const payouts: Record<string, Record<number, number>> = {};
@@ -224,8 +233,8 @@ const SlotsGame: React.FC = () => {
       });
       bonusCellsRef.current = held;
       bonusRoundRef.current = { ...round, baseWin: total, winningLines: lines };
-      setBonusCells(held); setRespins(3); setBonusRolling(false); setBonusStep(0); setWinInfo(null); setPhase('BONUS');
-      setStatus(`${bonusCount} coins locked — HOLD & SPIN begins!`); tone(523, .25, .06); return;
+      setBonusCells(held); setRespins(slotTheme.bonusMode === 'respin' ? 4 : 3); setBonusRolling(false); setBonusStep(0); setWinInfo(null); setPhase('BONUS');
+      setStatus(`${bonusCount} ${slotTheme.bonusMode === 'egg' ? 'eggs' : 'bonus symbols'} locked — ${slotTheme.bonus} begins!`); tone(523, .25, .06); return;
     }
 
     const featureText = awardedSpins ? ` ${awardedSpins} FREE SPINS AWARDED!` : '';
@@ -279,7 +288,8 @@ const SlotsGame: React.FC = () => {
     setBonusRolling(true); setStatus(`Hold & Spin — ${respins} respin${respins === 1 ? '' : 's'} left.`);
     const timer = window.setTimeout(async () => {
       const current = bonusCellsRef.current; let landed = 0;
-      const next = current.map((value) => { if (value !== null || Math.random() >= .12) return value; landed += 1; return bonusValue(round.lineBet); });
+      const chance = slotTheme.bonusMode === 'breaker' ? .18 : slotTheme.bonusMode === 'egg' ? .1 : .12;
+      const next = current.map((value) => { if (value !== null || Math.random() >= chance) return value; landed += 1; return bonusValue(round.lineBet) * (slotTheme.bonusMode === 'ladder' ? 1 + bonusStep * .2 : 1); });
       bonusCellsRef.current = next; setBonusCells(next);
       const remaining = landed ? 3 : respins - 1;
       setRespins(remaining); setBonusRolling(false);
@@ -287,14 +297,15 @@ const SlotsGame: React.FC = () => {
       if (remaining > 0) { setStatus(landed ? `${landed} new coin${landed === 1 ? '' : 's'} — respins reset!` : `${remaining} respins remain.`); setBonusStep((step) => step + 1); return; }
       const rawBonus = next.reduce<number>((sum, value) => sum + (value ?? 0), 0);
       const fullBoard = next.every((value) => value !== null);
-      const bonusWin = rawBonus * (fullBoard ? 2 : 1);
+      const bonusMultiplier = fullBoard ? 2 : slotTheme.bonusMode === 'duel' ? 1.35 : slotTheme.bonusMode === 'ladder' ? 1 + bonusStep * .1 : 1;
+      const bonusWin = rawBonus * bonusMultiplier;
       const grandTotal = round.baseWin + bonusWin;
       const credited = await addCoins(grandTotal, 'Slots Hold & Spin Win', round.currency);
       if (!mountedRef.current) return;
       if (!credited) { setPhase('IDLE'); setAutoSpin(false); setStatus('The bonus credit could not be applied.'); return; }
       setLastWin(grandTotal); setWinInfo({ winningPaylines: round.winningLines, totalWin: grandTotal }); setPhase('WIN');
-      setStatus(`${fullBoard ? 'FULL VAULT 2×! ' : ''}Hold & Spin won ${grandTotal} ${round.currency === 'fun' ? 'FC' : 'RC'}!`);
-      celebrate(fullBoard ? 'FULL VAULT' : grandTotal >= totalBet * 10 ? 'BONUS WIN' : 'VAULT WIN', grandTotal);
+      setStatus(`${fullBoard ? 'FULL BOARD 2×! ' : ''}${slotTheme.bonus} won ${grandTotal} ${round.currency === 'fun' ? 'FC' : 'RC'}!`);
+      celebrate(fullBoard ? 'FULL BOARD' : grandTotal >= totalBet * 10 ? 'BONUS WIN' : 'FEATURE WIN', grandTotal);
     }, reduceMotionRef.current ? 40 : 820);
     timersRef.current.push(timer);
     return () => window.clearTimeout(timer);
@@ -319,8 +330,8 @@ const SlotsGame: React.FC = () => {
       <div className="volt-machine">
         <div className="volt-lights" aria-hidden="true">{Array.from({ length: 24 }, (_, index) => <i key={index} />)}</div>
         {freeSpins > 0 && <div className="free-spin-banner"><strong>FREE SPINS ACTIVE</strong><span>{freeSpins} REMAINING · ALL LINE WINS 1.5×</span></div>}
-        {phase === 'BONUS' ? <div className={`vault-board${bonusRolling ? ' rolling' : ''}`}><div className="vault-title"><span>HOLD & SPIN VAULT</span><strong>{respins} RESPINS</strong></div><div className="vault-grid">{bonusCells.map((value, index) => <div key={index} className={value !== null ? 'held' : ''}>{value !== null ? <><span>🪙</span><strong>{value}</strong><small>{symbol}</small></> : <i>+</i>}</div>)}</div><p>Fill all 15 spaces to double the entire vault.</p></div> : (
-          <div className="slots-stage h-[470px] w-full overflow-hidden rounded-xl"><SlotsMachine3D reels={reels} winningPositions={winningPositions} anticipation={anticipation} theme={themeId} disabled={phase === 'SPINNING' || isProcessing} onSpin={() => void spin()} /></div>
+        {phase === 'BONUS' ? <div className={`vault-board${bonusRolling ? ' rolling' : ''}`}><div className="vault-title"><span>{bonusTitle}</span><strong>{respins} RESPINS</strong></div><div className="vault-grid">{bonusCells.map((value, index) => <div key={index} className={value !== null ? 'held' : ''}>{value !== null ? <><span>🪙</span><strong>{value}</strong><small>{symbol}</small></> : <i>+</i>}</div>)}</div><p>{bonusInstruction}</p></div> : (
+          <div className="slots-stage h-[470px] w-full overflow-hidden rounded-xl"><SlotsMachine3D reels={reels} winningPositions={winningPositions} anticipation={anticipation} theme={themeId} spinStyle={slotTheme.spinStyle} disabled={phase === 'SPINNING' || isProcessing} onSpin={() => void spin()} /></div>
         )}
         {celebration && <div className="win-celebration"><small>{celebration.title}</small><strong>{celebration.amount}</strong><span>{symbol}</span></div>}
         <div className="volt-status" role="status" aria-live="polite">{status}</div>

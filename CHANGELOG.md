@@ -2,6 +2,12 @@
 
 This changelog starts with v0.0.35. Earlier history remains available in the Git commit and pull-request history.
 
+## v0.0.41 - 2026-08-23
+
+### Changed
+- Added theme-specific slot spin animations, payout line patterns, and bonus mechanics.
+- Added distinct Piggy Bank, Golden Egg, Heavenly Ladder, Hellfire Respin, and Blood Moon bonus behaviors.
+
 ## v0.0.40 - 2026-08-23
 
 ### Added

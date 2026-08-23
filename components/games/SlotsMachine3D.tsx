@@ -2,6 +2,7 @@ import React, { useEffect, useRef } from 'react';
 import type { Mesh, Object3D } from 'three';
 
 type Reel = { symbols: string[]; spinning: boolean };
+type SpinStyle = 'standard' | 'bounce' | 'cascade' | 'rush' | 'pulse' | 'duel';
 
 const symbolCanvas = (symbol: string) => {
   const canvas = document.createElement('canvas'); canvas.width = 256; canvas.height = 220;
@@ -24,9 +25,10 @@ const SlotsMachine3D: React.FC<{
   winningPositions: string[];
   anticipation: boolean;
   theme: string;
+  spinStyle: SpinStyle;
   disabled: boolean;
   onSpin: () => void;
-}> = ({ reels, winningPositions, anticipation, theme, disabled, onSpin }) => {
+}> = ({ reels, winningPositions, anticipation, theme, spinStyle, disabled, onSpin }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const stateRef = useRef({ reels, winningPositions, anticipation, theme, disabled, onSpin }); stateRef.current = { reels, winningPositions, anticipation, theme, disabled, onSpin };
   useEffect(() => {
@@ -115,10 +117,17 @@ const SlotsMachine3D: React.FC<{
         live.reels.forEach((reel, reelIndex) => {
           if (wasSpinning[reelIndex] && !reel.spinning) landingAt[reelIndex] = now;
           wasSpinning[reelIndex] = reel.spinning;
-          const speedTarget = reel.spinning ? 22 + reelIndex * 1.25 : 0;
+          const speedTarget = reel.spinning ? ({
+            standard: 22 + reelIndex * 1.25,
+            bounce: 18 + reelIndex * 2.8,
+            cascade: 15 + reelIndex * 4.5,
+            rush: 34 + reelIndex * 2.5,
+            pulse: 20 + Math.sin(now * .009 + reelIndex) * 5,
+            duel: 25 + (reelIndex % 2 ? 7 : 0),
+          }[spinStyle]) : 0;
           reelVelocity[reelIndex] += (speedTarget - reelVelocity[reelIndex]) * (1 - Math.exp(-(reel.spinning ? 5.5 : 11) * delta));
-          reelPhase[reelIndex] += reelVelocity[reelIndex] * delta * .34;
-          drums[reelIndex].rotation.x += delta * (reelVelocity[reelIndex] + .18);
+          reelPhase[reelIndex] += reelVelocity[reelIndex] * delta * (spinStyle === 'cascade' ? .48 : spinStyle === 'rush' ? .27 : .34);
+          drums[reelIndex].rotation.x += delta * (reelVelocity[reelIndex] + (spinStyle === 'pulse' ? .5 : .18));
           const landingAge = (now - landingAt[reelIndex]) / 1000;
           reelGroups[reelIndex].position.y = !reduceMotion && landingAge >= 0 && landingAge < .65 ? Math.sin(landingAge * Math.PI * 8) * Math.exp(-landingAge * 7) * .2 : 0;
           symbolMeshes.forEach((mesh, key) => {
@@ -128,7 +137,7 @@ const SlotsMachine3D: React.FC<{
             if (reel.spinning) {
               const cycle = ((Number(mesh.userData.slot) + reelPhase[reelIndex]) % 9 + 9) % 9;
               const lane = cycle > 4.5 ? cycle - 9 : cycle;
-              const y = -lane * 1.53;
+              const y = -lane * (spinStyle === 'bounce' ? 1.7 : spinStyle === 'duel' ? 1.42 : 1.53);
               mesh.position.y = y; mesh.position.z = 1.46 - Math.min(.3, Math.abs(y) * .075);
               mesh.rotation.x = THREE.MathUtils.clamp(y * .075, -.22, .22); mesh.scale.set(1, .98, 1); mesh.visible = Math.abs(y) < 2.72; materials.forEach((material) => { material.opacity = 1; material.transparent = false; });
             } else {

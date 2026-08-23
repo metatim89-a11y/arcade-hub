@@ -14,7 +14,7 @@ const WhackAttack3D = React.lazy(() => import('./components/games/WhackAttack3D'
 const NeonHopperGame = React.lazy(() => import('./components/games/NeonHopperGame'));
 const KongClimberGame = React.lazy(() => import('./components/games/KongClimberGame'));
 
-export const APP_VERSION = '0.0.40';
+export const APP_VERSION = '0.0.41';
 
 export const ADULT_GAMES: Game[] = [
     { id: 'fishing', label: 'Ocean Hunter', component: FishingGame },
