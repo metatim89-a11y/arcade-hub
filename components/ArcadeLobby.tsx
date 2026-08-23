@@ -179,13 +179,13 @@ const ArcadeLobby: React.FC<ArcadeLobbyProps> = ({ games, mode, onPlay }) => {
       const nextTime = new Date(progression.nextFaucetAt!).getTime();
       if (now >= nextTime) {
         setFaucetReady(true);
-        setFaucetReadyStr('CLAIM FREE GC NOW');
+        setFaucetLabel('CLAIM FREE GC NOW');
       } else {
         setFaucetReady(false);
         const diff = Math.floor((nextTime - now) / 1000);
         const m = Math.floor(diff / 60);
         const s = diff % 60;
-        setFaucetReadyStr(`COOLDOWN: ${m}m ${String(s).padStart(2, '0')}s`);
+        setFaucetLabel(`COOLDOWN: ${m}m ${String(s).padStart(2, '0')}s`);
       }
     }, 1000);
     return () => clearInterval(interval);
@@ -296,11 +296,6 @@ const ArcadeLobby: React.FC<ArcadeLobbyProps> = ({ games, mode, onPlay }) => {
     }
   };
 
-  const handleClaim = async () => {
-    if (!faucetReady) return;
-    await claimLevelFaucet();
-  };
-
   const economyCards = useMemo(() => [
     ['GC', 'Free play currency', 'GC is given away through the faucet and play systems. You do not need to buy GC to enjoy Arcade Hub.'],
     ['Tickets', 'Competitive rewards', 'Tickets are earned through eligible head-to-head and real-player competition and can be used in the shop or traded toward XP.'],
@@ -331,7 +326,7 @@ const ArcadeLobby: React.FC<ArcadeLobbyProps> = ({ games, mode, onPlay }) => {
                   : 'bg-slate-800 text-slate-400 opacity-70 cursor-not-allowed border border-slate-700'
               }`}
             >
-              {faucetReadyStr}
+              {faucetLabel}
             </button>
           </div>
         )}

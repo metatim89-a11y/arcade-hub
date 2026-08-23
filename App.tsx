@@ -9,10 +9,7 @@ import { ADULT_GAMES, UNDER18_GAMES } from './constants';
 import Header from './components/Header';
 import GameArea from './components/GameArea';
 import Footer from './components/Footer';
-import LoginPage from './components/auth/LoginPage';
-import SignupPage from './components/auth/SignupPage';
 import VerificationPage from './components/auth/VerificationPage';
-import ForgotPasswordPage from './components/auth/ForgotPasswordPage';
 import ResetPasswordPage from './components/auth/ResetPasswordPage';
 import ProfilePage from './components/profile/ProfilePage';
 import AestheticShopPage from './components/shop/AestheticShopPage';
@@ -33,7 +30,7 @@ const requestedGameId = () => {
 };
 
 const AppContent: React.FC = () => {
-  const { user, isAuthenticated, isLoading, verificationPendingEmail, isPasswordRecovery } = useAuth();
+  const { user, isAuthenticated, isLoading, verificationPendingEmail, isPasswordRecovery, loginAsGuest } = useAuth();
   const { notification, clearNotification } = useCoinSystem();
   const [mode, setMode] = useState<GameMode>(() => {
     const requested = requestedGameId();
@@ -70,7 +67,6 @@ const AppContent: React.FC = () => {
   }, [isAuthenticated]);
   
   // View States for Auth/Profile/TradingBot/HeadToHead
-  const [authView, setAuthView] = useState<'login' | 'signup' | 'forgot'>('login');
   const [showProfile, setShowProfile] = useState(false);
   const [showShop, setShowShop] = useState(false);
   const [showSupport, setShowSupport] = useState(false);
@@ -120,6 +116,11 @@ const AppContent: React.FC = () => {
     void recordSiteEvent('game_opened', game.id, user && !user.isGuest ? user.id : undefined);
   };
 
+  const handleLandingPlay = async (game: Game) => {
+    if (!isAuthenticated) await loginAsGuest();
+    handleSelectGame(game);
+  };
+
   if (isLoading) {
     return <div className="min-h-screen flex items-center justify-center bg-gray-900 text-yellow-400">Loading Arcade...</div>;
   }
@@ -131,7 +132,7 @@ const AppContent: React.FC = () => {
       <div className="min-h-screen bg-[radial-gradient(circle_at_50%_25%,_#161b22_60%,_#232a35_100%)] text-gray-100 font-sans flex flex-col">
         <Header mode={mode} setMode={handleSetMode} simple onSupportClick={() => setShowSupport(true)} />
         <main className="flex-grow flex flex-col items-center w-full pt-10">
-            <ResetPasswordPage onComplete={() => setAuthView('login')} />
+            <ResetPasswordPage onComplete={() => { window.location.assign(window.location.pathname); }} />
         </main>
         <Footer />
       </div>
@@ -157,16 +158,7 @@ const AppContent: React.FC = () => {
         <div className="min-h-screen bg-[radial-gradient(circle_at_50%_25%,_#161b22_60%,_#232a35_100%)] text-gray-100 font-sans flex flex-col">
             <Header mode={mode} setMode={handleSetMode} simple onSupportClick={() => setShowSupport(true)} />
             <main className="flex-grow flex flex-col items-center w-full pt-10">
-                {showSupport ? <SupportPage onBack={() => setShowSupport(false)} /> : authView === 'login' ? (
-                    <LoginPage onSwitchToSignup={() => setAuthView('signup')} onForgotPassword={() => setAuthView('forgot')} />
-                ) : authView === 'signup' ? (
-                    <SignupPage 
-                        onSwitchToLogin={() => setAuthView('login')} 
-                        onSignupSuccess={() => {/* Logic handled by verification state in context */}}
-                    />
-                ) : (
-                    <ForgotPasswordPage onBackToLogin={() => setAuthView('login')} />
-                )}
+          {showSupport ? <SupportPage onBack={() => setShowSupport(false)} /> : <ArcadeLobby games={mode === GameMode.Adult ? ADULT_GAMES : UNDER18_GAMES} mode={mode} onPlay={(game) => void handleLandingPlay(game)} />}
             </main>
             <Footer />
         </div>
