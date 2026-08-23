@@ -2,6 +2,21 @@
 
 This changelog starts with v0.0.35. Earlier history remains available in the Git commit and pull-request history.
 
+## v0.0.40 - 2026-08-23
+
+### Added
+- Made Arcade Lobby the public landing page with guest game launch support.
+- Added shared keyboard navigation for game controls.
+- Added Arcade Mission Control metrics and automatic admin dashboard refresh.
+
+### Changed
+- Replaced Coin Pusher with Whack Attack 3D in active game listings, rewards, and visual theming.
+- Updated mobile E2E coverage for all current games.
+
+### Fixed
+- Fixed Free GC countdown interval cleanup.
+- Fixed admin panel layering, mobile sizing, and Escape/backdrop closing.
+
 ## v0.0.36 - 2026-08-21
 
 ### Fixed

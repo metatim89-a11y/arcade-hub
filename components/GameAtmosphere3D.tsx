@@ -83,6 +83,10 @@ const GameAtmosphere3D: React.FC<{ gameId: string }> = ({ gameId }) => {
       let frame = 0;
       const started = performance.now();
       const animate = (now: number) => {
+        if (document.hidden) {
+          frame = 0;
+          return;
+        }
         const elapsed = (now - started) / 1000;
         resize();
         objects.forEach((item, index) => {
@@ -98,11 +102,16 @@ const GameAtmosphere3D: React.FC<{ gameId: string }> = ({ gameId }) => {
         renderer.render(scene, camera);
         frame = requestAnimationFrame(animate);
       };
+      const onVisibilityChange = () => {
+        if (!document.hidden && !frame) frame = requestAnimationFrame(animate);
+      };
+      document.addEventListener('visibilitychange', onVisibilityChange);
       frame = requestAnimationFrame(animate);
       dispose = () => {
         cancelAnimationFrame(frame);
         observer.disconnect();
         window.removeEventListener('pointermove', onPointer);
+        document.removeEventListener('visibilitychange', onVisibilityChange);
         objects.forEach(item => { item.mesh.geometry.dispose(); (item.mesh.material as Material).dispose(); });
         renderer.dispose();
       };
