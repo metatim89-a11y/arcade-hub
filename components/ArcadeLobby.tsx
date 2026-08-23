@@ -174,22 +174,19 @@ const ArcadeLobby: React.FC<ArcadeLobbyProps> = ({ games, mode, onPlay }) => {
       setFaucetLabel(`CLAIM ${progression.faucetAmount.toLocaleString()} FREE GC`);
       return;
     }
-    const interval = setInterval(() => {
-      const now = new Date().getTime();
-      const nextTime = new Date(progression.nextFaucetAt!).getTime();
-      if (now >= nextTime) {
-        setFaucetReady(true);
-        setFaucetLabel('CLAIM FREE GC NOW');
-      } else {
-        setFaucetReady(false);
-        const diff = Math.floor((nextTime - now) / 1000);
-        const m = Math.floor(diff / 60);
-        const s = diff % 60;
-        setFaucetLabel(`COOLDOWN: ${m}m ${String(s).padStart(2, '0')}s`);
-      }
-    }, 1000);
-    return () => clearInterval(interval);
-  }, [progression.nextFaucetAt]);
+    const now = Date.now();
+    const nextTime = new Date(progression.nextFaucetAt).getTime();
+    if (now >= nextTime) {
+      setFaucetReady(true);
+      setFaucetLabel('CLAIM FREE GC NOW');
+      return;
+    }
+    setFaucetReady(false);
+    const diff = Math.floor((nextTime - now) / 1000);
+    const m = Math.floor(diff / 60);
+    const s = diff % 60;
+    setFaucetLabel(`COOLDOWN: ${m}m ${String(s).padStart(2, '0')}s`);
+  };
 
   const handleClaim = async () => {
     if (!faucetReady) return;
