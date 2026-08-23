@@ -424,5 +424,9 @@ const HeadToHeadLobby: React.FC<HeadToHeadLobbyProps> = ({ games, onStartMatch, 
           })}
           </div>
         )}
+      </div>
+    </div>
+  );
+}
 
 export default HeadToHeadLobby;
