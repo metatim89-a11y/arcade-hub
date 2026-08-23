@@ -153,6 +153,31 @@ const GameArea: React.FC<GameAreaProps> = ({ games, selectedGame, onSelectGame, 
       setFeedback('Full screen is not available in this browser.');
     }
   };
+
+  const handleGameKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (event.target instanceof HTMLInputElement || event.target instanceof HTMLSelectElement || event.target instanceof HTMLTextAreaElement) return;
+
+    const stage = stageRef.current;
+    if (!stage) return;
+    const controls = Array.from(stage.querySelectorAll<HTMLButtonElement>('button:not(:disabled)')).filter((button) => {
+      const style = window.getComputedStyle(button);
+      return style.display !== 'none' && style.visibility !== 'hidden';
+    });
+    if (!controls.length) return;
+
+    const currentIndex = controls.indexOf(document.activeElement as HTMLButtonElement);
+    if (event.key === 'ArrowRight' || event.key === 'ArrowDown') {
+      event.preventDefault();
+      controls[(currentIndex + 1 + controls.length) % controls.length].focus();
+    } else if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') {
+      event.preventDefault();
+      controls[(currentIndex - 1 + controls.length) % controls.length].focus();
+    } else if ((event.key === 'Enter' || event.key === ' ') && currentIndex < 0) {
+      event.preventDefault();
+      controls[0].focus();
+      controls[0].click();
+    }
+  };
   
   const gameAreaSizeClass = activeGameProps.game.id === 'fishing'
     ? 'max-w-[1900px]'
@@ -247,6 +272,9 @@ const GameArea: React.FC<GameAreaProps> = ({ games, selectedGame, onSelectGame, 
       {/* Game Canvas */}
       <div 
         ref={stageRef}
+        tabIndex={0}
+        onKeyDown={handleGameKeyDown}
+        aria-label={`${activeGameProps.game.label} game controls`}
         data-game={activeGameProps.game.id}
         className={`game-engine-stage w-full ${gameAreaSizeClass} min-h-[420px] rounded-3xl mb-4 ${activeNeedsNaturalHeight ? 'overflow-visible' : 'overflow-hidden'} transition-colors duration-500 relative ${themeClasses}`}
         style={equippedAesthetic ? {
