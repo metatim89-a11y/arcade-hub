@@ -129,6 +129,12 @@ type LandingComment = {
   created_at: string;
 };
 
+type LeaderboardRow = {
+  display_name: string;
+  play_count: number;
+  coins_spent: number;
+};
+
 const GAME_META: Record<string, { icon: string; tag: string; blurb: string }> = {
   fishing: { icon: '🌊', tag: 'Ocean Action', blurb: 'Hunt targets, chain combos, face bosses and push deeper into the ocean.' },
   whackattack: { icon: '🔨', tag: 'Target Rush', blurb: 'Whack targets, dodge red decoys and build a high-speed combo.' },
@@ -166,7 +172,8 @@ const ArcadeLobby: React.FC<ArcadeLobbyProps> = ({ games, mode, onPlay }) => {
   const isAdult = String(mode) === 'Adult';
   const commentMode = isAdult ? 'adult' : 'regular';
   const featured = games.find((game) => game.id === (isAdult ? 'fishing' : 'neonhopper')) ?? games[0];
-  const featuredMeta = GAME_META[featured?.id] ?? fallbackMeta;
+  const art = GAME_META[featured?.id] ?? fallbackMeta;
+  const originals = games;
 
   const updateFaucetState = () => {
     if (!progression.nextFaucetAt) {
