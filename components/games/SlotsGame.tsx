@@ -17,7 +17,17 @@ const SYMBOL_WEIGHTS: Array<[string, number]> = [
 const SYMBOL_POOL = SYMBOL_WEIGHTS.flatMap(([symbol, weight]) => Array.from({ length: weight }, () => symbol));
 
 type SlotThemeId = 'volt' | 'pig' | 'chicken' | 'angels' | 'devil' | 'crypt';
-type SlotTheme = { name: string; kicker: string; symbols: string[]; accent: string; bonus: string; lines: number; payoutScale: number };
+type SlotTheme = {
+  name: string;
+  kicker: string;
+  symbols: string[];
+  accent: string;
+  bonus: string;
+  lines: number;
+  payoutScale: number;
+  spinStyle: 'standard' | 'bounce' | 'cascade' | 'pulse' | 'rush' | 'duel';
+  bonusMode: 'vault' | 'breaker' | 'egg' | 'ladder' | 'respin' | 'duel';
+};
 const SLOT_THEMES: Record<SlotThemeId, SlotTheme> = {
   volt: { name: 'Volt Vault', kicker: 'PREMIUM 5×3 SLOTS', symbols: ['🍋','🍇','🍒','🧠','🔔','🎰','💎','7️⃣'], accent: '#ec50ff', bonus: 'HOLD & SPIN VAULT', lines: 7, payoutScale: 1, spinStyle: 'standard', bonusMode: 'vault' },
   pig: { name: 'Piggy Bank Bonanza', kicker: 'LUCKY 5×3 SLOTS', symbols: ['🐷','💰','🍀','🥓','🍎','🎩','💎','7️⃣'], accent: '#ff6d9e', bonus: 'PIGGY BANK BREAKER', lines: 5, payoutScale: 1.1, spinStyle: 'bounce', bonusMode: 'breaker' },
